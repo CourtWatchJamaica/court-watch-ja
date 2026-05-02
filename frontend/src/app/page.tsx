@@ -1,21 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import Navbar from "@/components/Navbar";
-import CaseCard from "@/components/CaseCard";
+import JudgmentCarousel from "@/components/JudgmentCarousel";
+import DocketSection from "@/components/DocketSection";
+import LegalPulse from "@/components/LegalPulse";
 import { apiClient } from "@/lib/api";
-import { Judgment, UserCase } from "@/lib/types";
-import { Button } from "@/components/ui/button";
-import {
-  FileText,
-  Bookmark,
-  TrendingUp,
-  Scale,
-  ArrowRight,
-  Plus,
-} from "lucide-react";
+import { Judgment, UserCase, CourtSitting } from "@/lib/types";
+import { FileText, Bookmark, TrendingUp, Scale, Calendar, Clock, Building2, User } from "lucide-react";
 
 /* ── Stat card — always dark regardless of theme ── */
 function StatCard({
@@ -32,7 +26,7 @@ function StatCard({
   iconColor: string;
 }) {
   return (
-    <div className="flex items-center gap-3.5 rounded-2xl border border-white/[0.07] bg-[#0d0d1a] px-5 py-4">
+    <div className="flex items-center gap-3.5 rounded-2xl border border-white/[0.07] bg-[#0d0d1a] px-5 py-4 shrink-0">
       <div className={`rounded-xl p-2.5 ${iconBg}`}>
         <Icon className={`h-5 w-5 ${iconColor}`} />
       </div>
@@ -44,13 +38,117 @@ function StatCard({
   );
 }
 
-function SkeletonCard() {
+function SkeletonStat() {
   return (
-    <div className="rounded-xl border border-white/[0.06] bg-[#0d0d1a] p-4 space-y-3 animate-pulse">
-      <div className="h-3.5 w-3/4 rounded bg-white/[0.06]" />
-      <div className="h-2.5 w-1/2 rounded bg-white/[0.04]" />
-      <div className="h-2.5 w-2/3 rounded bg-white/[0.04]" />
+    <div className="flex items-center gap-3.5 rounded-2xl border border-white/[0.06] bg-[#0d0d1a] px-5 py-4 shrink-0 animate-pulse min-w-[140px]">
+      <div className="h-10 w-10 rounded-xl bg-white/[0.06]" />
+      <div className="space-y-2">
+        <div className="h-5 w-10 rounded bg-white/[0.06]" />
+        <div className="h-2.5 w-20 rounded bg-white/[0.04]" />
+      </div>
     </div>
+  );
+}
+
+/* ── Today's Sittings ── */
+
+function formatSittingTime(time: string): string {
+  const [h, m] = time.split(":");
+  const hour = parseInt(h, 10);
+  return `${hour % 12 || 12}:${m} ${hour >= 12 ? "PM" : "AM"}`;
+}
+
+interface TodaySittingsProps {
+  sittings: CourtSitting[];
+  loading: boolean;
+}
+
+function TodaySittings({ sittings, loading }: TodaySittingsProps) {
+  const today = new Date().toISOString().split("T")[0];
+  const todaySittings = sittings.filter((s) => s.event_date === today);
+  const upcoming = sittings
+    .filter((s) => s.event_date && s.event_date > today)
+    .sort((a, b) => (a.event_date ?? "").localeCompare(b.event_date ?? ""));
+  const display = todaySittings.length > 0 ? todaySittings.slice(0, 5) : upcoming.slice(0, 5);
+  const label = todaySittings.length > 0 ? "Today's Sittings" : "Upcoming Sittings";
+
+  return (
+    <section>
+      <div className="mb-3 flex items-center gap-2">
+        <Calendar className="h-4 w-4 text-[#FED100]" />
+        <h2 className="text-sm font-semibold text-foreground">{label}</h2>
+      </div>
+
+      {loading ? (
+        <div className="space-y-2">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="h-14 animate-pulse rounded-xl border border-white/[0.06] bg-[#0d0d1a]"
+            />
+          ))}
+        </div>
+      ) : display.length > 0 ? (
+        <div className="rounded-2xl border border-white/[0.06] bg-[#0d0d1a] overflow-hidden divide-y divide-white/[0.05]">
+          {display.map((sitting) => (
+            <div
+              key={sitting.id}
+              className="group flex items-start gap-3 px-4 py-3 hover:bg-white/[0.025] transition-colors"
+            >
+              {/* Time */}
+              <div className="shrink-0 text-center min-w-[44px]">
+                {sitting.event_time ? (
+                  <>
+                    <p className="text-[11px] font-bold text-[#FED100]">
+                      {formatSittingTime(sitting.event_time)}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-[11px] text-white/30">TBD</p>
+                )}
+                {sitting.event_date && sitting.event_date !== today && (
+                  <p className="text-[9px] text-white/30 mt-0.5">
+                    {new Date(`${sitting.event_date}T00:00:00`).toLocaleDateString("en-JM", {
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </p>
+                )}
+              </div>
+
+              {/* Divider */}
+              <div className="mt-1 h-full w-px bg-white/[0.08] shrink-0 self-stretch" />
+
+              {/* Content */}
+              <div className="flex-1 min-w-0">
+                <p className="text-[12px] font-medium text-white/80 line-clamp-1 group-hover:text-white transition-colors">
+                  {sitting.title || sitting.case_number || "Untitled Sitting"}
+                </p>
+                <div className="mt-1 flex items-center gap-2 flex-wrap">
+                  {sitting.judge_name && (
+                    <div className="flex items-center gap-1 text-[10px] text-white/35">
+                      <User className="h-2.5 w-2.5" />
+                      <span className="truncate max-w-[100px]">{sitting.judge_name}</span>
+                    </div>
+                  )}
+                  {sitting.court_division && (
+                    <div className="flex items-center gap-1 text-[10px] text-white/35">
+                      <Building2 className="h-2.5 w-2.5" />
+                      <span className="truncate max-w-[100px]">{sitting.court_division}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.05] bg-[#0d0d1a] py-10 text-center">
+          <Calendar className="mb-2.5 h-8 w-8 text-white/10" />
+          <p className="text-sm text-white/30">No sittings scheduled</p>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -60,38 +158,52 @@ export default function Dashboard() {
   const router = useRouter();
   const [latestJudgments, setLatestJudgments] = useState<Judgment[]>([]);
   const [trackedCases, setTrackedCases] = useState<UserCase[]>([]);
+  const [sittings, setSittings] = useState<CourtSitting[]>([]);
+  const [allJudgments, setAllJudgments] = useState<Judgment[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [judgmentsRes, casesRes] = await Promise.all([
-          apiClient.getJudgments(),
-          apiClient.getUserCases(),
-        ]);
-        setLatestJudgments(judgmentsRes.judgments.slice(0, 5));
-        setTrackedCases(casesRes.cases);
-      } catch (error) {
-        console.error("Failed to fetch dashboard data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [judgmentsRes, casesRes, sittingsRes] = await Promise.all([
+        apiClient.getJudgments(),
+        apiClient.getUserCases(),
+        apiClient.getCourtSittings(),
+      ]);
+      setAllJudgments(judgmentsRes.judgments);
+      setLatestJudgments(judgmentsRes.judgments.slice(0, 6));
+      setTrackedCases(casesRes.cases);
+      setSittings(sittingsRes.sittings);
+    } catch (error) {
+      console.error("Failed to fetch dashboard data:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
+  useEffect(() => {
     fetchData();
+  }, [fetchData]);
+
+  const handleUntrack = useCallback(async (caseId: number) => {
+    try {
+      await apiClient.removeUserCase(caseId);
+      setTrackedCases((prev) => prev.filter((c) => c.case_id !== caseId));
+    } catch (err) {
+      console.error("Failed to untrack case:", err);
+    }
   }, []);
 
   return (
     <AuthGuard>
-      {/* bg-background adapts to theme; inner sections stay dark explicitly */}
       <div className="min-h-screen bg-background">
         <Navbar />
 
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-28 md:pb-12">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-32 md:pb-16">
 
-          {/* ── Header — theme-aware ── */}
-          <div className="mb-8">
-            <div className="mb-3 flex items-center gap-2">
+          {/* ── Header ── */}
+          <div className="mb-7">
+            <div className="mb-2.5 flex items-center gap-2">
               <Scale className="h-4 w-4 text-[#009B3A]" />
               <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#009B3A]">
                 CourtWatch JA
@@ -110,151 +222,81 @@ export default function Dashboard() {
             </p>
           </div>
 
-          {/* ── Stats row — forced dark ── */}
-          <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-3">
-            <StatCard
-              label="Total Judgments"
-              value={loading ? "—" : `${latestJudgments.length}+`}
-              icon={FileText}
-              iconBg="bg-[#009B3A]/15"
-              iconColor="text-[#009B3A]"
-            />
-            <StatCard
-              label="Tracked Cases"
-              value={loading ? "—" : trackedCases.length}
-              icon={Bookmark}
-              iconBg="bg-[#FED100]/12"
-              iconColor="text-[#FED100]"
-            />
-            <div className="col-span-2 lg:col-span-1">
-              <StatCard
-                label="Live Updates"
-                value="Active"
-                icon={TrendingUp}
-                iconBg="bg-blue-500/15"
-                iconColor="text-blue-400"
-              />
+          {/* ── a. Stat Cards — horizontal scroll on mobile ── */}
+          <div className="mb-8 -mx-4 sm:mx-0">
+            <div className="flex gap-3 overflow-x-auto px-4 sm:px-0 sm:grid sm:grid-cols-2 lg:grid-cols-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pb-1">
+              {loading ? (
+                [1, 2, 3, 4].map((i) => <SkeletonStat key={i} />)
+              ) : (
+                <>
+                  <StatCard
+                    label="Total Judgments"
+                    value={`${allJudgments.length}+`}
+                    icon={FileText}
+                    iconBg="bg-[#009B3A]/15"
+                    iconColor="text-[#009B3A]"
+                  />
+                  <StatCard
+                    label="Tracked Cases"
+                    value={trackedCases.length}
+                    icon={Bookmark}
+                    iconBg="bg-[#FED100]/12"
+                    iconColor="text-[#FED100]"
+                  />
+                  <StatCard
+                    label="Today's Sittings"
+                    value={
+                      sittings.filter(
+                        (s) =>
+                          s.event_date ===
+                          new Date().toISOString().split("T")[0],
+                      ).length
+                    }
+                    icon={Calendar}
+                    iconBg="bg-blue-500/15"
+                    iconColor="text-blue-400"
+                  />
+                  <StatCard
+                    label="Live Updates"
+                    value="Active"
+                    icon={TrendingUp}
+                    iconBg="bg-purple-500/15"
+                    iconColor="text-purple-400"
+                  />
+                </>
+              )}
             </div>
           </div>
 
-          {/* ── Two-column grid — cards stay dark ── */}
-          <div className="grid gap-6 lg:grid-cols-2">
-
-            {/* Latest Judgments */}
-            <section>
-              <div className="mb-4 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-[#009B3A]" />
-                  <h2 className="text-sm font-semibold text-foreground">
-                    Latest Judgments
-                  </h2>
+          {/* ── b. Latest Judgments Carousel ── */}
+          <div className="mb-8 carousel-container group">
+            {loading ? (
+              <div>
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="h-4 w-32 rounded bg-white/[0.06] animate-pulse" />
+                  <div className="h-3.5 w-24 rounded bg-white/[0.04] animate-pulse" />
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => router.push("/cases")}
-                  className="h-7 gap-1 px-2 text-[11px] text-muted-foreground hover:text-foreground"
-                >
-                  View all <ArrowRight className="h-3 w-3" />
-                </Button>
+                <div className="h-[168px] sm:h-[200px] rounded-2xl border border-white/[0.06] bg-[#0d0d1a] animate-pulse" />
               </div>
-
-              <div className="space-y-2.5">
-                {loading ? (
-                  Array.from({ length: 3 }).map((_, i) => (
-                    <SkeletonCard key={i} />
-                  ))
-                ) : latestJudgments.length > 0 ? (
-                  latestJudgments.map((judgment) => (
-                    <CaseCard
-                      key={judgment.id}
-                      judgment={judgment}
-                      onClick={() => router.push(`/cases/${judgment.id}`)}
-                    />
-                  ))
-                ) : (
-                  <div className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.05] bg-[#0d0d1a] py-14 text-center">
-                    <FileText className="mb-3 h-10 w-10 text-white/10" />
-                    <p className="text-sm text-white/30">No judgments found</p>
-                  </div>
-                )}
-              </div>
-            </section>
-
-            {/* Tracked Cases */}
-            <section>
-              <div className="mb-4 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Bookmark className="h-4 w-4 text-[#FED100]" />
-                  <h2 className="text-sm font-semibold text-foreground">
-                    Tracked Cases
-                    {!loading && trackedCases.length > 0 && (
-                      <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                        ({trackedCases.length})
-                      </span>
-                    )}
-                  </h2>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => router.push("/cases")}
-                  className="h-7 gap-1 px-2 text-[11px] text-muted-foreground hover:text-foreground"
-                >
-                  <Plus className="h-3 w-3" /> Track more
-                </Button>
-              </div>
-
-              <div className="space-y-2">
-                {loading ? (
-                  Array.from({ length: 3 }).map((_, i) => (
-                    <SkeletonCard key={i} />
-                  ))
-                ) : trackedCases.length > 0 ? (
-                  trackedCases.map((userCase) => (
-                    <div
-                      key={userCase.id}
-                      className="group flex cursor-pointer items-center justify-between rounded-xl border border-white/[0.07] bg-[#0d0d1a] px-4 py-3 transition-all duration-200 hover:border-[#FED100]/25 hover:bg-[#FED100]/[0.04]"
-                      onClick={() => router.push(`/cases/${userCase.case_id}`)}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#FED100]/10">
-                          <Bookmark className="h-3.5 w-3.5 text-[#FED100]/80" />
-                        </div>
-                        <div>
-                          <p className="text-[13px] font-medium text-white/75 transition-colors group-hover:text-white">
-                            Case #{userCase.case_id}
-                          </p>
-                          <p className="text-[11px] text-white/35">
-                            Tracked{" "}
-                            {new Date(userCase.created_at).toLocaleDateString(
-                              "en-JM",
-                              { month: "short", day: "numeric", year: "numeric" },
-                            )}
-                          </p>
-                        </div>
-                      </div>
-                      <ArrowRight className="h-3.5 w-3.5 text-white/15 transition-colors group-hover:text-[#FED100]/50" />
-                    </div>
-                  ))
-                ) : (
-                  <div className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.05] bg-[#0d0d1a] py-14 text-center">
-                    <Bookmark className="mb-3 h-10 w-10 text-white/10" />
-                    <p className="mb-5 text-sm text-white/30">
-                      No tracked cases yet
-                    </p>
-                    <Button
-                      size="sm"
-                      onClick={() => router.push("/cases")}
-                      className="h-8 bg-[#009B3A] px-4 text-xs text-white hover:bg-[#009B3A]/85"
-                    >
-                      Browse Cases
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </section>
+            ) : (
+              <JudgmentCarousel judgments={latestJudgments} />
+            )}
           </div>
+
+          {/* ── c+d. Docket + Sittings: 2-col desktop / stacked mobile ── */}
+          <div className="mb-8 grid gap-6 lg:grid-cols-2">
+            <DocketSection
+              trackedCases={trackedCases}
+              judgments={allJudgments}
+              sittings={sittings}
+              loading={loading}
+              onUntrack={handleUntrack}
+            />
+            <TodaySittings sittings={sittings} loading={loading} />
+          </div>
+
+          {/* ── e. Legal Pulse ── */}
+          <LegalPulse />
         </main>
       </div>
     </AuthGuard>
