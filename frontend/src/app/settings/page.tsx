@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import Navbar from "@/components/Navbar";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -15,9 +16,10 @@ import {
 } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Settings as SettingsIcon, Palette } from "lucide-react";
+import { Settings as SettingsIcon, Palette, Bell, ChevronRight } from "lucide-react";
 
 export default function SettingsPage() {
+  const router = useRouter();
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [pushNotifications, setPushNotifications] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -64,9 +66,7 @@ export default function SettingsPage() {
                   <Palette className="h-4 w-4 text-[#009B3A]" />
                   <CardTitle className="text-base">Appearance</CardTitle>
                 </div>
-                <CardDescription>
-                  Switch between dark and light mode
-                </CardDescription>
+                <CardDescription>Switch between dark and light mode</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center justify-between">
@@ -81,15 +81,35 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
 
-            {/* Notifications */}
+            {/* Notification Settings — link card */}
+            <button
+              onClick={() => router.push("/settings/notifications")}
+              className="w-full text-left group"
+            >
+              <Card className="border-border bg-card transition-colors group-hover:border-[#009B3A]/30">
+                <CardContent className="flex items-center justify-between p-5">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#009B3A]/10">
+                      <Bell className="h-4 w-4 text-[#009B3A]" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold">Notification Alerts</p>
+                      <p className="text-xs text-muted-foreground">
+                        Set custom alert schedules for your tracked cases
+                      </p>
+                    </div>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                </CardContent>
+              </Card>
+            </button>
+
+            {/* Global Notification Preferences */}
             <Card className="border-border bg-card">
               <CardHeader className="pb-4">
-                <CardTitle className="text-base">
-                  Notification Preferences
-                </CardTitle>
+                <CardTitle className="text-base">Notification Preferences</CardTitle>
                 <CardDescription>
-                  Choose how you want to receive updates about your tracked
-                  cases
+                  Global notification delivery settings
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
