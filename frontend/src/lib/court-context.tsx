@@ -17,6 +17,18 @@ export const COURTS: Court[] = [
   "Parish Court",
 ];
 
+export const COURT_TO_SLUG: Record<Court, string> = {
+  "Supreme Court": "supreme-court",
+  "Court of Appeal": "court-of-appeal",
+  "Parish Court": "parish-court",
+};
+
+export const SLUG_TO_COURT: Record<string, Court> = {
+  "supreme-court": "Supreme Court",
+  "court-of-appeal": "Court of Appeal",
+  "parish-court": "Parish Court",
+};
+
 interface CourtContextValue {
   selectedCourt: Court;
   setSelectedCourt: (court: Court) => void;
