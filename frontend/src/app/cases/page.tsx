@@ -1,45 +1,20 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import Navbar from "@/components/Navbar";
 import SearchBar from "@/components/SearchBar";
 import CaseCard from "@/components/CaseCard";
+import SittingCard from "@/components/SittingCard";
 import { apiClient } from "@/lib/api";
 import { Judgment, CourtSitting } from "@/lib/types";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import {
-  Scale,
-  Calendar,
-  FileText,
-  User,
-  Building2,
-  Clock,
-  ArrowUpRight,
-} from "lucide-react";
+import { useTracking } from "@/lib/tracking-context";
+import { FileText, Scale, Calendar } from "lucide-react";
 
 type Tab = "judgments" | "sittings";
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
-
-function formatSittingTime(time: string): string {
-  const [h, m] = time.split(":");
-  const hour = parseInt(h, 10);
-  const ampm = hour >= 12 ? "PM" : "AM";
-  return `${hour % 12 || 12}:${m} ${ampm}`;
-}
-
-function formatSittingDate(date: string): string {
-  return new Date(`${date}T00:00:00`).toLocaleDateString("en-JM", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-// ── Sub-components ─────────────────────────────────────────────────────────────
+// ── Tab toggle ─────────────────────────────────────────────────────────────────
 
 function TabToggle({
   active,
@@ -71,17 +46,20 @@ function TabToggle({
           onClick={() => onChange(id)}
           className={[
             "flex flex-1 items-center justify-center gap-3 rounded-xl px-5 py-4",
-            "transition-all duration-200 active:scale-[0.97] text-left",
+            "transition-all duration-200 active:scale-[0.97]",
             active === id
               ? "bg-[#009B3A] text-white shadow-[0_4px_20px_rgba(0,155,58,0.4)]"
               : "text-white/40 hover:text-white/70 hover:bg-white/[0.05]",
           ].join(" ")}
         >
-          <Icon className="h-5 w-5 shrink-0" strokeWidth={active === id ? 2.2 : 1.8} />
-          <div>
+          <Icon
+            className="h-5 w-5 shrink-0"
+            strokeWidth={active === id ? 2.2 : 1.8}
+          />
+          <div className="text-left">
             <p className="text-[15px] font-semibold leading-none">{label}</p>
             <p
-              className={`text-[11px] mt-1 leading-none ${
+              className={`mt-1 text-[11px] leading-none ${
                 active === id ? "text-white/65" : "text-white/30"
               }`}
             >
@@ -94,71 +72,7 @@ function TabToggle({
   );
 }
 
-function SittingCard({ sitting }: { sitting: CourtSitting }) {
-  return (
-    <Card className="group relative bg-[#0d0d1a] border-l-2 border-l-[#FED100]/50 border-t-white/[0.06] border-r-white/[0.06] border-b-white/[0.06] cursor-pointer overflow-hidden transition-all duration-300 hover:border-l-[#FED100] hover:bg-[#FED100]/[0.03] hover:shadow-[0_4px_24px_rgba(254,209,0,0.12)]">
-      {/* Hover glow */}
-      <div className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-br from-[#FED100]/[0.04] via-transparent to-transparent" />
-
-      <CardHeader className="pb-2 pt-4 px-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-white/85 text-[13px] leading-snug group-hover:text-white transition-colors line-clamp-2">
-              {sitting.title || sitting.case_number || "Untitled Sitting"}
-            </h3>
-            {sitting.case_number && sitting.title && (
-              <p className="mt-1 text-[10px] font-mono text-[#FED100]/50">
-                {sitting.case_number}
-              </p>
-            )}
-          </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            {sitting.event_type && (
-              <Badge className="bg-[#FED100]/10 text-[#FED100] border border-[#FED100]/25 text-[10px] font-medium px-1.5 py-0 h-5 rounded-md whitespace-nowrap">
-                {sitting.event_type}
-              </Badge>
-            )}
-            <ArrowUpRight className="h-3.5 w-3.5 text-white/20 group-hover:text-[#FED100]/60 transition-colors shrink-0" />
-          </div>
-        </div>
-      </CardHeader>
-
-      <CardContent className="px-4 pb-4 pt-0">
-        <div className="space-y-1.5">
-          {sitting.judge_name && (
-            <div className="flex items-center gap-1.5 text-[11px] text-white/40">
-              <User className="h-3 w-3 text-white/25 shrink-0" />
-              <span className="truncate">{sitting.judge_name}</span>
-            </div>
-          )}
-          {sitting.court_division && (
-            <div className="flex items-center gap-1.5 text-[11px] text-white/40">
-              <Building2 className="h-3 w-3 text-white/25 shrink-0" />
-              <span className="truncate">{sitting.court_division}</span>
-            </div>
-          )}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-            {sitting.event_date && (
-              <div className="flex items-center gap-1.5 text-[11px] text-white/40">
-                <Calendar className="h-3 w-3 text-white/25 shrink-0" />
-                <span>{formatSittingDate(sitting.event_date)}</span>
-              </div>
-            )}
-            {sitting.event_time && (
-              <div className="flex items-center gap-1.5 text-[11px] text-white/40">
-                <Clock className="h-3 w-3 text-white/25 shrink-0" />
-                <span>{formatSittingTime(sitting.event_time)}</span>
-              </div>
-            )}
-          </div>
-        </div>
-      </CardContent>
-
-      {/* Bottom gold sweep on hover */}
-      <div className="absolute bottom-0 left-0 h-[1.5px] w-0 group-hover:w-full transition-all duration-500 ease-out bg-gradient-to-r from-[#FED100] via-[#FED100]/60 to-transparent" />
-    </Card>
-  );
-}
+// ── Skeletons + empty state ─────────────────────────────────────────────────────
 
 function SkeletonCard() {
   return (
@@ -194,6 +108,8 @@ function EmptyState({ tab }: { tab: Tab }) {
 // ── Page ───────────────────────────────────────────────────────────────────────
 
 export default function CasesPage() {
+  const router = useRouter();
+  const { isTracked, track } = useTracking();
   const [activeTab, setActiveTab] = useState<Tab>("judgments");
   const [query, setQuery] = useState("");
   const [judgments, setJudgments] = useState<Judgment[]>([]);
@@ -207,7 +123,7 @@ export default function CasesPage() {
         const res = await apiClient.getJudgments(q || undefined);
         setJudgments(res.judgments);
       } else {
-        const res = await apiClient.getCourtSittings(q || undefined);
+        const res = await apiClient.getCourtSittings({ q: q || undefined });
         setSittings(res.sittings);
       }
     } catch (err) {
@@ -217,7 +133,6 @@ export default function CasesPage() {
     }
   }, []);
 
-  // Initial load
   useEffect(() => {
     fetchData("", "judgments");
   }, [fetchData]);
@@ -240,8 +155,7 @@ export default function CasesPage() {
       <div className="min-h-screen bg-background">
         <Navbar />
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-28 md:pb-12">
-
-          {/* ── Header ── */}
+          {/* Header */}
           <div className="mb-6">
             <div className="mb-3 flex items-center gap-2">
               <Scale className="h-4 w-4 text-[#009B3A]" />
@@ -252,12 +166,10 @@ export default function CasesPage() {
             <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground mb-6">
               Search Cases
             </h1>
-
-            {/* ── Tab Toggle ── */}
             <TabToggle active={activeTab} onChange={handleTabChange} />
           </div>
 
-          {/* ── Search ── */}
+          {/* Search */}
           <div className="mb-6">
             <SearchBar
               key={activeTab}
@@ -270,7 +182,7 @@ export default function CasesPage() {
             />
           </div>
 
-          {/* ── Result count hint ── */}
+          {/* Result count */}
           {!loading && (
             <p className="mb-4 text-[11px] text-white/25">
               {activeTab === "judgments"
@@ -280,7 +192,7 @@ export default function CasesPage() {
             </p>
           )}
 
-          {/* ── Results ── */}
+          {/* Results */}
           {loading ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {Array.from({ length: 6 }).map((_, i) => (
@@ -292,13 +204,27 @@ export default function CasesPage() {
               {activeTab === "judgments" ? (
                 judgments.length > 0 ? (
                   judgments.map((j) => (
-                    <CaseCard key={j.id} judgment={j} />
+                    <CaseCard
+                      key={j.id}
+                      judgment={j}
+                      onClick={() => router.push(`/cases/${j.id}`)}
+                      isTracked={isTracked(j.id, "judgment")}
+                      onTrack={(id) => track(id, "judgment")}
+                    />
                   ))
                 ) : (
                   <EmptyState tab="judgments" />
                 )
               ) : sittings.length > 0 ? (
-                sittings.map((s) => <SittingCard key={s.id} sitting={s} />)
+                sittings.map((s) => (
+                  <SittingCard
+                    key={s.id}
+                    sitting={s}
+                    onClick={() => router.push(`/cases/sittings/${s.id}`)}
+                    isTracked={isTracked(s.id, "sitting")}
+                    onTrack={(id) => track(id, "sitting")}
+                  />
+                ))
               ) : (
                 <EmptyState tab="sittings" />
               )}
