@@ -9,7 +9,7 @@ import DocketSection from "@/components/DocketSection";
 import LegalPulse from "@/components/LegalPulse";
 import { apiClient } from "@/lib/api";
 import { Judgment, UserCase, CourtSitting } from "@/lib/types";
-import { FileText, Bookmark, TrendingUp, Scale, Calendar, Clock, Building2, User } from "lucide-react";
+import { FileText, Bookmark, TrendingUp, Scale, Calendar, Clock, Building2, User, ArrowUpRight } from "lucide-react";
 
 /* ── Stat card — always dark regardless of theme ── */
 function StatCard({
@@ -64,6 +64,7 @@ interface TodaySittingsProps {
 }
 
 function TodaySittings({ sittings, loading }: TodaySittingsProps) {
+  const router = useRouter();
   const today = new Date().toISOString().split("T")[0];
   const todaySittings = sittings.filter((s) => s.event_date === today);
   const upcoming = sittings
@@ -93,7 +94,8 @@ function TodaySittings({ sittings, loading }: TodaySittingsProps) {
           {display.map((sitting) => (
             <div
               key={sitting.id}
-              className="group flex items-start gap-3 px-4 py-3 hover:bg-white/[0.025] transition-colors"
+              className="group flex items-start gap-3 px-4 py-3 hover:bg-white/[0.025] transition-colors cursor-pointer"
+              onClick={() => router.push(`/cases/sittings/${sitting.id}`)}
             >
               {/* Time */}
               <div className="shrink-0 text-center min-w-[44px]">
@@ -139,6 +141,7 @@ function TodaySittings({ sittings, loading }: TodaySittingsProps) {
                   )}
                 </div>
               </div>
+              <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-white/15 group-hover:text-white/50 transition-colors" />
             </div>
           ))}
         </div>
