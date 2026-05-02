@@ -45,6 +45,7 @@ export interface UserCase {
   id: number;
   user_id: number;
   case_id: number;
+  case_type: "judgment" | "sitting";
   created_at: string;
 }
 
