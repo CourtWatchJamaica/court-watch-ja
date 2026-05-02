@@ -19,7 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import ThemeToggle from "@/components/ThemeToggle";
 import { apiClient } from "@/lib/api";
-import { useCourt, COURTS, type Court } from "@/lib/court-context";
+import { useCourt, COURTS, COURT_TO_SLUG, type Court } from "@/lib/court-context";
 import { useChambers } from "@/lib/chambers-context";
 
 const DESKTOP_LINKS = [
@@ -86,6 +86,7 @@ export default function Navbar() {
   const handleCourtSelect = (court: Court) => {
     setSelectedCourt(court);
     setCourtSheetOpen(false);
+    router.push(`/court/${COURT_TO_SLUG[court]}`);
   };
 
   return (
@@ -129,7 +130,7 @@ export default function Navbar() {
                 {COURTS.map((court) => (
                   <button
                     key={court}
-                    onClick={() => setSelectedCourt(court)}
+                    onClick={() => { setSelectedCourt(court); router.push(`/court/${COURT_TO_SLUG[court]}`); }}
                     className={[
                       "px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all duration-200 whitespace-nowrap",
                       selectedCourt === court
