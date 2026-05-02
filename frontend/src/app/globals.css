@@ -164,3 +164,28 @@ main {
     word-break: break-word;
     overflow-wrap: anywhere;
 }
+
+/* Court selector loading bar */
+@keyframes court-progress {
+    0%   { transform: scaleX(0); }
+    100% { transform: scaleX(1); }
+}
+.court-progress-bar {
+    transform-origin: left;
+    animation: court-progress 0.9s ease-out forwards;
+}
+
+/* Judgment carousel auto-advance progress bar */
+@keyframes carousel-progress {
+    0%   { transform: scaleX(0); }
+    100% { transform: scaleX(1); }
+}
+.carousel-progress-bar {
+    transform-origin: left;
+    animation: carousel-progress 5s linear forwards;
+}
+
+/* Show carousel arrow buttons on parent hover */
+.carousel-container:hover .carousel-arrow {
+    opacity: 1 !important;
+}
