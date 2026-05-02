@@ -34,6 +34,13 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 }
 
+export interface CourtStats {
+  court: string;
+  totalJudgments: number;
+  sittingsThisWeek: number;
+  activeJudges: number;
+}
+
 export const apiClient = {
   // Auth
   async signup(email: string, password: string): Promise<{ token: string }> {
@@ -51,9 +58,12 @@ export const apiClient = {
   },
 
   // Judgments
-  async getJudgments(q?: string): Promise<{ judgments: Judgment[] }> {
-    const query = q ? `?q=${encodeURIComponent(q)}` : "";
-    return request(`/judgments${query}`);
+  async getJudgments(q?: string, court?: string): Promise<{ judgments: Judgment[] }> {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (court) params.set("court", court);
+    const qs = params.toString();
+    return request(`/judgments${qs ? `?${qs}` : ""}`);
   },
 
   async getJudgment(id: string): Promise<{ judgment: Judgment }> {
@@ -61,9 +71,28 @@ export const apiClient = {
   },
 
   // Court Sittings
-  async getCourtSittings(q?: string): Promise<{ sittings: CourtSitting[] }> {
-    const query = q ? `?q=${encodeURIComponent(q)}` : "";
-    return request(`/court-sittings${query}`);
+  async getCourtSittings(opts?: {
+    q?: string;
+    court?: string;
+    date_from?: string;
+    date_to?: string;
+  }): Promise<{ sittings: CourtSitting[] }> {
+    const params = new URLSearchParams();
+    if (opts?.q) params.set("q", opts.q);
+    if (opts?.court) params.set("court", opts.court);
+    if (opts?.date_from) params.set("date_from", opts.date_from);
+    if (opts?.date_to) params.set("date_to", opts.date_to);
+    const qs = params.toString();
+    return request(`/court-sittings${qs ? `?${qs}` : ""}`);
+  },
+
+  async getCourtSitting(id: number): Promise<{ sitting: CourtSitting }> {
+    return request(`/court-sittings/${id}`);
+  },
+
+  // Court Stats
+  async getCourtStats(court: string): Promise<CourtStats> {
+    return request(`/court-stats?court=${encodeURIComponent(court)}`);
   },
 
   // Judges
@@ -80,10 +109,13 @@ export const apiClient = {
     return request("/user/cases");
   },
 
-  async addUserCase(case_id: number): Promise<{ success: boolean }> {
+  async addUserCase(
+    case_id: number,
+    case_type: "judgment" | "sitting" = "judgment",
+  ): Promise<{ success: boolean }> {
     return request("/user/cases", {
       method: "POST",
-      body: JSON.stringify({ case_id }),
+      body: JSON.stringify({ case_id, case_type }),
     });
   },
 
