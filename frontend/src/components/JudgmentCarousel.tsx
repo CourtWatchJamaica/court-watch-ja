@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Building2, Calendar, ArrowRight, Scale } from "lucide-react";
+import { ChevronLeft, ChevronRight, Building2, Calendar, ArrowRight, Scale, Bookmark, BookmarkCheck } from "lucide-react";
 import { Judgment } from "@/lib/types";
+import { useTracking } from "@/lib/tracking-context";
 
 interface JudgmentCarouselProps {
   judgments: Judgment[];
@@ -13,12 +14,14 @@ const SLIDE_INTERVAL = 5000;
 
 function CarouselCard({ judgment }: { judgment: Judgment }) {
   const router = useRouter();
+  const { isTracked, track } = useTracking();
+  const tracked = isTracked(judgment.id, "judgment");
+
   return (
     <div
       className="group relative h-full w-full rounded-2xl border border-white/[0.07] bg-[#0d0d1a] cursor-pointer overflow-hidden p-5 flex flex-col justify-between transition-colors duration-200 hover:border-[#009B3A]/30"
       onClick={() => router.push(`/cases/${judgment.id}`)}
     >
-      {/* Subtle radial glow */}
       <div className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-[radial-gradient(ellipse_at_top_left,rgba(0,155,58,0.08),transparent_60%)]" />
 
       {/* Top row */}
@@ -56,24 +59,42 @@ function CarouselCard({ judgment }: { judgment: Judgment }) {
       </div>
 
       {/* Bottom row */}
-      <div className="mt-3 flex items-center justify-between">
+      <div className="mt-3 flex items-center justify-between gap-2">
         {judgment.judge_name ? (
           <div className="flex items-center gap-1.5">
             <Building2 className="h-3 w-3 text-white/25 shrink-0" />
-            <span className="text-[11px] text-white/40 truncate max-w-[160px]">
+            <span className="text-[11px] text-white/40 truncate max-w-[140px]">
               {judgment.judge_name}
             </span>
           </div>
         ) : (
           <div />
         )}
-        <span className="flex items-center gap-1 text-[11px] font-medium text-[#009B3A]/70 group-hover:text-[#009B3A] transition-colors shrink-0">
-          Read case
-          <ArrowRight className="h-3 w-3" />
-        </span>
+        <div className="flex items-center gap-2 shrink-0">
+          {tracked ? (
+            <span
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center gap-1 rounded-full bg-[#009B3A]/15 border border-[#009B3A]/25 px-2 py-0.5 text-[9px] font-semibold text-[#009B3A]"
+            >
+              <BookmarkCheck className="h-2.5 w-2.5" />
+              Tracked
+            </span>
+          ) : (
+            <button
+              onClick={(e) => { e.stopPropagation(); track(judgment.id, "judgment"); }}
+              className="flex items-center gap-1 rounded-full border border-white/[0.12] px-2 py-0.5 text-[9px] font-semibold text-white/40 hover:border-[#009B3A]/40 hover:text-[#009B3A] hover:bg-[#009B3A]/10 transition-colors"
+            >
+              <Bookmark className="h-2.5 w-2.5" />
+              Track
+            </button>
+          )}
+          <span className="flex items-center gap-1 text-[11px] font-medium text-[#009B3A]/70 group-hover:text-[#009B3A] transition-colors">
+            Read case
+            <ArrowRight className="h-3 w-3" />
+          </span>
+        </div>
       </div>
 
-      {/* Bottom sweep */}
       <div className="absolute bottom-0 left-0 h-[1.5px] w-0 group-hover:w-full transition-all duration-500 ease-out bg-gradient-to-r from-[#009B3A] via-[#009B3A]/60 to-transparent" />
     </div>
   );
@@ -102,7 +123,6 @@ export default function JudgmentCarousel({ judgments }: JudgmentCarouselProps) {
     [total],
   );
 
-  /* Auto-advance */
   useEffect(() => {
     if (paused || total <= 1) return;
     timerRef.current = setInterval(() => {
@@ -117,7 +137,6 @@ export default function JudgmentCarousel({ judgments }: JudgmentCarouselProps) {
     };
   }, [paused, total, scrollToIndex]);
 
-  /* IntersectionObserver — detect active card after manual swipe */
   useEffect(() => {
     const container = scrollRef.current;
     if (!container) return;
@@ -153,11 +172,9 @@ export default function JudgmentCarousel({ judgments }: JudgmentCarouselProps) {
       onMouseLeave={() => setPaused(false)}
       onTouchStart={() => setPaused(true)}
       onTouchEnd={() => {
-        /* resume after a short delay to let snap settle */
         setTimeout(() => setPaused(false), 800);
       }}
     >
-      {/* Section header */}
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Scale className="h-4 w-4 text-[#009B3A]" />
@@ -174,9 +191,7 @@ export default function JudgmentCarousel({ judgments }: JudgmentCarouselProps) {
         </button>
       </div>
 
-      {/* Carousel viewport */}
       <div className="relative overflow-hidden rounded-2xl">
-        {/* Left arrow — desktop hover */}
         <button
           onClick={() => scrollToIndex((activeIndex - 1 + total) % total)}
           className="absolute left-2 top-1/2 z-10 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-[#0d0d1a]/80 border border-white/[0.1] text-white/50 opacity-0 hover:opacity-100 hover:text-white hover:bg-[#0d0d1a] transition-all duration-200 focus:opacity-100 md:group-hover:opacity-100 carousel-arrow"
@@ -192,7 +207,6 @@ export default function JudgmentCarousel({ judgments }: JudgmentCarouselProps) {
           <ChevronRight className="h-4 w-4" />
         </button>
 
-        {/* Scrollable strip */}
         <div
           ref={scrollRef}
           className="flex overflow-x-scroll gap-3 px-4 [scroll-snap-type:x_mandatory] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -209,9 +223,7 @@ export default function JudgmentCarousel({ judgments }: JudgmentCarouselProps) {
         </div>
       </div>
 
-      {/* Progress bar + dots */}
       <div className="mt-3 space-y-2">
-        {/* Progress bar */}
         <div className="h-[2px] w-full overflow-hidden rounded-full bg-white/[0.06]">
           {!paused && (
             <div
@@ -220,8 +232,6 @@ export default function JudgmentCarousel({ judgments }: JudgmentCarouselProps) {
             />
           )}
         </div>
-
-        {/* Dot indicators */}
         <div className="flex items-center justify-center gap-1.5">
           {Array.from({ length: dotsVisible }).map((_, i) => (
             <button
