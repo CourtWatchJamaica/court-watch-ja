@@ -1,0 +1,6 @@
+.env
+backend/pdfs/
+backend/target/
+backend/scraper_state.json
+frontend/.next/
+frontend/node_modules/

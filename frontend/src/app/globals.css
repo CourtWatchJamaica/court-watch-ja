@@ -1,0 +1,166 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --font-sans: var(--font-sans);
+    --font-mono: var(--font-geist-mono);
+    --font-heading: var(--font-sans);
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* CourtWatch JA – Light mode */
+:root {
+    --background: #f0f2f5;
+    --foreground: #0f0f1a;
+    --card: #ffffff;
+    --card-foreground: #0f0f1a;
+    --popover: #ffffff;
+    --popover-foreground: #0f0f1a;
+    --primary: #009b3a;
+    --primary-foreground: #ffffff;
+    --secondary: #eef0f5;
+    --secondary-foreground: #0f0f1a;
+    --muted: #eef0f5;
+    --muted-foreground: #6b7280;
+    --accent: #fed100;
+    --accent-foreground: #000000;
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: rgba(0, 0, 0, 0.08);
+    --input: rgba(0, 0, 0, 0.08);
+    --ring: #009b3a;
+    --chart-1: #009b3a;
+    --chart-2: #fed100;
+    --chart-3: oklch(0.439 0 0);
+    --chart-4: oklch(0.371 0 0);
+    --chart-5: oklch(0.269 0 0);
+    --radius: 0.625rem;
+    --sidebar: #ffffff;
+    --sidebar-foreground: #0f0f1a;
+    --sidebar-primary: #009b3a;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #eef0f5;
+    --sidebar-accent-foreground: #0f0f1a;
+    --sidebar-border: rgba(0, 0, 0, 0.08);
+    --sidebar-ring: #009b3a;
+}
+
+/* CourtWatch JA – Jamaican Dark Theme */
+.dark {
+    --background: #07070f;
+    --foreground: #eeeeff;
+    --card: #0d0d1a;
+    --card-foreground: #eeeeff;
+    --popover: #0d0d1a;
+    --popover-foreground: #eeeeff;
+    --primary: #009b3a;
+    --primary-foreground: #ffffff;
+    --secondary: #12122a;
+    --secondary-foreground: #eeeeff;
+    --muted: #12122a;
+    --muted-foreground: #7777aa;
+    --accent: #fed100;
+    --accent-foreground: #000000;
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: rgba(255, 255, 255, 0.08);
+    --input: rgba(255, 255, 255, 0.08);
+    --ring: #009b3a;
+    --chart-1: #009b3a;
+    --chart-2: #fed100;
+    --chart-3: oklch(0.439 0 0);
+    --chart-4: oklch(0.371 0 0);
+    --chart-5: oklch(0.269 0 0);
+    --sidebar: #0d0d1a;
+    --sidebar-foreground: #eeeeff;
+    --sidebar-primary: #009b3a;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #12122a;
+    --sidebar-accent-foreground: #eeeeff;
+    --sidebar-border: rgba(255, 255, 255, 0.08);
+    --sidebar-ring: #009b3a;
+}
+
+@layer base {
+    * {
+        @apply border-border outline-ring/50;
+    }
+    body {
+        @apply bg-background text-foreground;
+    }
+    html {
+        @apply font-sans;
+    }
+}
+
+/* Smooth scrollbar in dark theme */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 155, 58, 0.5);
+}
+
+body {
+    overflow-x: hidden; /* prevents horizontal scrollbar */
+    max-width: 100vw;
+}
+
+main {
+    overflow-x: clip;
+    padding-bottom: 5rem; /* extra room above the mobile nav */
+}
+
+/* Fix clipping on dashboard judgment cards */
+[data-slot="card"] {
+    overflow: visible !important;
+    min-width: 0;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
