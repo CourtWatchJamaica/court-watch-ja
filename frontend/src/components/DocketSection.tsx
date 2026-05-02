@@ -6,12 +6,14 @@ import { Bell, X, ArrowRight, Scale, Building2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Judgment, UserCase, CourtSitting } from "@/lib/types";
+import { getAlertCount } from "@/lib/notif-settings";
 
 /* ── Types ── */
 
 interface DocketItem {
   userCase: UserCase;
   judgment: Judgment | null;
+  sitting: CourtSitting | null;
   nextSitting: CourtSitting | null;
 }
 
@@ -68,12 +70,21 @@ function DocketCard({
   onUntrack: (caseId: number) => void;
 }) {
   const router = useRouter();
+  const isSitting = item.userCase.case_type === "sitting";
+  const navUrl = isSitting
+    ? `/cases/sittings/${item.userCase.case_id}`
+    : `/cases/${item.userCase.case_id}`;
+
   const statusColor = getStatusColor(item.nextSitting);
   const countdown = getCountdown(item.nextSitting?.event_date ?? null);
   const countdownColor = getCountdownColor(item.nextSitting?.event_date ?? null);
-  const title = item.judgment?.title || `Case #${item.userCase.case_id}`;
-  const citation = item.judgment?.case_number ?? null;
-  const court = item.judgment?.court ?? "Supreme Court";
+  const alertCount = getAlertCount(item.userCase.case_id);
+
+  const title = isSitting
+    ? (item.sitting?.title || item.sitting?.case_number || `Sitting #${item.userCase.case_id}`)
+    : (item.judgment?.title || `Case #${item.userCase.case_id}`);
+  const citation = isSitting ? (item.sitting?.case_number ?? null) : (item.judgment?.case_number ?? null);
+  const court = isSitting ? (item.sitting?.court_division ?? "Court") : (item.judgment?.court ?? "Supreme Court");
   const hearingDateStr = item.nextSitting?.event_date ?? null;
 
   /* Swipe-to-reveal on mobile */
@@ -108,7 +119,7 @@ function DocketCard({
 
   return (
     <div className="relative overflow-hidden rounded-xl">
-      {/* ── Reveal: Remove button (behind card) ── */}
+      {/* Reveal: Remove button (behind card) */}
       <div className="absolute inset-y-0 right-0 flex w-20 items-center justify-center rounded-r-xl bg-red-500/90">
         <button
           onClick={() => onUntrack(item.userCase.case_id)}
@@ -120,7 +131,7 @@ function DocketCard({
         </button>
       </div>
 
-      {/* ── Card ── */}
+      {/* Card */}
       <div
         className="group relative flex rounded-xl border border-white/[0.07] bg-[#0d0d1a] transition-all duration-200 hover:border-white/[0.12] hover:bg-[#0d0d1a]/80 overflow-hidden cursor-pointer"
         style={{
@@ -136,7 +147,7 @@ function DocketCard({
             setRevealed(false);
             return;
           }
-          router.push(`/cases/${item.userCase.case_id}`);
+          router.push(navUrl);
         }}
       >
         {/* Left status bar */}
@@ -152,9 +163,22 @@ function DocketCard({
                 {court}
               </span>
             </div>
-            <Bell className="h-3 w-3 text-white/20 shrink-0" />
+            {/* Alert bell */}
+            {alertCount > 0 ? (
+              <div className="flex items-center gap-0.5">
+                <Bell className="h-3 w-3 text-[#FED100]" />
+                <span className="text-[9px] font-bold text-[#FED100]">{alertCount}</span>
+              </div>
+            ) : (
+              <Bell className="h-3 w-3 text-white/20 shrink-0" />
+            )}
+            {isSitting && (
+              <span className="rounded-full bg-[#FED100]/10 border border-[#FED100]/20 px-1.5 py-0.5 text-[8px] font-semibold text-[#FED100]">
+                Sitting
+              </span>
+            )}
             <div className="flex-1" />
-            {/* × button — desktop hover, always mobile */}
+            {/* × button */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -213,7 +237,6 @@ function DocketEmpty() {
   const router = useRouter();
   return (
     <div className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.05] bg-[#0d0d1a] py-12 text-center px-4">
-      {/* Courthouse SVG */}
       <svg
         viewBox="0 0 64 64"
         className="mb-4 h-14 w-14 text-white/10"
@@ -279,6 +302,12 @@ export default function DocketSection({
   const router = useRouter();
 
   const enriched: DocketItem[] = trackedCases.map((uc) => {
+    if (uc.case_type === "sitting") {
+      const sitting = sittings.find((s) => s.id === uc.case_id) ?? null;
+      const nextSitting =
+        sitting?.event_date && sitting.event_date >= TODAY ? sitting : null;
+      return { userCase: uc, judgment: null, sitting, nextSitting };
+    }
     const judgment = judgments.find((j) => j.id === uc.case_id) ?? null;
     const nextSitting = judgment
       ? (sittings
@@ -291,12 +320,11 @@ export default function DocketSection({
           .sort((a, b) => (a.event_date ?? "").localeCompare(b.event_date ?? ""))
           .at(0) ?? null)
       : null;
-    return { userCase: uc, judgment, nextSitting };
+    return { userCase: uc, judgment, sitting: null, nextSitting };
   });
 
   return (
     <section>
-      {/* Section label */}
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <div className="h-px w-3 bg-[#FED100]/60" />
@@ -318,7 +346,6 @@ export default function DocketSection({
         </button>
       </div>
 
-      {/* Content */}
       {loading ? (
         <DocketSkeleton />
       ) : enriched.length > 0 ? (
