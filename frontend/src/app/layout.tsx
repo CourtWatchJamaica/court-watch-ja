@@ -4,6 +4,7 @@ import "./globals.css";
 import { cn } from "@/lib/utils";
 import Providers from "@/components/Providers";
 import ScrollToTop from "@/components/ScrollToTop";
+import ChambersPanel from "@/components/ChambersPanel";
 
 const geistSans = Geist({
   subsets: ["latin"],
@@ -36,6 +37,7 @@ export default function RootLayout({
         <Providers>
           {children}
           <ScrollToTop />
+          <ChambersPanel />
         </Providers>
       </body>
     </html>
