@@ -12,6 +12,7 @@ pub struct SittingsParams {
     pub q: Option<String>,
     pub date_from: Option<String>,
     pub date_to: Option<String>,
+    pub court: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -28,17 +29,19 @@ pub async fn list_sittings(
     State(state): State<AppState>,
     Query(params): Query<SittingsParams>,
 ) -> Result<Json<SittingsResponse>, AppError> {
+    let court = params.court.as_deref();
+
     // Full-text search takes priority over date-range filtering.
     if let Some(q) = &params.q {
         if !q.trim().is_empty() {
-            let sittings = queries::search_court_sittings(&state.db, q.trim()).await?;
+            let sittings = queries::search_court_sittings(&state.db, q.trim(), court).await?;
             return Ok(Json(SittingsResponse { sittings }));
         }
     }
 
     let date_from = params.date_from.as_deref().map(parse_date).transpose()?;
     let date_to   = params.date_to.as_deref().map(parse_date).transpose()?;
-    let sittings  = queries::list_court_sittings(&state.db, date_from, date_to).await?;
+    let sittings  = queries::list_court_sittings(&state.db, date_from, date_to, court).await?;
     Ok(Json(SittingsResponse { sittings }))
 }
 
