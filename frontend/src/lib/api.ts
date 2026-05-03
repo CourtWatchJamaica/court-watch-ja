@@ -1,4 +1,15 @@
-import { CourtSitting, Judge, Judgment, Notification, UserCase } from "./types";
+import {
+  ActivityLogRow,
+  AdminUser,
+  CourtSitting,
+  Judge,
+  Judgment,
+  Notification,
+  ScraperStatus,
+  SystemConfigEntry,
+  User,
+  UserCase,
+} from "./types";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
 
@@ -16,15 +27,21 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
     if (res.status === 401) {
       if (typeof window !== "undefined") {
+        const hadToken = !!localStorage.getItem("token");
         localStorage.removeItem("token");
-        window.location.href = "/auth/login";
+        // Only hard-redirect when a token existed (session expired) and we're
+        // not already on an auth page — prevents the infinite reload loop that
+        // occurs when unauthenticated calls fire from root-layout providers.
+        if (hadToken && !window.location.pathname.startsWith("/auth/")) {
+          window.location.href = "/auth/login";
+        }
       }
       throw new Error("Unauthorized");
     }
 
     if (!res.ok) {
       const error = await res.json().catch(() => null);
-      throw new Error(error?.message || `Request failed: ${res.status}`);
+      throw new Error(error?.error || error?.message || `Request failed: ${res.status}`);
     }
 
     return res.json();
@@ -36,13 +53,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 export interface CourtStats {
   court: string;
-  totalJudgments: number;
-  sittingsThisWeek: number;
-  activeJudges: number;
+  total_judgments: number;
+  sittings_this_week: number;
+  total_sittings: number;
+  active_judges: number;
 }
 
 export const apiClient = {
-  // Auth
+  // ── Auth ────────────────────────────────────────────────────────────────
   async signup(email: string, password: string): Promise<{ token: string }> {
     return request("/auth/signup", {
       method: "POST",
@@ -57,8 +75,12 @@ export const apiClient = {
     });
   },
 
-  // Judgments
-  async getJudgments(q?: string, court?: string): Promise<{ judgments: Judgment[] }> {
+  async getMe(): Promise<User> {
+    return request("/auth/me");
+  },
+
+  // ── Judgments ───────────────────────────────────────────────────────────
+  async getJudgments(q?: string, court?: string): Promise<{ judgments: Judgment[]; total: number }> {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
     if (court) params.set("court", court);
@@ -70,7 +92,7 @@ export const apiClient = {
     return request(`/judgments/${id}`);
   },
 
-  // Court Sittings
+  // ── Court Sittings ──────────────────────────────────────────────────────
   async getCourtSittings(opts?: {
     q?: string;
     court?: string;
@@ -90,12 +112,12 @@ export const apiClient = {
     return request(`/court-sittings/${id}`);
   },
 
-  // Court Stats
+  // ── Court Stats ─────────────────────────────────────────────────────────
   async getCourtStats(court: string): Promise<CourtStats> {
     return request(`/court-stats?court=${encodeURIComponent(court)}`);
   },
 
-  // Judges
+  // ── Judges ──────────────────────────────────────────────────────────────
   async getJudges(): Promise<{ judges: Judge[] }> {
     return request("/judges");
   },
@@ -104,7 +126,7 @@ export const apiClient = {
     return request(`/judges/${id}`);
   },
 
-  // User Cases
+  // ── User Cases ──────────────────────────────────────────────────────────
   async getUserCases(): Promise<{ cases: UserCase[] }> {
     return request("/user/cases");
   },
@@ -119,18 +141,32 @@ export const apiClient = {
     });
   },
 
-  async removeUserCase(case_id: number): Promise<{ success: boolean }> {
-    return request(`/user/cases/${case_id}`, {
+  async removeUserCase(
+    case_id: number,
+    case_type: "judgment" | "sitting" = "judgment",
+  ): Promise<{ success: boolean }> {
+    return request(`/user/cases/${case_id}?case_type=${case_type}`, {
       method: "DELETE",
     });
   },
 
-  // Notifications
+  // ── Notifications ───────────────────────────────────────────────────────
   async getNotifications(): Promise<{ notifications: Notification[] }> {
     return request("/notifications");
   },
 
-  // User Preferences
+  async getNotificationsUnreadCount(): Promise<{ count: number }> {
+    return request("/notifications/unread-count");
+  },
+
+  async markAllNotificationsRead(): Promise<{ updated: number }> {
+    return request("/notifications/mark-read", { method: "POST" });
+  },
+
+  async markNotificationRead(id: number): Promise<{ marked: boolean }> {
+    return request(`/notifications/${id}/mark-read`, { method: "POST" });
+  },
+
   async updatePreferences(
     email_notifications: boolean,
     push_notifications: boolean,
@@ -139,5 +175,101 @@ export const apiClient = {
       method: "PUT",
       body: JSON.stringify({ email_notifications, push_notifications }),
     });
+  },
+
+  // ── Admin: Users ────────────────────────────────────────────────────────
+  async adminListUsers(): Promise<{ users: AdminUser[] }> {
+    return request("/admin/users");
+  },
+
+  async adminSetUserRole(
+    userId: number,
+    role: "user" | "admin" | "super_admin",
+  ): Promise<AdminUser> {
+    return request(`/admin/users/${userId}/role`, {
+      method: "PUT",
+      body: JSON.stringify({ role }),
+    });
+  },
+
+  async adminDeleteUser(userId: number): Promise<{ deleted: boolean }> {
+    return request(`/admin/users/${userId}`, { method: "DELETE" });
+  },
+
+  // ── Admin: Config ────────────────────────────────────────────────────────
+  async adminGetConfig(): Promise<{ config: SystemConfigEntry[] }> {
+    return request("/admin/config");
+  },
+
+  async adminSetConfig(key: string, value: string): Promise<{ key: string; value: string }> {
+    return request(`/admin/config/${encodeURIComponent(key)}`, {
+      method: "PUT",
+      body: JSON.stringify({ value }),
+    });
+  },
+
+  // ── Admin: Scraper ───────────────────────────────────────────────────────
+  async adminGetScraperState(): Promise<ScraperStatus> {
+    return request("/admin/scraper/state");
+  },
+
+  async adminTriggerScraper(): Promise<{ started: boolean; message: string }> {
+    return request("/admin/scraper/trigger", { method: "POST" });
+  },
+
+  async adminRemoveSkippedPdf(url: string): Promise<{ removed: boolean }> {
+    return request("/admin/scraper/skipped", {
+      method: "DELETE",
+      body: JSON.stringify({ url }),
+    });
+  },
+
+  // ── Admin: Data — Judgments ──────────────────────────────────────────────
+  async adminListJudgments(
+    page = 1,
+    limit = 50,
+  ): Promise<{ judgments: Judgment[]; total: number }> {
+    return request(`/admin/data/judgments?page=${page}&limit=${limit}`);
+  },
+
+  async adminUpdateJudgment(
+    id: number,
+    data: Partial<Pick<Judgment, "title" | "judge_name" | "court" | "date" | "summary_text">>,
+  ): Promise<{ judgment: Judgment }> {
+    return request(`/admin/data/judgments/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async adminDeleteJudgment(id: number): Promise<{ deleted: boolean }> {
+    return request(`/admin/data/judgments/${id}`, { method: "DELETE" });
+  },
+
+  // ── Admin: Data — Sittings ───────────────────────────────────────────────
+  async adminListSittings(
+    page = 1,
+    limit = 50,
+  ): Promise<{ sittings: CourtSitting[]; total: number }> {
+    return request(`/admin/data/sittings?page=${page}&limit=${limit}`);
+  },
+
+  async adminUpdateSitting(
+    id: number,
+    data: Partial<Pick<CourtSitting, "title" | "judge_name" | "event_date" | "event_time">>,
+  ): Promise<{ sitting: CourtSitting }> {
+    return request(`/admin/data/sittings/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async adminDeleteSitting(id: number): Promise<{ deleted: boolean }> {
+    return request(`/admin/data/sittings/${id}`, { method: "DELETE" });
+  },
+
+  // ── Admin: Logs ──────────────────────────────────────────────────────────
+  async adminGetActivityLog(): Promise<{ activity: ActivityLogRow[] }> {
+    return request("/admin/logs");
   },
 };

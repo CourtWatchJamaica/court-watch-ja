@@ -10,16 +10,17 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) {
-      router.push("/auth/login");
+      router.replace("/auth/login");
     } else {
       setIsAuthenticated(true);
     }
-  }, [router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (!isAuthenticated) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900" />
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/10 border-t-[#009B3A]" />
       </div>
     );
   }
