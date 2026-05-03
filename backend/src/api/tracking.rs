@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     Extension, Json,
 };
 use serde::{Deserialize, Serialize};
@@ -19,6 +19,14 @@ pub struct SuccessResponse {
 #[derive(Deserialize)]
 pub struct AddCaseRequest {
     pub case_id: i32,
+    /// `"judgment"` (default) or `"sitting"`
+    pub case_type: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct RemoveCaseParams {
+    /// `"judgment"` (default) or `"sitting"`
+    pub case_type: Option<String>,
 }
 
 pub async fn get_user_cases(
@@ -34,27 +42,15 @@ pub async fn add_user_case(
     Extension(user_id): Extension<i32>,
     Json(body): Json<AddCaseRequest>,
 ) -> Result<Json<SuccessResponse>, AppError> {
-    queries::add_user_case(&state.db, user_id, body.case_id)
-        .await
-        .map_err(|e| match e {
-            sqlx::Error::RowNotFound => {
-                // ON CONFLICT DO NOTHING returns no row — treat as success
-                e
-            }
-            other => other,
-        })
-        .or_else(|e| {
-            if matches!(e, sqlx::Error::RowNotFound) {
-                Ok(crate::db::models::UserCase {
-                    id: 0,
-                    user_id,
-                    case_id: body.case_id,
-                    created_at: chrono::Utc::now().naive_utc(),
-                })
-            } else {
-                Err(AppError::Sqlx(e))
-            }
-        })?;
+    let case_type = body.case_type.as_deref().unwrap_or("judgment");
+
+    match queries::add_user_case(&state.db, user_id, body.case_id, case_type).await {
+        Ok(_) | Err(sqlx::Error::RowNotFound) => {
+            // RowNotFound means ON CONFLICT DO NOTHING fired — already tracking, still a success.
+        }
+        Err(e) => return Err(AppError::Sqlx(e)),
+    }
+
     Ok(Json(SuccessResponse { success: true }))
 }
 
@@ -62,7 +58,9 @@ pub async fn remove_user_case(
     State(state): State<AppState>,
     Extension(user_id): Extension<i32>,
     Path(case_id): Path<i32>,
+    Query(params): Query<RemoveCaseParams>,
 ) -> Result<Json<SuccessResponse>, AppError> {
-    queries::remove_user_case(&state.db, user_id, case_id).await?;
+    let case_type = params.case_type.as_deref().unwrap_or("judgment");
+    queries::remove_user_case(&state.db, user_id, case_id, case_type).await?;
     Ok(Json(SuccessResponse { success: true }))
 }
