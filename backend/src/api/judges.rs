@@ -1,14 +1,19 @@
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     Json,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     api::errors::AppError,
     db::{models::{Judge, JudgeWithCount, Judgment}, queries},
     AppState,
 };
+
+#[derive(Deserialize)]
+pub struct JudgesParams {
+    pub court: Option<String>,
+}
 
 #[derive(Serialize)]
 pub struct JudgesResponse {
@@ -23,8 +28,9 @@ pub struct JudgeDetailResponse {
 
 pub async fn list_judges(
     State(state): State<AppState>,
+    Query(params): Query<JudgesParams>,
 ) -> Result<Json<JudgesResponse>, AppError> {
-    let judges = queries::list_judges(&state.db).await?;
+    let judges = queries::list_judges(&state.db, params.court.as_deref()).await?;
     Ok(Json(JudgesResponse { judges }))
 }
 
