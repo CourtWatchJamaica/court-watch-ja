@@ -5,17 +5,18 @@ import { useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import Navbar from "@/components/Navbar";
 import JudgeCard3D from "@/components/JudgeCard3D";
+import { Skeleton } from "@/components/ui/skeleton";
 import { apiClient } from "@/lib/api";
 import { Judge } from "@/lib/types";
 import { Users } from "lucide-react";
 
 function SkeletonJudgeCard() {
   return (
-    <div className="animate-pulse overflow-hidden rounded-2xl border border-white/[0.06] bg-black/20">
-      <div className="h-[200px] bg-white/[0.04]" />
+    <div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-black/20">
+      <Skeleton className="h-[200px] w-full rounded-none bg-white/[0.04]" />
       <div className="space-y-2 p-4">
-        <div className="h-3.5 w-3/4 rounded bg-white/[0.06]" />
-        <div className="h-2.5 w-1/2 rounded bg-white/[0.04]" />
+        <Skeleton className="h-3.5 w-3/4 bg-white/[0.06]" />
+        <Skeleton className="h-2.5 w-1/2 bg-white/[0.04]" />
       </div>
     </div>
   );
@@ -80,10 +81,13 @@ export default function JudgesPage() {
                 />
               ))
             ) : (
-              <div className="col-span-full flex flex-col items-center justify-center rounded-2xl border border-white/[0.05] bg-black/15 py-20 text-center">
-                <Users className="mb-4 h-12 w-12 text-white/10" />
-                <p className="text-sm text-white/30">
-                  No judges found in the registry
+              <div className="col-span-full flex flex-col items-center justify-center rounded-2xl border border-white/[0.05] bg-[#0d0d1a] py-20 text-center px-8">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#009B3A]/[0.07] ring-1 ring-[#009B3A]/20">
+                  <Users className="h-7 w-7 text-[#009B3A]/50" />
+                </div>
+                <p className="text-sm font-semibold text-white/50">No judges in the registry yet</p>
+                <p className="mt-1.5 text-xs text-white/25 max-w-[220px] leading-relaxed">
+                  The judicial directory is populated when cases are scraped.
                 </p>
               </div>
             )}

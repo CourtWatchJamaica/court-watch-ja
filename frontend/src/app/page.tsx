@@ -10,6 +10,7 @@ import LegalPulse from "@/components/LegalPulse";
 import { apiClient } from "@/lib/api";
 import { Judgment, UserCase, CourtSitting } from "@/lib/types";
 import { FileText, Bookmark, TrendingUp, Scale, Calendar, Clock, Building2, User, ArrowUpRight } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 /* ── Stat card — always dark regardless of theme ── */
 function StatCard({
@@ -40,11 +41,11 @@ function StatCard({
 
 function SkeletonStat() {
   return (
-    <div className="flex items-center gap-3.5 rounded-2xl border border-white/[0.06] bg-[#0d0d1a] px-5 py-4 shrink-0 animate-pulse min-w-[140px]">
-      <div className="h-10 w-10 rounded-xl bg-white/[0.06]" />
+    <div className="flex items-center gap-3.5 rounded-2xl border border-white/[0.06] bg-[#0d0d1a] px-5 py-4 shrink-0 min-w-[140px]">
+      <Skeleton className="h-10 w-10 rounded-xl bg-white/[0.06]" />
       <div className="space-y-2">
-        <div className="h-5 w-10 rounded bg-white/[0.06]" />
-        <div className="h-2.5 w-20 rounded bg-white/[0.04]" />
+        <Skeleton className="h-5 w-10 bg-white/[0.06]" />
+        <Skeleton className="h-2.5 w-20 bg-white/[0.04]" />
       </div>
     </div>
   );
@@ -83,10 +84,7 @@ function TodaySittings({ sittings, loading }: TodaySittingsProps) {
       {loading ? (
         <div className="space-y-2">
           {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="h-14 animate-pulse rounded-xl border border-white/[0.06] bg-[#0d0d1a]"
-            />
+            <Skeleton key={i} className="h-14 rounded-xl bg-white/[0.06]" />
           ))}
         </div>
       ) : display.length > 0 ? (
@@ -146,9 +144,12 @@ function TodaySittings({ sittings, loading }: TodaySittingsProps) {
           ))}
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.05] bg-[#0d0d1a] py-10 text-center">
-          <Calendar className="mb-2.5 h-8 w-8 text-white/10" />
-          <p className="text-sm text-white/30">No sittings scheduled</p>
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.05] bg-[#0d0d1a] py-10 text-center px-6">
+          <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-[#FED100]/[0.07] ring-1 ring-[#FED100]/15">
+            <Calendar className="h-5 w-5 text-[#FED100]/50" />
+          </div>
+          <p className="text-sm font-medium text-white/40">No sittings scheduled</p>
+          <p className="mt-1 text-xs text-white/20">Court lists are updated daily.</p>
         </div>
       )}
     </section>
@@ -188,14 +189,17 @@ export default function Dashboard() {
     fetchData();
   }, [fetchData]);
 
-  const handleUntrack = useCallback(async (caseId: number) => {
-    try {
-      await apiClient.removeUserCase(caseId);
-      setTrackedCases((prev) => prev.filter((c) => c.case_id !== caseId));
-    } catch (err) {
-      console.error("Failed to untrack case:", err);
-    }
-  }, []);
+  const handleUntrack = useCallback(
+    async (caseId: number, caseType: "judgment" | "sitting") => {
+      try {
+        await apiClient.removeUserCase(caseId, caseType);
+        setTrackedCases((prev) => prev.filter((c) => c.case_id !== caseId));
+      } catch (err) {
+        console.error("Failed to untrack case:", err);
+      }
+    },
+    [],
+  );
 
   return (
     <AuthGuard>
@@ -276,10 +280,10 @@ export default function Dashboard() {
             {loading ? (
               <div>
                 <div className="mb-3 flex items-center justify-between">
-                  <div className="h-4 w-32 rounded bg-white/[0.06] animate-pulse" />
-                  <div className="h-3.5 w-24 rounded bg-white/[0.04] animate-pulse" />
+                  <Skeleton className="h-4 w-32 bg-white/[0.06]" />
+                  <Skeleton className="h-3.5 w-24 bg-white/[0.04]" />
                 </div>
-                <div className="h-[168px] sm:h-[200px] rounded-2xl border border-white/[0.06] bg-[#0d0d1a] animate-pulse" />
+                <Skeleton className="h-[168px] sm:h-[200px] rounded-2xl bg-white/[0.04]" />
               </div>
             ) : (
               <JudgmentCarousel judgments={latestJudgments} />

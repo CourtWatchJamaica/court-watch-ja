@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import AuthGuard from "@/components/AuthGuard";
 import Navbar from "@/components/Navbar";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -16,7 +17,7 @@ import {
 } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Settings as SettingsIcon, Palette, Bell, ChevronRight } from "lucide-react";
+import { Settings as SettingsIcon, Palette, Bell, ChevronRight, HelpCircle, Mail } from "lucide-react";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -167,6 +168,43 @@ export default function SettingsPage() {
                 </div>
               </CardContent>
             </Card>
+            {/* Help & Contact */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Link href="/help" className="group">
+                <Card className="border-border bg-card h-full transition-colors group-hover:border-[#009B3A]/30">
+                  <CardContent className="flex items-center justify-between p-5">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#009B3A]/10">
+                        <HelpCircle className="h-4 w-4 text-[#009B3A]" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold">Help Centre</p>
+                        <p className="text-xs text-muted-foreground">FAQs &amp; guides</p>
+                      </div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                  </CardContent>
+                </Card>
+              </Link>
+
+              <Link href="mailto:hello@courtwatchja.com" className="group">
+                <Card className="border-border bg-card h-full transition-colors group-hover:border-[#009B3A]/30">
+                  <CardContent className="flex items-center justify-between p-5">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#009B3A]/10">
+                        <Mail className="h-4 w-4 text-[#009B3A]" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold">Contact Us</p>
+                        <p className="text-xs text-muted-foreground">hello@courtwatchja.com</p>
+                      </div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                  </CardContent>
+                </Card>
+              </Link>
+            </div>
+
           </div>
         </main>
       </div>

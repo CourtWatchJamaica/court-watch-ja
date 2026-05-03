@@ -12,6 +12,7 @@ pub struct User {
     pub email: String,
     #[serde(skip_serializing)]
     pub password_hash: String,
+    pub role: String,
     pub created_at: NaiveDateTime,
 }
 
@@ -45,6 +46,9 @@ pub struct Judgment {
     pub summary_text: Option<String>,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
+    /// Populated only by FTS queries via ts_headline; None otherwise.
+    #[sqlx(default)]
+    pub snippet: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
@@ -67,6 +71,7 @@ pub struct Notification {
     #[serde(rename = "type")]
     pub notification_type: String,
     pub sent_at: NaiveDateTime,
+    pub read_at: Option<NaiveDateTime>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
@@ -82,12 +87,17 @@ pub struct CourtSitting {
     pub lawyers: Option<String>,
     pub pdf_source_url: Option<String>,
     pub created_at: NaiveDateTime,
+    /// Populated only by FTS queries via ts_headline; None otherwise.
+    #[sqlx(default)]
+    pub snippet: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CourtStats {
     pub court: String,
     pub total_judgments: i64,
+    /// Sittings whose event_date falls within the next 7 days (today inclusive).
+    pub sittings_this_week: i64,
     pub total_sittings: i64,
     pub active_judges: i64,
 }

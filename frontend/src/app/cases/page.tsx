@@ -7,38 +7,23 @@ import Navbar from "@/components/Navbar";
 import SearchBar from "@/components/SearchBar";
 import CaseCard from "@/components/CaseCard";
 import SittingCard from "@/components/SittingCard";
+import { Skeleton } from "@/components/ui/skeleton";
 import { apiClient } from "@/lib/api";
 import { Judgment, CourtSitting } from "@/lib/types";
 import { useTracking } from "@/lib/tracking-context";
-import { FileText, Scale, Calendar } from "lucide-react";
+import { FileText, Scale, Calendar, SearchX } from "lucide-react";
 
 type Tab = "judgments" | "sittings";
 
-// ── Tab toggle ─────────────────────────────────────────────────────────────────
+// ── Tab toggle ──────────────────────────────────────────────────────────────
 
-function TabToggle({
-  active,
-  onChange,
-}: {
-  active: Tab;
-  onChange: (t: Tab) => void;
-}) {
+function TabToggle({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) {
   return (
     <div className="flex rounded-2xl bg-black/30 p-1.5 gap-1.5">
       {(
         [
-          {
-            id: "judgments" as Tab,
-            icon: Scale,
-            label: "Judgments",
-            sub: "Past decisions",
-          },
-          {
-            id: "sittings" as Tab,
-            icon: Calendar,
-            label: "Court Lists",
-            sub: "Upcoming sittings",
-          },
+          { id: "judgments" as Tab, icon: Scale, label: "Judgments", sub: "Past decisions" },
+          { id: "sittings" as Tab, icon: Calendar, label: "Court Lists", sub: "Upcoming sittings" },
         ] as const
       ).map(({ id, icon: Icon, label, sub }) => (
         <button
@@ -52,17 +37,10 @@ function TabToggle({
               : "text-white/40 hover:text-white/70 hover:bg-white/[0.05]",
           ].join(" ")}
         >
-          <Icon
-            className="h-5 w-5 shrink-0"
-            strokeWidth={active === id ? 2.2 : 1.8}
-          />
+          <Icon className="h-5 w-5 shrink-0" strokeWidth={active === id ? 2.2 : 1.8} />
           <div className="text-left">
             <p className="text-[15px] font-semibold leading-none">{label}</p>
-            <p
-              className={`mt-1 text-[11px] leading-none ${
-                active === id ? "text-white/65" : "text-white/30"
-              }`}
-            >
+            <p className={`mt-1 text-[11px] leading-none ${active === id ? "text-white/65" : "text-white/30"}`}>
               {sub}
             </p>
           </div>
@@ -72,44 +50,79 @@ function TabToggle({
   );
 }
 
-// ── Skeletons + empty state ─────────────────────────────────────────────────────
+// ── Skeleton ────────────────────────────────────────────────────────────────
 
 function SkeletonCard() {
   return (
-    <div className="animate-pulse rounded-xl border border-white/[0.06] bg-[#0d0d1a] p-4 space-y-3">
+    <div className="rounded-xl border border-white/[0.06] bg-[#0d0d1a] p-4 space-y-3">
       <div className="flex justify-between items-start gap-3">
-        <div className="h-3.5 w-2/3 rounded bg-white/[0.06]" />
-        <div className="h-5 w-20 rounded-md bg-white/[0.06] shrink-0" />
+        <Skeleton className="h-3.5 w-2/3 bg-white/[0.06]" />
+        <Skeleton className="h-5 w-20 rounded-md bg-white/[0.06] shrink-0" />
       </div>
       <div className="space-y-2 pt-1">
-        <div className="h-2.5 w-1/2 rounded bg-white/[0.04]" />
-        <div className="h-2.5 w-2/5 rounded bg-white/[0.04]" />
-        <div className="h-2.5 w-1/3 rounded bg-white/[0.04]" />
+        <Skeleton className="h-2.5 w-1/2 bg-white/[0.04]" />
+        <Skeleton className="h-2.5 w-2/5 bg-white/[0.04]" />
+        <Skeleton className="h-2.5 w-1/3 bg-white/[0.04]" />
       </div>
     </div>
   );
 }
 
-function EmptyState({ tab }: { tab: Tab }) {
+// ── Empty states ────────────────────────────────────────────────────────────
+
+function EmptyState({
+  tab,
+  hasQuery,
+  onClear,
+}: {
+  tab: Tab;
+  hasQuery: boolean;
+  onClear: () => void;
+}) {
+  if (hasQuery) {
+    return (
+      <div className="col-span-full flex flex-col items-center justify-center rounded-2xl border border-white/[0.05] bg-[#0d0d1a] py-20 text-center px-8">
+        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/[0.04] ring-1 ring-white/[0.06]">
+          <SearchX className="h-7 w-7 text-white/20" />
+        </div>
+        <p className="text-sm font-semibold text-white/50">No results found</p>
+        <p className="mt-1.5 text-xs text-white/25 max-w-[220px] leading-relaxed">
+          Try different keywords, or browse without a search term.
+        </p>
+        <button
+          onClick={onClear}
+          className="mt-5 rounded-xl bg-[#009B3A]/15 border border-[#009B3A]/30 px-5 py-2 text-xs font-semibold text-[#009B3A] hover:bg-[#009B3A]/25 transition-colors"
+        >
+          Clear search
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="col-span-full flex flex-col items-center justify-center rounded-2xl border border-white/[0.05] bg-[#0d0d1a] py-20 text-center">
-      {tab === "judgments" ? (
-        <FileText className="mb-3 h-10 w-10 text-white/10" />
-      ) : (
-        <Calendar className="mb-3 h-10 w-10 text-white/10" />
-      )}
-      <p className="text-sm text-white/30">
-        {tab === "judgments" ? "No judgments found" : "No sittings found"}
+    <div className="col-span-full flex flex-col items-center justify-center rounded-2xl border border-white/[0.05] bg-[#0d0d1a] py-20 text-center px-8">
+      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#009B3A]/[0.07] ring-1 ring-[#009B3A]/20">
+        {tab === "judgments" ? (
+          <FileText className="h-7 w-7 text-[#009B3A]/50" />
+        ) : (
+          <Calendar className="h-7 w-7 text-[#009B3A]/50" />
+        )}
+      </div>
+      <p className="text-sm font-semibold text-white/50">
+        No {tab === "judgments" ? "judgments" : "sittings"} yet
+      </p>
+      <p className="mt-1.5 text-xs text-white/25 max-w-[220px] leading-relaxed">
+        New cases are scraped daily. Check back soon.
       </p>
     </div>
   );
 }
 
-// ── Page ───────────────────────────────────────────────────────────────────────
+// ── Page ────────────────────────────────────────────────────────────────────
 
 export default function CasesPage() {
   const router = useRouter();
-  const { isTracked, track } = useTracking();
+  const { isTracked, track, untrack } = useTracking();
   const [activeTab, setActiveTab] = useState<Tab>("judgments");
   const [query, setQuery] = useState("");
   const [judgments, setJudgments] = useState<Judgment[]>([]);
@@ -133,21 +146,45 @@ export default function CasesPage() {
     }
   }, []);
 
+  // Read ?q= and ?tab= from URL on mount
   useEffect(() => {
-    fetchData("", "judgments");
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const initialQ = params.get("q") || "";
+    const initialTab = (params.get("tab") as Tab) || "judgments";
+    setQuery(initialQ);
+    setActiveTab(initialTab);
+    fetchData(initialQ, initialTab);
   }, [fetchData]);
+
+  const syncUrl = useCallback((q: string, tab: Tab) => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (tab !== "judgments") params.set("tab", tab);
+    const qs = params.toString();
+    window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
+  }, []);
 
   const handleSearch = useCallback(
     (q: string) => {
       setQuery(q);
+      syncUrl(q, activeTab);
       fetchData(q, activeTab);
     },
-    [fetchData, activeTab],
+    [fetchData, activeTab, syncUrl],
   );
 
   const handleTabChange = (tab: Tab) => {
     setActiveTab(tab);
+    syncUrl(query, tab);
     fetchData(query, tab);
+  };
+
+  const handleClearSearch = () => {
+    setQuery("");
+    syncUrl("", activeTab);
+    fetchData("", activeTab);
   };
 
   return (
@@ -173,6 +210,7 @@ export default function CasesPage() {
           <div className="mb-6">
             <SearchBar
               key={activeTab}
+              initialValue={query}
               onSearch={handleSearch}
               placeholder={
                 activeTab === "judgments"
@@ -209,11 +247,13 @@ export default function CasesPage() {
                       judgment={j}
                       onClick={() => router.push(`/cases/${j.id}`)}
                       isTracked={isTracked(j.id, "judgment")}
-                      onTrack={(id) => track(id, "judgment")}
+                      onTrack={(id) =>
+                        isTracked(id, "judgment") ? untrack(id) : track(id, "judgment")
+                      }
                     />
                   ))
                 ) : (
-                  <EmptyState tab="judgments" />
+                  <EmptyState tab="judgments" hasQuery={!!query} onClear={handleClearSearch} />
                 )
               ) : sittings.length > 0 ? (
                 sittings.map((s) => (
@@ -222,11 +262,13 @@ export default function CasesPage() {
                     sitting={s}
                     onClick={() => router.push(`/cases/sittings/${s.id}`)}
                     isTracked={isTracked(s.id, "sitting")}
-                    onTrack={(id) => track(id, "sitting")}
+                    onTrack={(id) =>
+                      isTracked(id, "sitting") ? untrack(id) : track(id, "sitting")
+                    }
                   />
                 ))
               ) : (
-                <EmptyState tab="sittings" />
+                <EmptyState tab="sittings" hasQuery={!!query} onClear={handleClearSearch} />
               )}
             </div>
           )}

@@ -4,6 +4,7 @@ import { Judgment } from "@/lib/types";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, User, Building2, ArrowUpRight, Bookmark, BookmarkCheck } from "lucide-react";
+import HighlightedSnippet from "@/components/HighlightedSnippet";
 
 interface CaseCardProps {
   judgment: Judgment;
@@ -31,10 +32,15 @@ export default function CaseCard({ judgment, onClick, isTracked, onTrack }: Case
             </Badge>
             {onTrack && (
               isTracked ? (
-                <span className="flex items-center gap-1 rounded-md bg-[#009B3A]/15 border border-[#009B3A]/30 px-1.5 h-5 text-[9px] font-semibold text-[#009B3A]">
+                <button
+                  onClick={(e) => { e.stopPropagation(); onTrack(judgment.id); }}
+                  className="flex items-center gap-1 rounded-md bg-[#009B3A]/15 border border-[#009B3A]/30 px-1.5 h-5 text-[9px] font-semibold text-[#009B3A] hover:bg-red-500/10 hover:border-red-500/20 hover:text-red-400 transition-colors"
+                  aria-label="Untrack case"
+                  title="Click to untrack"
+                >
                   <BookmarkCheck className="h-2.5 w-2.5" />
                   Tracked
-                </span>
+                </button>
               ) : (
                 <button
                   onClick={(e) => { e.stopPropagation(); onTrack(judgment.id); }}
@@ -78,12 +84,16 @@ export default function CaseCard({ judgment, onClick, isTracked, onTrack }: Case
           )}
         </div>
 
-        {judgment.summary_text && (
+        {(judgment.snippet || judgment.summary_text) && (
           <>
             <div className="h-px bg-white/[0.05] mb-3" />
-            <p className="text-[11px] text-white/35 line-clamp-2 leading-relaxed">
-              {judgment.summary_text}
-            </p>
+            {judgment.snippet ? (
+              <HighlightedSnippet text={judgment.snippet} className="text-[11px] text-white/35 line-clamp-3 leading-relaxed" />
+            ) : (
+              <p className="text-[11px] text-white/35 line-clamp-2 leading-relaxed">
+                {judgment.summary_text}
+              </p>
+            )}
           </>
         )}
       </CardContent>
