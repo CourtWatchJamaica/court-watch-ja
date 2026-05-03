@@ -17,9 +17,26 @@ pub async fn download_pdf(client: &reqwest::Client, url: &str) -> anyhow::Result
 }
 
 /// Extract all text from a PDF given as raw bytes.
+///
+/// `pdf-extract` panics on certain PDFs (e.g. files that use a `DeviceN`
+/// colour space).  We catch those panics here and return `Err` so that
+/// callers (i.e. `extract_text_safe`) fall through to the OCR pipeline
+/// instead of crashing the whole scraper run.
 pub fn extract_text_from_bytes(bytes: &[u8]) -> anyhow::Result<String> {
-    pdf_extract::extract_text_from_mem(bytes)
-        .map_err(|e| anyhow::anyhow!("PDF extraction failed: {e}"))
+    // `catch_unwind` requires the closure to be `UnwindSafe`.  `&[u8]` satisfies
+    // that constraint, so capturing `bytes` by reference is fine here.
+    let result = std::panic::catch_unwind(|| pdf_extract::extract_text_from_mem(bytes));
+
+    match result {
+        Ok(Ok(text)) => Ok(text),
+        Ok(Err(e)) => Err(anyhow::anyhow!("PDF extraction failed: {e}")),
+        Err(_panic_payload) => {
+            warn!("pdf-extract panicked (likely unsupported colour space) — falling back to OCR");
+            Err(anyhow::anyhow!(
+                "pdf-extract panicked on this PDF (unsupported colour space)"
+            ))
+        }
+    }
 }
 
 /// OCR a PDF using pdftoppm + tesseract.
