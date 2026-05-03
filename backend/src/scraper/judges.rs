@@ -35,7 +35,7 @@ pub async fn run(pool: &PgPool, client: &reqwest::Client) -> anyhow::Result<()> 
     Ok(())
 }
 
-fn extract_judge_names(html: &str) -> Vec<String> {
+pub fn extract_judge_names(html: &str) -> Vec<String> {
     let doc = Html::parse_document(html);
 
     // Pull all text from the main content area
