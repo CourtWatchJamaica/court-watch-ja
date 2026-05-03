@@ -52,6 +52,9 @@ pub struct UserCase {
     pub id: i32,
     pub user_id: i32,
     pub case_id: i32,
+    pub case_type: String,
+    pub last_event_date: Option<NaiveDate>,
+    pub last_event_time: Option<NaiveTime>,
     pub created_at: NaiveDateTime,
 }
 
@@ -79,4 +82,12 @@ pub struct CourtSitting {
     pub lawyers: Option<String>,
     pub pdf_source_url: Option<String>,
     pub created_at: NaiveDateTime,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CourtStats {
+    pub court: String,
+    pub total_judgments: i64,
+    pub total_sittings: i64,
+    pub active_judges: i64,
 }
