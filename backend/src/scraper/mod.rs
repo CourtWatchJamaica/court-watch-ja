@@ -1,7 +1,11 @@
+pub mod appeal_court;
+pub mod appeal_court_lists;
 pub mod court_lists;
 pub mod judgment_detail;
 pub mod judgments;
 pub mod judges;
+pub mod parish_court;
+pub mod parish_court_lists;
 pub mod pdf;
 pub mod runner;
 
@@ -19,6 +23,28 @@ pub struct ScraperState {
     pub processed_pdf_urls: Vec<String>,
     /// When we last scraped the judges directory.
     pub last_judges_scraped_at: Option<DateTime<Utc>>,
+
+    // ── Court of Appeal ──────────────────────────────────────────────────────
+    /// Next Court of Appeal **civil** judgment listing page (0-indexed).
+    #[serde(default)]
+    pub next_appeal_page: u32,
+    /// Next Court of Appeal **criminal** judgment listing page (0-indexed).
+    #[serde(default)]
+    pub next_appeal_criminal_page: u32,
+    /// Court of Appeal court-list PDF URLs we have already processed.
+    #[serde(default)]
+    pub processed_appeal_pdf_urls: Vec<String>,
+    /// When we last scraped the Court of Appeal judges directory.
+    #[serde(default)]
+    pub last_appeal_judges_scraped_at: Option<DateTime<Utc>>,
+
+    // ── Parish Court ─────────────────────────────────────────────────────────
+    /// The next Parish Court judgment listing page to scrape (0-indexed).
+    #[serde(default)]
+    pub next_parish_page: u32,
+    /// Parish Court court-list PDF URLs we have already processed.
+    #[serde(default)]
+    pub processed_parish_pdf_urls: Vec<String>,
 }
 
 impl ScraperState {
@@ -46,6 +72,26 @@ impl ScraperState {
 
     pub fn pdf_already_processed(&self, url: &str) -> bool {
         self.processed_pdf_urls.iter().any(|u| u == url)
+    }
+
+    pub fn mark_appeal_pdf_processed(&mut self, url: String) {
+        if !self.processed_appeal_pdf_urls.contains(&url) {
+            self.processed_appeal_pdf_urls.push(url);
+        }
+    }
+
+    pub fn appeal_pdf_already_processed(&self, url: &str) -> bool {
+        self.processed_appeal_pdf_urls.iter().any(|u| u == url)
+    }
+
+    pub fn mark_parish_pdf_processed(&mut self, url: String) {
+        if !self.processed_parish_pdf_urls.contains(&url) {
+            self.processed_parish_pdf_urls.push(url);
+        }
+    }
+
+    pub fn parish_pdf_already_processed(&self, url: &str) -> bool {
+        self.processed_parish_pdf_urls.iter().any(|u| u == url)
     }
 }
 
