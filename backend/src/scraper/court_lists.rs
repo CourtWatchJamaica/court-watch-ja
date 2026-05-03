@@ -160,7 +160,7 @@ async fn process_one_pdf(
 }
 
 /// Pre-process OCR output to fix common artefacts before the regex parser runs.
-fn normalize_ocr_text(text: &str) -> String {
+pub fn normalize_ocr_text(text: &str) -> String {
     // Collapse spaced-out commercial case numbers:
     //   "SU 2022 CD 00537"  →  "SU2022CD00537"
     //   "SU2022 CD 00537"   →  "SU2022CD00537"
@@ -193,7 +193,7 @@ fn normalize_ocr_text(text: &str) -> String {
 
 /// Try pdf-extract → OCR (pdftoppm + tesseract) → raw UTF-8 fallback.
 /// All char operations use iterators — never byte-indexed slices.
-fn extract_text_safe(bytes: &[u8], url: &str) -> String {
+pub fn extract_text_safe(bytes: &[u8], url: &str) -> String {
     match pdf_utils::extract_text_from_bytes(bytes) {
         Ok(t) if !t.trim().is_empty() => return t,
         Ok(_) => info!("pdf-extract returned empty text for {url}, trying OCR"),
@@ -214,7 +214,7 @@ fn extract_text_safe(bytes: &[u8], url: &str) -> String {
         .collect()
 }
 
-fn extract_pdf_links(html: &str) -> Vec<String> {
+pub fn extract_pdf_links(html: &str) -> Vec<String> {
     let doc = Html::parse_document(html);
     let sel = Selector::parse("a[href]").unwrap();
     let mut links = Vec::new();
@@ -232,14 +232,14 @@ fn extract_pdf_links(html: &str) -> Vec<String> {
     links
 }
 
-fn sanitize_filename(url: &str) -> String {
+pub fn sanitize_filename(url: &str) -> String {
     url.split('/')
         .last()
         .unwrap_or("court_list.pdf")
         .replace(|c: char| !c.is_alphanumeric() && c != '.' && c != '-' && c != '_', "_")
 }
 
-fn date_from_url(url: &str) -> Option<NaiveDate> {
+pub fn date_from_url(url: &str) -> Option<NaiveDate> {
     let re_iso = Regex::new(r"(\d{4}-\d{2}-\d{2})").unwrap();
     if let Some(cap) = re_iso.captures(url) {
         return NaiveDate::parse_from_str(&cap[1], "%Y-%m-%d").ok();
@@ -255,7 +255,7 @@ fn date_from_url(url: &str) -> Option<NaiveDate> {
     None
 }
 
-fn date_from_text(text: &str) -> Option<NaiveDate> {
+pub fn date_from_text(text: &str) -> Option<NaiveDate> {
     let re = Regex::new(
         r"(?i)(?:week\s+commencing|for\s+the\s+week|dated?|sitting)\s+:?\s*(\d{1,2}\s+\w+\s+\d{4}|\w+\s+\d{1,2},?\s+\d{4})",
     )
