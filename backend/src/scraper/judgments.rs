@@ -139,7 +139,7 @@ pub async fn run(
 }
 
 /// Parse the judgments table from an HTML listing page.
-fn parse_listing_page(html: &str) -> Vec<JudgmentRow> {
+pub fn parse_listing_page(html: &str) -> Vec<JudgmentRow> {
     let doc = Html::parse_document(html);
 
     // Try common Drupal Views table selectors
@@ -192,7 +192,7 @@ fn parse_listing_page(html: &str) -> Vec<JudgmentRow> {
     rows
 }
 
-fn parse_date(s: &str) -> Option<NaiveDate> {
+pub fn parse_date(s: &str) -> Option<NaiveDate> {
     // Try common formats used by Jamaican courts
     for fmt in &["%d/%m/%Y", "%Y-%m-%d", "%B %d, %Y", "%d %B %Y", "%d-%m-%Y"] {
         if let Ok(d) = NaiveDate::parse_from_str(s, fmt) {
