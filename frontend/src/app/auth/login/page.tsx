@@ -1,22 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiClient } from "@/lib/api";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
-import { Scale } from "lucide-react";
+import { Scale, Loader2 } from "lucide-react";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -30,63 +19,116 @@ export default function LoginPage() {
     try {
       const { token } = await apiClient.login(email, password);
       localStorage.setItem("token", token);
-      router.push("/");
+      // Hard redirect so the root-layout Navbar remounts and re-reads the
+      // role from the new JWT, ensuring the admin shield appears immediately.
+      window.location.href = "/";
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
-    } finally {
       setLoading(false);
     }
   };
 
+  const inputCls =
+    "w-full rounded-xl border border-white/[0.1] bg-black/30 px-4 py-3 text-sm text-white placeholder-white/25 focus:outline-none focus:border-[#009B3A]/60 focus:bg-black/50 transition-colors";
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <Scale className="h-12 w-12" />
+    <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] px-4">
+      {/* Jamaican stripe */}
+      <div
+        className="fixed top-0 left-0 right-0 h-[3px] z-50"
+        style={{
+          background:
+            "linear-gradient(to right, #111111 33.33%, #009B3A 33.33%, #009B3A 66.66%, #FED100 66.66%)",
+        }}
+      />
+
+      <div className="w-full max-w-sm">
+        {/* Logo */}
+        <div className="mb-8 flex flex-col items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#009B3A]/15 ring-1 ring-[#009B3A]/30">
+            <Scale className="h-6 w-6 text-[#009B3A]" />
           </div>
-          <CardTitle className="text-2xl">Welcome Back</CardTitle>
-          <CardDescription>
-            Sign in to your Jamaican Law account
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          <div className="text-center">
+            <h1 className="text-2xl font-bold tracking-tight text-white">
+              Court<span className="text-[#009B3A]">Watch</span>
+              <span className="text-[#FED100]"> JA</span>
+            </h1>
+            <p className="mt-1 text-sm text-white/40">
+              Sign in to your account
+            </p>
+          </div>
+        </div>
+
+        {/* Card */}
+        <div className="rounded-2xl border border-white/[0.08] bg-[#0d0d1a] p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Input
+              <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40 mb-1.5">
+                Email
+              </label>
+              <input
                 type="email"
-                placeholder="Email"
+                className={inputCls}
+                placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                autoComplete="email"
               />
             </div>
+
             <div>
-              <Input
+              <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40 mb-1.5">
+                Password
+              </label>
+              <input
                 type="password"
-                placeholder="Password"
+                className={inputCls}
+                placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                autoComplete="current-password"
               />
             </div>
+
             {error && (
-              <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md">
+              <div className="rounded-xl bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-400">
                 {error}
               </div>
             )}
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Signing in..." : "Sign In"}
-            </Button>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#009B3A] py-3 text-sm font-semibold text-white hover:bg-[#009B3A]/85 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Signing in…
+                </>
+              ) : (
+                "Sign In"
+              )}
+            </button>
           </form>
-          <div className="mt-4 text-center text-sm">
-            Don't have an account?{" "}
-            <Link href="/auth/signup" className="text-blue-600 hover:underline">
+
+          <div className="mt-5 text-center text-sm text-white/35">
+            Don&apos;t have an account?{" "}
+            <Link
+              href="/auth/signup"
+              className="font-medium text-[#009B3A] hover:text-[#009B3A]/80 transition-colors"
+            >
               Sign up
             </Link>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+
+        <p className="mt-6 text-center text-[11px] text-white/20">
+          Jamaica&apos;s premier legal case tracker
+        </p>
+      </div>
     </div>
   );
 }
