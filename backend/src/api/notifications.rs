@@ -1,5 +1,6 @@
-use axum::{extract::State, Extension, Json};
+use axum::{extract::{Path, State}, Extension, Json};
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 
 use crate::{api::errors::AppError, db::{models::Notification, queries}, AppState};
 
@@ -28,8 +29,31 @@ pub async fn get_notifications(
     Ok(Json(NotificationsResponse { notifications }))
 }
 
-// Preferences are stored in env / future user_preferences table.
-// Accept and acknowledge for now; extend with a preferences table if needed.
+pub async fn get_unread_count(
+    State(state): State<AppState>,
+    Extension(user_id): Extension<i32>,
+) -> Result<Json<Value>, AppError> {
+    let count = queries::get_unread_notification_count(&state.db, user_id).await?;
+    Ok(Json(json!({ "count": count })))
+}
+
+pub async fn mark_all_read(
+    State(state): State<AppState>,
+    Extension(user_id): Extension<i32>,
+) -> Result<Json<Value>, AppError> {
+    let updated = queries::mark_notifications_read(&state.db, user_id).await?;
+    Ok(Json(json!({ "updated": updated })))
+}
+
+pub async fn mark_one_read(
+    State(state): State<AppState>,
+    Extension(user_id): Extension<i32>,
+    Path(id): Path<i32>,
+) -> Result<Json<Value>, AppError> {
+    let marked = queries::mark_notification_read(&state.db, id, user_id).await?;
+    Ok(Json(json!({ "marked": marked })))
+}
+
 pub async fn update_preferences(
     Extension(_user_id): Extension<i32>,
     Json(_body): Json<PreferencesRequest>,
