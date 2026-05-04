@@ -241,14 +241,7 @@ pub async fn admin_delete_sitting(pool: &PgPool, id: i32) -> sqlx::Result<bool> 
 
 // ── Admin: Activity log ────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, serde::Serialize, sqlx::FromRow)]
-pub struct ActivityLogRow {
-    pub id: i32,
-    pub email: String,
-    pub case_id: i32,
-    pub notification_type: String,
-    pub sent_at: chrono::NaiveDateTime,
-}
+pub use super::models::ActivityLogRow;
 
 pub async fn admin_recent_activity(pool: &PgPool, limit: i64) -> sqlx::Result<Vec<ActivityLogRow>> {
     sqlx::query_as::<_, ActivityLogRow>(
@@ -261,6 +254,87 @@ pub async fn admin_recent_activity(pool: &PgPool, limit: i64) -> sqlx::Result<Ve
     .bind(limit)
     .fetch_all(pool)
     .await
+}
+
+// ── Admin: Create Judgment ─────────────────────────────────────────────────
+
+pub async fn admin_create_judgment(
+    pool: &PgPool,
+    case_number: &str,
+    title: Option<&str>,
+    judge_name: Option<&str>,
+    court: Option<&str>,
+    date: Option<chrono::NaiveDate>,
+    pdf_url: Option<&str>,
+    summary_text: Option<&str>,
+) -> sqlx::Result<Judgment> {
+    let sql = format!(
+        "INSERT INTO judgments (case_number, title, judge_name, court, date, pdf_url, summary_text)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING {J}"
+    );
+    sqlx::query_as::<_, Judgment>(&sql)
+        .bind(case_number)
+        .bind(title)
+        .bind(judge_name)
+        .bind(court)
+        .bind(date)
+        .bind(pdf_url)
+        .bind(summary_text)
+        .fetch_one(pool)
+        .await
+}
+
+// ── Admin: Create Sitting ──────────────────────────────────────────────────
+
+pub async fn admin_create_sitting(
+    pool: &PgPool,
+    case_number: Option<&str>,
+    title: Option<&str>,
+    judge_name: Option<&str>,
+    court_division: Option<&str>,
+    event_type: Option<&str>,
+    event_date: Option<chrono::NaiveDate>,
+    event_time: Option<chrono::NaiveTime>,
+    lawyers: Option<&str>,
+    pdf_source_url: Option<&str>,
+) -> sqlx::Result<CourtSitting> {
+    let sql = format!(
+        "INSERT INTO court_sittings
+           (case_number, title, judge_name, court_division, event_type, event_date, event_time, lawyers, pdf_source_url)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         RETURNING {S}"
+    );
+    sqlx::query_as::<_, CourtSitting>(&sql)
+        .bind(case_number)
+        .bind(title)
+        .bind(judge_name)
+        .bind(court_division)
+        .bind(event_type)
+        .bind(event_date)
+        .bind(event_time)
+        .bind(lawyers)
+        .bind(pdf_source_url)
+        .fetch_one(pool)
+        .await
+}
+
+// ── Admin: Announce ────────────────────────────────────────────────────────
+
+pub async fn admin_announce(
+    pool: &PgPool,
+    title: &str,
+    message: &str,
+) -> sqlx::Result<i64> {
+    let result = sqlx::query(
+        "INSERT INTO notifications (user_id, case_id, type, title, message, sent_at)
+         SELECT id, NULL, 'announcement', $1, $2, NOW() FROM users",
+    )
+    .bind(title)
+    .bind(message)
+    .execute(pool)
+    .await?;
+    Ok(result.rows_affected() as i64)
 }
 
 // ── Judgments ──────────────────────────────────────────────────────────────
@@ -528,7 +602,7 @@ pub async fn remove_user_case(
 
 pub async fn get_notifications(pool: &PgPool, user_id: i32) -> sqlx::Result<Vec<Notification>> {
     sqlx::query_as::<_, Notification>(
-        r#"SELECT id, user_id, case_id, "type", sent_at, read_at
+        r#"SELECT id, user_id, case_id, "type", sent_at, read_at, title, message
            FROM notifications WHERE user_id = $1 ORDER BY sent_at DESC LIMIT 100"#,
     )
     .bind(user_id)
