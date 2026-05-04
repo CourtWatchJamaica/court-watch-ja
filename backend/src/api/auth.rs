@@ -1,4 +1,4 @@
-use axum::{extract::State, Json};
+use axum::{extract::State, Extension, Json};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -17,6 +17,14 @@ pub struct AuthRequest {
 #[derive(Serialize)]
 pub struct AuthResponse {
     pub token: String,
+}
+
+#[derive(Serialize)]
+pub struct MeResponse {
+    pub id: i32,
+    pub email: String,
+    pub role: String,
+    pub created_at: String,
 }
 
 pub async fn signup(
@@ -42,7 +50,7 @@ pub async fn signup(
             other => AppError::Sqlx(other),
         })?;
 
-    let token = jwt::encode_token(user.id, &state.config.jwt_secret)?;
+    let token = jwt::encode_token(user.id, &user.email, &user.role, &state.config.jwt_secret)?;
     Ok(Json(AuthResponse { token }))
 }
 
@@ -61,6 +69,22 @@ pub async fn login(
         return Err(AppError::Unauthorized);
     }
 
-    let token = jwt::encode_token(user.id, &state.config.jwt_secret)?;
+    let token = jwt::encode_token(user.id, &user.email, &user.role, &state.config.jwt_secret)?;
     Ok(Json(AuthResponse { token }))
+}
+
+pub async fn me(
+    State(state): State<AppState>,
+    Extension(user_id): Extension<i32>,
+) -> Result<Json<MeResponse>, AppError> {
+    let user = queries::get_user_by_id(&state.db, user_id)
+        .await?
+        .ok_or(AppError::NotFound)?;
+
+    Ok(Json(MeResponse {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        created_at: user.created_at.to_string(),
+    }))
 }
