@@ -1,11 +1,16 @@
 use axum::{
-    extract::{Query, State},
+    extract::{Path, Query, State},
     Json,
 };
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 
 use crate::{api::errors::AppError, db::{models::CourtSitting, queries}, AppState};
+
+#[derive(Serialize)]
+pub struct SittingResponse {
+    pub sitting: CourtSitting,
+}
 
 #[derive(Deserialize)]
 pub struct SittingsParams {
@@ -50,4 +55,14 @@ pub async fn today_sittings(
 ) -> Result<Json<SittingsResponse>, AppError> {
     let sittings = queries::get_today_sittings(&state.db).await?;
     Ok(Json(SittingsResponse { sittings }))
+}
+
+pub async fn get_sitting(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+) -> Result<Json<SittingResponse>, AppError> {
+    let sitting = queries::get_court_sitting_by_id(&state.db, id)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    Ok(Json(SittingResponse { sitting }))
 }
