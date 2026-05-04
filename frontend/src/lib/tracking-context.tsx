@@ -81,13 +81,14 @@ export function TrackingProvider({ children }: { children: React.ReactNode }) {
     async (id: number) => {
       // Determine type from current state
       const isSitting = sittingIds.has(id);
+      const caseType = isSitting ? "sitting" : "judgment";
       if (isSitting) {
         setSittingIds((prev) => { const s = new Set(prev); s.delete(id); return s; });
       } else {
         setJudgmentIds((prev) => { const s = new Set(prev); s.delete(id); return s; });
       }
       try {
-        await apiClient.removeUserCase(id);
+        await apiClient.removeUserCase(id, caseType);
       } catch {
         // Roll back
         if (isSitting) {
