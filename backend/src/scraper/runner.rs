@@ -1,15 +1,15 @@
 /// Scheduler — runs scrapers on Mon / Wed / Fri at 06:00 UTC.
 /// Judgment + court-list scrapers: Mon, Wed, Fri.
 /// Judges scraper: Monday only (once per week is sufficient).
-use chrono::{Duration, Utc};
+use chrono::{Duration, NaiveDate, Utc};
 use sqlx::PgPool;
 use std::sync::Arc;
 use tokio_cron_scheduler::{Job, JobScheduler};
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use super::{
     appeal_court, appeal_court_lists, court_lists, judges, judgments, parish_court,
-    parish_court_lists, ScraperState,
+    parish_court_lists, ScraperState, MAX_PDF_FAILURES,
 };
 use crate::{config::Config, db::queries};
 
@@ -131,6 +131,7 @@ pub async fn run_catchup_check(pool: &PgPool, config: &Config) -> anyhow::Result
          parish_sittings_stale={parish_sittings_stale} (last={parish_sitting_date:?})"
     );
 
+    let cutoff = load_cutoff_from_db(pool, config).await;
     let client = super::http_client()?;
     let mut state = ScraperState::load(&config.scraper_state_path).await;
 
@@ -139,15 +140,15 @@ pub async fn run_catchup_check(pool: &PgPool, config: &Config) -> anyhow::Result
             "Catch-up: running Supreme Court judgment scraper from page {}",
             state.next_judgment_page
         );
-        if let Err(e) = judgments::run(pool, &mut state, config.judgment_cutoff_date, &client).await
-        {
+        if let Err(e) = judgments::run(pool, &mut state, cutoff, &client).await {
             error!("Catch-up SC judgment scraper error: {e}");
         }
         state.save(&config.scraper_state_path).await.ok();
 
-        if let Err(e) = download_pending_pdfs(pool, config, &client).await {
+        if let Err(e) = download_pending_pdfs(pool, config, &client, &mut state).await {
             error!("Catch-up SC PDF download error: {e}");
         }
+        state.save(&config.scraper_state_path).await.ok();
     }
 
     if coa_judgments_stale {
@@ -155,16 +156,15 @@ pub async fn run_catchup_check(pool: &PgPool, config: &Config) -> anyhow::Result
             "Catch-up: running Court of Appeal judgment scraper (civil pg {}, criminal pg {})",
             state.next_appeal_page, state.next_appeal_criminal_page
         );
-        if let Err(e) =
-            appeal_court::run(pool, &mut state, config.judgment_cutoff_date, &client).await
-        {
+        if let Err(e) = appeal_court::run(pool, &mut state, cutoff, &client).await {
             error!("Catch-up CoA judgment scraper error: {e}");
         }
         state.save(&config.scraper_state_path).await.ok();
 
-        if let Err(e) = download_pending_pdfs(pool, config, &client).await {
+        if let Err(e) = download_pending_pdfs(pool, config, &client, &mut state).await {
             error!("Catch-up CoA PDF download error: {e}");
         }
+        state.save(&config.scraper_state_path).await.ok();
     }
 
     if parish_judgments_stale {
@@ -172,9 +172,7 @@ pub async fn run_catchup_check(pool: &PgPool, config: &Config) -> anyhow::Result
             "Catch-up: running Parish Court judgment scraper from page {}",
             state.next_parish_page
         );
-        if let Err(e) =
-            parish_court::run(pool, &mut state, config.judgment_cutoff_date, &client).await
-        {
+        if let Err(e) = parish_court::run(pool, &mut state, cutoff, &client).await {
             error!("Catch-up Parish judgment scraper error: {e}");
         }
         state.save(&config.scraper_state_path).await.ok();
@@ -210,24 +208,38 @@ pub async fn run_catchup_check(pool: &PgPool, config: &Config) -> anyhow::Result
 
 /// One complete scraper run (all scrapers for all courts).
 pub async fn run_all(pool: &PgPool, config: &Config) -> anyhow::Result<()> {
+    // Read the cutoff date from the DB so admin changes take effect without a restart.
+    let cutoff = load_cutoff_from_db(pool, config).await;
+    info!("Scraper cutoff date: {cutoff}");
+
     let client = super::http_client()?;
 
     let mut state = ScraperState::load(&config.scraper_state_path).await;
+
+    // Log permanently-skipped PDFs so operators can investigate or clear them.
+    if !state.pdf_skipped.is_empty() {
+        warn!(
+            "{} PDF(s) permanently skipped (>{MAX_PDF_FAILURES} failures): {}",
+            state.pdf_skipped.len(),
+            state.pdf_skipped.join(", ")
+        );
+    }
 
     // 1. Supreme Court judgment listing scraper
     info!(
         "-- Starting Supreme Court judgment scraper (page {})",
         state.next_judgment_page
     );
-    if let Err(e) = judgments::run(pool, &mut state, config.judgment_cutoff_date, &client).await {
+    if let Err(e) = judgments::run(pool, &mut state, cutoff, &client).await {
         error!("SC judgment scraper error: {e}");
     }
     state.save(&config.scraper_state_path).await.ok();
 
     // 2. PDF download for Supreme Court judgments that have a pdf_url but no local copy
-    if let Err(e) = download_pending_pdfs(pool, config, &client).await {
+    if let Err(e) = download_pending_pdfs(pool, config, &client, &mut state).await {
         error!("PDF download step error: {e}");
     }
+    state.save(&config.scraper_state_path).await.ok();
 
     // 3. Supreme Court court lists (PDFs)
     info!("-- Starting Supreme Court court-lists scraper");
@@ -257,20 +269,21 @@ pub async fn run_all(pool: &PgPool, config: &Config) -> anyhow::Result<()> {
         "-- Starting Court of Appeal judgment scraper (civil pg {}, criminal pg {})",
         state.next_appeal_page, state.next_appeal_criminal_page
     );
-    let (coa_civil, coa_criminal) =
-        match appeal_court::run(pool, &mut state, config.judgment_cutoff_date, &client).await {
-            Ok(counts) => counts,
-            Err(e) => {
-                error!("[CoA] Judgment scraper error: {e}");
-                (0, 0)
-            }
-        };
+    let (coa_civil, coa_criminal) = match appeal_court::run(pool, &mut state, cutoff, &client).await
+    {
+        Ok(counts) => counts,
+        Err(e) => {
+            error!("[CoA] Judgment scraper error: {e}");
+            (0, 0)
+        }
+    };
     state.save(&config.scraper_state_path).await.ok();
 
     // 6. PDF downloads for Court of Appeal judgments
-    if let Err(e) = download_pending_pdfs(pool, config, &client).await {
+    if let Err(e) = download_pending_pdfs(pool, config, &client, &mut state).await {
         error!("[CoA] PDF download step error: {e}");
     }
+    state.save(&config.scraper_state_path).await.ok();
 
     // 7. Court of Appeal court lists (PDFs)
     info!("-- Starting Court of Appeal court-lists scraper");
@@ -310,8 +323,7 @@ pub async fn run_all(pool: &PgPool, config: &Config) -> anyhow::Result<()> {
         "-- Starting Parish Court judgment scraper (page {})",
         state.next_parish_page
     );
-    if let Err(e) = parish_court::run(pool, &mut state, config.judgment_cutoff_date, &client).await
-    {
+    if let Err(e) = parish_court::run(pool, &mut state, cutoff, &client).await {
         error!("[Parish] Judgment scraper error: {e}");
     }
     state.save(&config.scraper_state_path).await.ok();
@@ -342,16 +354,37 @@ pub async fn run_all(pool: &PgPool, config: &Config) -> anyhow::Result<()> {
     Ok(())
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/// Read the judgment cutoff date from `system_config`, falling back to the
+/// value baked into `Config` if the DB row is absent or unparseable.
+async fn load_cutoff_from_db(pool: &PgPool, config: &Config) -> NaiveDate {
+    match queries::get_system_config(pool, "judgment_cutoff_date").await {
+        Ok(Some(s)) => {
+            NaiveDate::parse_from_str(&s, "%Y-%m-%d").unwrap_or(config.judgment_cutoff_date)
+        }
+        Ok(None) => {
+            warn!("judgment_cutoff_date not found in system_config; using config default");
+            config.judgment_cutoff_date
+        }
+        Err(e) => {
+            warn!("Failed to read judgment_cutoff_date from DB: {e}; using config default");
+            config.judgment_cutoff_date
+        }
+    }
+}
+
 async fn download_pending_pdfs(
     pool: &PgPool,
     config: &Config,
     client: &reqwest::Client,
+    state: &mut ScraperState,
 ) -> anyhow::Result<()> {
     use crate::{db::queries, utils::pdf as pdf_utils};
     use std::path::Path;
 
     let pending = queries::judgments_needing_pdf(pool).await?;
-    info!("Downloading PDFs for {} judgments", pending.len());
+    info!("Downloading PDFs for {} judgment(s)", pending.len());
 
     for judgment in pending {
         let Some(pdf_url) = &judgment.pdf_url else {
@@ -377,6 +410,12 @@ async fn download_pending_pdfs(
             }
         };
 
+        // Skip PDFs that have permanently failed.
+        if state.is_pdf_skipped(&full_url) {
+            info!("Skipping permanently-failed PDF: {full_url}");
+            continue;
+        }
+
         let filename = format!("{}.pdf", judgment.case_number.replace('/', "_"));
         let dest = Path::new(&config.pdf_dir).join(&filename);
 
@@ -393,9 +432,23 @@ async fn download_pending_pdfs(
                     error!("Failed to update local_pdf_path for {}: {e}", judgment.id);
                 } else {
                     info!("Saved PDF: {path_str}");
+                    state.clear_pdf_failure(&full_url);
                 }
             }
-            Err(e) => error!("Failed to download PDF for {}: {e}", judgment.case_number),
+            Err(e) => {
+                let permanently_skipped = state.record_pdf_failure(full_url.clone());
+                if permanently_skipped {
+                    error!(
+                        "PDF permanently skipped after {MAX_PDF_FAILURES} failures: {} ({full_url}) — {e}",
+                        judgment.case_number
+                    );
+                } else {
+                    error!(
+                        "Failed to download PDF for {} ({full_url}): {e}",
+                        judgment.case_number
+                    );
+                }
+            }
         }
 
         tokio::time::sleep(std::time::Duration::from_secs(3)).await;
