@@ -73,10 +73,36 @@ fn extract_names_from_text(text: &str) -> Vec<String> {
 
     let mut names = Vec::new();
     for cap in re.captures_iter(text) {
-        let name = cap[2].trim().to_string();
+        // Normalise to title case: official sites often emit ALL-CAPS names.
+        let name = normalize_name_case(cap[2].trim());
         if name.split_whitespace().count() >= 2 && !names.contains(&name) {
             names.push(name);
         }
     }
     names
+}
+
+/// Convert a judge's bare name from ALL CAPS or mixed case to title case.
+///
+/// Handles hyphenated surnames ("JACKSON-HAISLEY" → "Jackson-Haisley") and
+/// single-letter initials ("S." → "S.").
+fn normalize_name_case(name: &str) -> String {
+    name.split_whitespace()
+        .map(|word| {
+            if word.contains('-') {
+                word.split('-').map(capitalize_word).collect::<Vec<_>>().join("-")
+            } else {
+                capitalize_word(word)
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn capitalize_word(word: &str) -> String {
+    let mut chars = word.chars();
+    match chars.next() {
+        None => String::new(),
+        Some(first) => first.to_uppercase().to_string() + &chars.as_str().to_lowercase(),
+    }
 }
