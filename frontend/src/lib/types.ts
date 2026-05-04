@@ -37,7 +37,7 @@ export interface ScraperStatus {
 export interface ActivityLogRow {
   id: number;
   email: string;
-  case_id: number;
+  case_id: number | null;
   notification_type: string;
   sent_at: string;
 }
@@ -96,8 +96,10 @@ export interface UserCase {
 export interface Notification {
   id: number;
   user_id: number;
-  case_id: number;
+  case_id: number | null;
   type: string;
   sent_at: string;
   read_at: string | null;
+  title?: string | null;
+  message?: string | null;
 }
