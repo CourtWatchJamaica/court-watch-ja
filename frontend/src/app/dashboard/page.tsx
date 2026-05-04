@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Card,
@@ -24,26 +24,8 @@ import {
   TrendingUp,
   Clock,
 } from "lucide-react";
-
-// Types matching your database
-interface Judgment {
-  id: number;
-  case_number: string;
-  title: string | null;
-  judge_name: string | null;
-  court: string | null;
-  date: string | null;
-  summary_text: string | null;
-}
-
-interface UserCase {
-  id: number;
-  user_id: number;
-  case_id: number;
-  created_at: string;
-}
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
+import { apiClient } from "@/lib/api";
+import { Judgment, UserCase } from "@/lib/types";
 
 export default function DashboardPage() {
   const [judgments, setJudgments] = useState<Judgment[]>([]);
@@ -56,87 +38,37 @@ export default function DashboardPage() {
     tracked: 0,
   });
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
-  async function fetchDashboardData() {
+  const fetchDashboardData = useCallback(async () => {
     try {
-      const token = localStorage.getItem("token");
-      const headers: HeadersInit = {
-        "Content-Type": "application/json",
-        ...(token && { Authorization: `Bearer ${token}` }),
-      };
+      const [judgmentsData, trackedData] = await Promise.all([
+        apiClient.getJudgments(),
+        apiClient.getUserCases(),
+      ]);
 
-      // Fetch recent judgments (first 5)
-      const judgmentsRes = await fetch(`${API_URL}/judgments?limit=5`, {
-        headers,
-      });
-      const judgmentsData = await judgmentsRes.json();
-      const recentJudgments = judgmentsData?.judgments || [];
-
-      // Fetch tracked cases
-      const trackedRes = await fetch(`${API_URL}/user/cases`, { headers });
-      const trackedData = await trackedRes.json();
-      const tracked = trackedData?.cases || [];
+      const recentJudgments = judgmentsData.judgments.slice(0, 5);
+      const tracked = trackedData.cases;
 
       setJudgments(recentJudgments);
       setTrackedCases(tracked);
       setStats({
-        totalCases: recentJudgments.length,
+        totalCases: judgmentsData.total,
         activeJudges: [
-          ...new Set(recentJudgments.map((j: Judgment) => j.judge_name)),
+          ...new Set(recentJudgments.map((j) => j.judge_name).filter(Boolean)),
         ].length,
-        notifications: 3, // placeholder until API is ready
+        notifications: 0,
         tracked: tracked.length,
       });
     } catch (error) {
-      // Use mock data when backend isn't running
-      console.log("Backend not available, using mock data");
-      setJudgments([
-        {
-          id: 1,
-          case_number: "2024/HCV/00123",
-          title: "Smith v Attorney General",
-          judge_name: "Hon. Justice McDonald-Bishop",
-          court: "Supreme Court",
-          date: "2024-01-15",
-          summary_text:
-            "Constitutional challenge regarding fundamental rights.",
-        },
-        {
-          id: 2,
-          case_number: "2024/HCV/00456",
-          title: "Brown v Commissioner of Police",
-          judge_name: "Hon. Justice Sykes",
-          court: "Court of Appeal",
-          date: "2024-02-20",
-          summary_text:
-            "Appeal against conviction in the Resident Magistrate Court.",
-        },
-        {
-          id: 3,
-          case_number: "2024/HCV/00789",
-          title: "Jamaica Public Service v Green",
-          judge_name: "Hon. Justice McDonald-Bishop",
-          court: "Supreme Court",
-          date: "2024-03-10",
-          summary_text:
-            "Negligence claim arising from electrical infrastructure failure.",
-        },
-      ]);
-      setStats({
-        totalCases: 3,
-        activeJudges: 2,
-        notifications: 3,
-        tracked: 1,
-      });
+      console.error("Failed to load dashboard:", error);
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  // Format date nicely
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
+
   function formatDate(dateString: string | null) {
     if (!dateString) return "N/A";
     return new Date(dateString).toLocaleDateString("en-JM", {
@@ -176,32 +108,28 @@ export default function DashboardPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {[
             {
-              label: "Recent Cases",
+              label: "Total Cases",
               value: stats.totalCases,
               icon: Scale,
               color: "from-[#009B3A] to-[#006B3F]",
-              glow: "bg-[#009B3A]",
             },
             {
               label: "Active Judges",
               value: stats.activeJudges,
               icon: Gavel,
               color: "from-[#FED100] to-[#e6b800]",
-              glow: "bg-[#FED100]",
             },
             {
               label: "Notifications",
               value: stats.notifications,
               icon: Bell,
               color: "from-[#1a1a1a] to-[#333333]",
-              glow: "bg-white",
             },
             {
               label: "Tracked Cases",
               value: stats.tracked,
               icon: BookOpen,
               color: "from-[#009B3A] to-[#FED100]",
-              glow: "bg-[#009B3A]",
             },
           ].map((stat, index) => (
             <Card
@@ -220,15 +148,11 @@ export default function DashboardPage() {
                       </p>
                     )}
                   </div>
-                  <div
-                    className={`p-3 rounded-xl bg-gradient-to-br ${stat.color}`}
-                  >
+                  <div className={`p-3 rounded-xl bg-gradient-to-br ${stat.color}`}>
                     <stat.icon className="w-5 h-5 text-white" />
                   </div>
                 </div>
-                <div
-                  className={`mt-4 h-1 rounded-full bg-gradient-to-r ${stat.color} opacity-50`}
-                />
+                <div className={`mt-4 h-1 rounded-full bg-gradient-to-r ${stat.color} opacity-50`} />
               </CardContent>
             </Card>
           ))}
@@ -272,7 +196,7 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {judgments.map((judgment, index) => (
+                {judgments.map((judgment) => (
                   <Link href={`/cases/${judgment.id}`} key={judgment.id}>
                     <Card className="border-0 bg-black/30 backdrop-blur-sm hover:bg-black/50 transition-all duration-300 group cursor-pointer hover:shadow-lg hover:shadow-[#009B3A]/10">
                       <CardContent className="p-6">
@@ -317,8 +241,7 @@ export default function DashboardPage() {
                         )}
 
                         <div className="mt-4 flex items-center text-[#009B3A] text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                          Read full judgment{" "}
-                          <ArrowRight className="w-4 h-4 ml-1" />
+                          Read full judgment <ArrowRight className="w-4 h-4 ml-1" />
                         </div>
                       </CardContent>
                     </Card>
@@ -330,7 +253,6 @@ export default function DashboardPage() {
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Quick Actions */}
             <Card className="border-0 bg-black/30 backdrop-blur-sm">
               <CardHeader>
                 <CardTitle className="text-white flex items-center gap-2">
@@ -349,19 +271,13 @@ export default function DashboardPage() {
                   </Button>
                 </Link>
                 <Link href="/judges">
-                  <Button
-                    variant="outline"
-                    className="w-full border-[#FED100]/30 text-[#FED100] hover:bg-[#FED100]/10"
-                  >
+                  <Button variant="outline" className="w-full border-[#FED100]/30 text-[#FED100] hover:bg-[#FED100]/10">
                     <Gavel className="w-4 h-4 mr-2" />
                     Browse Judges
                   </Button>
                 </Link>
                 <Link href="/notifications">
-                  <Button
-                    variant="outline"
-                    className="w-full border-white/10 text-white/70 hover:bg-white/5"
-                  >
+                  <Button variant="outline" className="w-full border-white/10 text-white/70 hover:bg-white/5">
                     <Bell className="w-4 h-4 mr-2" />
                     Notifications
                   </Button>
@@ -369,7 +285,6 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
-            {/* Tracked Cases */}
             <Card className="border-0 bg-black/30 backdrop-blur-sm">
               <CardHeader>
                 <CardTitle className="text-white flex items-center gap-2">
@@ -377,16 +292,14 @@ export default function DashboardPage() {
                   Tracked Cases
                 </CardTitle>
                 <CardDescription className="text-white/50">
-                  Cases you're following
+                  Cases you&apos;re following
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {trackedCases.length === 0 ? (
                   <div className="text-center py-8">
                     <Clock className="w-12 h-12 text-white/20 mx-auto mb-3" />
-                    <p className="text-white/50 text-sm">
-                      No tracked cases yet
-                    </p>
+                    <p className="text-white/50 text-sm">No tracked cases yet</p>
                     <Link href="/cases">
                       <Button variant="link" className="text-[#009B3A] mt-2">
                         Start tracking cases
@@ -405,44 +318,16 @@ export default function DashboardPage() {
                             #{tc.case_id}
                           </Badge>
                           <span className="text-sm text-white/70">
-                            Case {tc.case_id}
+                            {tc.case_type === "sitting" ? "Sitting" : "Case"} {tc.case_id}
                           </span>
                         </div>
-                        <Badge
-                          variant="outline"
-                          className="border-[#009B3A]/30 text-[#009B3A]"
-                        >
+                        <Badge variant="outline" className="border-[#009B3A]/30 text-[#009B3A]">
                           Active
                         </Badge>
                       </div>
                     ))}
                   </div>
                 )}
-              </CardContent>
-            </Card>
-
-            {/* Stats */}
-            <Card
-              className="border-0 relative overflow-hidden"
-              style={{
-                background:
-                  "linear-gradient(135deg, #009B3A 0%, #006B3F 50%, #002B14 100%)",
-              }}
-            >
-              <div className="absolute top-0 right-0 w-32 h-32 bg-[#FED100] rounded-full filter blur-[64px] opacity-30" />
-              <CardContent className="relative p-6">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="p-2 rounded-lg bg-black/20">
-                    <Scale className="w-5 h-5 text-[#FED100]" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-white/70">Justice Delivered</p>
-                    <p className="text-2xl font-bold text-white">1,247+</p>
-                  </div>
-                </div>
-                <p className="text-xs text-white/50">
-                  Judgments available in our database
-                </p>
               </CardContent>
             </Card>
           </div>
