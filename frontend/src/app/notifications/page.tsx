@@ -1,94 +1,206 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import Navbar from "@/components/Navbar";
 import { apiClient } from "@/lib/api";
 import { Notification } from "@/lib/types";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Bell, FileText } from "lucide-react";
+import { Bell, FileText, Calendar, CheckCheck } from "lucide-react";
+
+const TYPE_META: Record<string, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
+  new_judgment: { label: "New Judgment", color: "bg-[#009B3A]/15 text-[#009B3A]", icon: FileText },
+  sitting_changed: { label: "Sitting Updated", color: "bg-[#FED100]/15 text-[#FED100]", icon: Calendar },
+};
+
+function NotifMeta(type: string) {
+  return TYPE_META[type] ?? { label: type, color: "bg-white/[0.07] text-white/50", icon: Bell };
+}
+
+function formatRelative(ts: string): string {
+  const diff = Date.now() - new Date(ts).getTime();
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(ts).toLocaleDateString("en-JM", { month: "short", day: "numeric" });
+}
+
+function NotifRow({
+  notif,
+  onRead,
+}: {
+  notif: Notification;
+  onRead: (id: number) => void;
+}) {
+  const router = useRouter();
+  const meta = NotifMeta(notif.type);
+  const Icon = meta.icon;
+  const isUnread = notif.read_at === null;
+
+  const handleClick = () => {
+    if (isUnread) onRead(notif.id);
+    router.push(notif.type === "sitting_changed"
+      ? `/cases/sittings/${notif.case_id}`
+      : `/cases/${notif.case_id}`);
+  };
+
+  return (
+    <button
+      onClick={handleClick}
+      className={`group w-full text-left flex items-start gap-4 px-4 py-4 transition-colors hover:bg-white/[0.02] ${
+        isUnread ? "bg-white/[0.015]" : ""
+      }`}
+    >
+      {/* Unread dot */}
+      <div className="mt-1 shrink-0 w-2 flex justify-center">
+        {isUnread && <span className="h-2 w-2 rounded-full bg-[#009B3A]" />}
+      </div>
+
+      {/* Icon */}
+      <div className={`shrink-0 rounded-xl p-2 ${meta.color.split(" ")[0]}`}>
+        <Icon className={`h-4 w-4 ${meta.color.split(" ")[1]}`} />
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1">
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${meta.color}`}>
+            {meta.label}
+          </span>
+          <span className="text-[10px] text-white/25">{formatRelative(notif.sent_at)}</span>
+        </div>
+        <p className={`text-sm leading-snug ${isUnread ? "text-white/80 font-medium" : "text-white/50"}`}>
+          {notif.type === "new_judgment"
+            ? `New judgment filed — Case #${notif.case_id}`
+            : `Sitting schedule changed — Case #${notif.case_id}`}
+        </p>
+      </div>
+    </button>
+  );
+}
 
 export default function NotificationsPage() {
-  const router = useRouter();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [marking, setMarking] = useState(false);
 
-  useEffect(() => {
-    const fetchNotifications = async () => {
-      try {
-        const { notifications: data } = await apiClient.getNotifications();
-        setNotifications(data);
-      } catch (error) {
-        console.error("Failed to fetch notifications:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchNotifications();
+  const fetchNotifications = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { notifications: data } = await apiClient.getNotifications();
+      setNotifications(data);
+    } catch (error) {
+      console.error("Failed to fetch notifications:", error);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  if (loading) {
-    return (
-      <AuthGuard>
-        <Navbar />
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900" />
-        </div>
-      </AuthGuard>
-    );
-  }
+  useEffect(() => { fetchNotifications(); }, [fetchNotifications]);
+
+  const handleReadOne = useCallback(async (id: number) => {
+    try {
+      await apiClient.markNotificationRead(id);
+      setNotifications((prev) =>
+        prev.map((n) => n.id === id ? { ...n, read_at: new Date().toISOString() } : n),
+      );
+    } catch {/* swallow */}
+  }, []);
+
+  const handleMarkAllRead = async () => {
+    setMarking(true);
+    try {
+      await apiClient.markAllNotificationsRead();
+      const now = new Date().toISOString();
+      setNotifications((prev) => prev.map((n) => ({ ...n, read_at: n.read_at ?? now })));
+    } catch {/* swallow */} finally {
+      setMarking(false);
+    }
+  };
+
+  const unreadCount = notifications.filter((n) => n.read_at === null).length;
 
   return (
     <AuthGuard>
-      <Navbar />
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2 flex items-center">
-            <Bell className="h-8 w-8 mr-3" />
-            Notifications
-          </h1>
-          <p className="text-gray-600">Updates on your tracked cases</p>
-        </div>
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="max-w-2xl mx-auto px-4 sm:px-6 py-8 pb-32 md:pb-16">
 
-        <div className="space-y-4">
-          {notifications.length > 0 ? (
-            notifications.map((notification) => (
-              <Card
-                key={notification.id}
-                className="hover:shadow-md transition-shadow cursor-pointer"
-                onClick={() => router.push(`/cases/${notification.case_id}`)}
+          {/* Header */}
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <div className="mb-1.5 flex items-center gap-2">
+                <Bell className="h-4 w-4 text-[#009B3A]" />
+                <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#009B3A]">
+                  Alerts
+                </span>
+              </div>
+              <h1 className="text-2xl font-bold tracking-tight text-foreground">
+                Notifications
+                {unreadCount > 0 && (
+                  <span className="ml-2.5 inline-flex items-center justify-center rounded-full bg-[#009B3A]/20 px-2 py-0.5 text-sm font-semibold text-[#009B3A]">
+                    {unreadCount}
+                  </span>
+                )}
+              </h1>
+            </div>
+
+            {unreadCount > 0 && (
+              <button
+                onClick={handleMarkAllRead}
+                disabled={marking}
+                className="flex items-center gap-1.5 rounded-xl bg-white/[0.05] px-3 py-2 text-xs font-medium text-white/50 hover:text-white/80 hover:bg-white/[0.08] disabled:opacity-50 transition-colors"
               >
-                <CardContent className="flex items-start p-4">
-                  <FileText className="h-5 w-5 mr-3 mt-1 text-blue-600" />
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-1">
-                      <Badge variant="secondary" className="text-xs">
-                        {notification.type}
-                      </Badge>
-                      <span className="text-xs text-gray-500">
-                        {new Date(notification.sent_at).toLocaleString()}
-                      </span>
+                <CheckCheck className="h-3.5 w-3.5" />
+                Mark all read
+              </button>
+            )}
+          </div>
+
+          {/* List */}
+          <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a] overflow-hidden divide-y divide-white/[0.04]">
+            {loading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex items-start gap-4 px-4 py-4 animate-pulse">
+                  <div className="mt-1 w-2 h-2 rounded-full bg-white/[0.06]" />
+                  <div className="h-9 w-9 rounded-xl bg-white/[0.06] shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="flex gap-2">
+                      <div className="h-4 w-24 rounded-full bg-white/[0.06]" />
+                      <div className="h-4 w-12 rounded bg-white/[0.04]" />
                     </div>
-                    <p className="text-sm text-gray-700">
-                      Update for Case ID {notification.case_id}
-                    </p>
+                    <div className="h-3.5 w-3/4 rounded bg-white/[0.04]" />
                   </div>
-                </CardContent>
-              </Card>
-            ))
-          ) : (
-            <Card>
-              <CardContent className="text-center py-12 text-gray-500">
-                <Bell className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                <p>No notifications yet</p>
-              </CardContent>
-            </Card>
+                </div>
+              ))
+            ) : notifications.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/[0.04]">
+                  <Bell className="h-7 w-7 text-white/15" />
+                </div>
+                <p className="text-sm font-medium text-white/35">No notifications yet</p>
+                <p className="mt-1 text-xs text-white/20 max-w-[200px]">
+                  Updates on your tracked cases will appear here.
+                </p>
+              </div>
+            ) : (
+              notifications.map((n) => (
+                <NotifRow key={n.id} notif={n} onRead={handleReadOne} />
+              ))
+            )}
+          </div>
+
+          {!loading && notifications.length > 0 && (
+            <p className="mt-4 text-center text-[11px] text-white/20">
+              Showing the 100 most recent notifications
+            </p>
           )}
-        </div>
-      </main>
+        </main>
+      </div>
     </AuthGuard>
   );
 }
