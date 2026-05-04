@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Scale,
   Bell,
@@ -15,6 +15,7 @@ import {
   ChevronDown,
   Check,
   X,
+  ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -28,7 +29,6 @@ const DESKTOP_LINKS = [
   { href: "/judges", label: "Judges" },
 ];
 
-/* Gavel SVG used for Chambers tab icon (avoids lucide version uncertainty) */
 function GavelIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -49,13 +49,64 @@ function GavelIcon({ className }: { className?: string }) {
   );
 }
 
+function getRoleFromToken(): string | null {
+  try {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    if (!token) return null;
+    const b64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const payload = JSON.parse(atob(b64));
+    return payload.role ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const { selectedCourt, setSelectedCourt, isRefreshing } = useCourt();
   const { openChambers } = useChambers();
-  const [notifCount, setNotifCount] = useState(0);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [courtSheetOpen, setCourtSheetOpen] = useState(false);
+  const [role, setRole] = useState<string | null>(null);
+  const [notifToast, setNotifToast] = useState<string | null>(null);
+  const prevCountRef = useRef<number | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Read role from JWT once on mount (no API call needed — payload is public)
+  useEffect(() => {
+    setRole(getRoleFromToken());
+  }, []);
+
+  // Poll unread count; show toast when new notifications arrive
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchCount = async () => {
+      try {
+        const { count } = await apiClient.getNotificationsUnreadCount();
+        if (cancelled) return;
+        setUnreadCount(count);
+        if (prevCountRef.current !== null && count > prevCountRef.current) {
+          const diff = count - prevCountRef.current;
+          const msg = diff === 1 ? "You have a new case update" : `${diff} new case updates`;
+          setNotifToast(msg);
+          if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+          toastTimerRef.current = setTimeout(() => setNotifToast(null), 4000);
+        }
+        prevCountRef.current = count;
+      } catch {
+        /* not authenticated yet */
+      }
+    };
+
+    fetchCount();
+    const interval = setInterval(fetchCount, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -65,40 +116,16 @@ export default function Navbar() {
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
 
-  useEffect(() => {
-    let cancelled = false;
-    const fetchCount = async () => {
-      try {
-        const { notifications } = await apiClient.getNotifications();
-        if (!cancelled) setNotifCount(notifications.length);
-      } catch {
-        /* not authenticated yet */
-      }
-    };
-    fetchCount();
-    const interval = setInterval(fetchCount, 60_000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, []);
-
-  const handleCourtSelect = (court: Court) => {
-    setSelectedCourt(court);
-    setCourtSheetOpen(false);
-    router.push(`/court/${COURT_TO_SLUG[court]}`);
-  };
+  const isAdmin = role === "admin" || role === "super_admin";
 
   return (
     <>
-      {/* ── Court-change loading bar — sits above flag bar ── */}
       {isRefreshing && (
         <div className="fixed top-0 left-0 right-0 z-[65] h-[3px] pointer-events-none overflow-hidden">
           <div className="h-full w-full bg-[#009B3A] court-progress-bar" />
         </div>
       )}
 
-      {/* ── Jamaican flag accent bar ── */}
       <div
         aria-hidden
         className="fixed top-0 left-0 right-0 h-[3px] z-[50] pointer-events-none"
@@ -108,12 +135,11 @@ export default function Navbar() {
         }}
       />
 
-      {/* ── Top bar — always dark ── */}
       <nav className="sticky top-[3px] z-50 border-b border-white/[0.07] bg-[#07070f]/92 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between gap-2">
 
-            {/* ── Left: Logo + Court Pills (lg+) ── */}
+            {/* Logo + Court Pills */}
             <div className="flex items-center gap-3 shrink-0">
               <Link href="/" className="flex items-center gap-2.5 shrink-0">
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#009B3A]/15 ring-1 ring-[#009B3A]/30">
@@ -125,7 +151,6 @@ export default function Navbar() {
                 </span>
               </Link>
 
-              {/* Desktop court pills — lg+ only */}
               <div className="hidden lg:flex items-center gap-1 ml-1">
                 {COURTS.map((court) => (
                   <button
@@ -145,7 +170,7 @@ export default function Navbar() {
               </div>
             </div>
 
-            {/* ── Center: Desktop nav links (md+) ── */}
+            {/* Center: Desktop nav links */}
             <div className="hidden md:flex items-center gap-0.5 flex-1 justify-center">
               {DESKTOP_LINKS.map(({ href, label }) => (
                 <Link
@@ -163,11 +188,24 @@ export default function Navbar() {
                   )}
                 </Link>
               ))}
+              {/* Admin link — only for admin/super_admin */}
+              {isAdmin && (
+                <Link
+                  href="/admin"
+                  className={`relative px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-1.5 ${
+                    isActive("/admin")
+                      ? "text-[#FED100] bg-[#FED100]/10"
+                      : "text-white/45 hover:text-white hover:bg-white/[0.07]"
+                  }`}
+                >
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  Admin
+                </Link>
+              )}
             </div>
 
-            {/* ── Right: Court chip (< lg) + actions ── */}
+            {/* Right: Actions */}
             <div className="flex items-center gap-1.5 shrink-0">
-              {/* Court chip — visible on mobile + tablet, hidden on lg+ */}
               <button
                 onClick={() => setCourtSheetOpen(true)}
                 className="lg:hidden flex items-center gap-1.5 rounded-full border border-[#009B3A]/40 bg-[#009B3A]/10 px-2.5 py-1.5 text-[11px] font-semibold text-[#009B3A] transition-colors hover:bg-[#009B3A]/20"
@@ -185,8 +223,10 @@ export default function Navbar() {
                   className="relative h-9 w-9 rounded-lg text-white/40 hover:text-white hover:bg-white/[0.07]"
                 >
                   <Bell className="h-4 w-4" />
-                  {notifCount > 0 && (
-                    <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-[#009B3A] ring-2 ring-[#07070f]" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-1.5 right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#009B3A] text-[8px] font-bold text-white ring-2 ring-[#07070f]">
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
                   )}
                 </Button>
               </Link>
@@ -213,13 +253,12 @@ export default function Navbar() {
         </div>
       </nav>
 
-      {/* ── Mobile floating bottom nav — 5 tabs ── */}
+      {/* Mobile bottom nav */}
       <div className="md:hidden fixed bottom-0 inset-x-0 z-50 flex justify-center pointer-events-none">
         <nav
           className="pointer-events-auto flex items-center gap-0 rounded-[22px] border border-white/[0.08] bg-[#0d0d1a]/96 px-1 py-2 shadow-[0_8px_48px_rgba(0,0,0,0.5)] backdrop-blur-2xl"
           style={{ marginBottom: "env(safe-area-inset-bottom, 0px)" }}
         >
-          {/* Regular nav tabs */}
           {[
             { href: "/", icon: Home, label: "Home", id: "home" },
             { href: "/cases", icon: Briefcase, label: "Cases", id: "cases" },
@@ -238,35 +277,29 @@ export default function Navbar() {
                 }`}
               >
                 <div className="relative">
-                  <Icon
-                    className="h-[19px] w-[19px]"
-                    strokeWidth={active ? 2.2 : 1.8}
-                  />
-                  {id === "alerts" && notifCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-[#009B3A] ring-2 ring-[#0d0d1a]" />
+                  <Icon className="h-[19px] w-[19px]" strokeWidth={active ? 2.2 : 1.8} />
+                  {id === "alerts" && unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#009B3A] text-[7px] font-bold text-white ring-[1.5px] ring-[#0d0d1a]">
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
                   )}
                 </div>
-                <span className="text-[9.5px] font-semibold tracking-wide leading-none">
-                  {label}
-                </span>
+                <span className="text-[9.5px] font-semibold tracking-wide leading-none">{label}</span>
               </Link>
             );
           })}
 
-          {/* Chambers tab — opens panel instead of navigating */}
           <button
             onClick={openChambers}
             className="relative flex flex-col items-center gap-[3px] rounded-[14px] px-[13px] py-2 transition-all duration-200 text-white/35 hover:text-white/70 hover:bg-white/[0.07]"
           >
             <GavelIcon className="h-[19px] w-[19px]" />
-            <span className="text-[9.5px] font-semibold tracking-wide leading-none">
-              Chambers
-            </span>
+            <span className="text-[9.5px] font-semibold tracking-wide leading-none">Chambers</span>
           </button>
         </nav>
       </div>
 
-      {/* ── Court selector bottom sheet (mobile + tablet) ── */}
+      {/* Court selector sheet */}
       {courtSheetOpen && (
         <>
           <div
@@ -290,7 +323,11 @@ export default function Navbar() {
               {COURTS.map((court) => (
                 <button
                   key={court}
-                  onClick={() => handleCourtSelect(court)}
+                  onClick={() => {
+                    setSelectedCourt(court);
+                    setCourtSheetOpen(false);
+                    router.push(`/court/${COURT_TO_SLUG[court]}`);
+                  }}
                   className={`flex w-full items-center gap-3 rounded-xl px-4 py-3.5 transition-all duration-150 text-left ${
                     selectedCourt === court
                       ? "bg-[#009B3A]/15 text-[#009B3A]"
@@ -299,14 +336,22 @@ export default function Navbar() {
                 >
                   <Scale className="h-4 w-4 shrink-0" />
                   <span className="text-sm font-medium flex-1">{court}</span>
-                  {selectedCourt === court && (
-                    <Check className="h-4 w-4 shrink-0" />
-                  )}
+                  {selectedCourt === court && <Check className="h-4 w-4 shrink-0" />}
                 </button>
               ))}
             </div>
           </div>
         </>
+      )}
+
+      {/* New notification toast */}
+      {notifToast && (
+        <div className="fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-[200] pointer-events-none">
+          <div className="flex items-center gap-2.5 rounded-xl border border-[#009B3A]/30 bg-[#0d0d1a] px-4 py-3 shadow-2xl animate-in fade-in slide-in-from-bottom-2">
+            <Bell className="h-4 w-4 text-[#009B3A] shrink-0" />
+            <p className="text-sm text-white/90">{notifToast}</p>
+          </div>
+        </div>
       )}
     </>
   );
