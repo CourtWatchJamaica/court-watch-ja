@@ -224,12 +224,39 @@ export const apiClient = {
     });
   },
 
+  async adminSkipPdf(url: string): Promise<{ skipped: boolean }> {
+    return request("/admin/scraper/skip", {
+      method: "POST",
+      body: JSON.stringify({ url }),
+    });
+  },
+
   // ── Admin: Data — Judgments ──────────────────────────────────────────────
+  async adminGetStats(): Promise<{ pending_notifications: number; last_scrape_at: string | null }> {
+    return request("/admin/stats");
+  },
+
+  async getMaintenanceStatus(): Promise<{ maintenance_mode: boolean }> {
+    return request("/maintenance/status");
+  },
+
+  async adminSetMaintenance(enabled: boolean): Promise<{ maintenance_mode: boolean }> {
+    return request("/admin/maintenance", {
+      method: "PUT",
+      body: JSON.stringify({ enabled }),
+    });
+  },
+
   async adminListJudgments(
     page = 1,
     limit = 50,
+    search?: string,
+    court?: string,
   ): Promise<{ judgments: Judgment[]; total: number }> {
-    return request(`/admin/data/judgments?page=${page}&limit=${limit}`);
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+    if (search) params.set("search", search);
+    if (court) params.set("court", court);
+    return request(`/admin/data/judgments?${params}`);
   },
 
   async adminUpdateJudgment(
@@ -250,8 +277,13 @@ export const apiClient = {
   async adminListSittings(
     page = 1,
     limit = 50,
+    search?: string,
+    division?: string,
   ): Promise<{ sittings: CourtSitting[]; total: number }> {
-    return request(`/admin/data/sittings?page=${page}&limit=${limit}`);
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+    if (search) params.set("search", search);
+    if (division) params.set("division", division);
+    return request(`/admin/data/sittings?${params}`);
   },
 
   async adminUpdateSitting(
@@ -271,5 +303,59 @@ export const apiClient = {
   // ── Admin: Logs ──────────────────────────────────────────────────────────
   async adminGetActivityLog(): Promise<{ activity: ActivityLogRow[] }> {
     return request("/admin/logs");
+  },
+
+  // ── Admin: Create Data ───────────────────────────────────────────────────
+  async adminCreateJudgment(data: {
+    case_number: string;
+    title?: string;
+    judge_name?: string;
+    court?: string;
+    date?: string;
+    pdf_url?: string;
+    summary_text?: string;
+  }): Promise<{ judgment: Judgment }> {
+    return request("/admin/data/judgments", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async adminCreateSitting(data: {
+    case_number?: string;
+    title?: string;
+    judge_name?: string;
+    court_division?: string;
+    event_type?: string;
+    event_date?: string;
+    event_time?: string;
+    lawyers?: string;
+    pdf_source_url?: string;
+  }): Promise<{ sitting: CourtSitting }> {
+    return request("/admin/data/sittings", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  // ── Admin: Announce ───────────────────────────────────────────────────────
+  async adminAnnounce(title: string, message: string): Promise<{ sent: boolean; user_count: number }> {
+    return request("/admin/announce", {
+      method: "POST",
+      body: JSON.stringify({ title, message }),
+    });
+  },
+
+  // ── Admin: Upload PDF ─────────────────────────────────────────────────────
+  async adminUploadPdf(
+    filename: string,
+    content: string,
+    doc_type: string,
+    court: string,
+  ): Promise<{ extracted: number; message: string }> {
+    return request("/admin/upload-pdf", {
+      method: "POST",
+      body: JSON.stringify({ filename, content, doc_type, court }),
+    });
   },
 };
