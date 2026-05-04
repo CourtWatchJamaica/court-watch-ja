@@ -66,12 +66,16 @@ pub struct UserCase {
 pub struct Notification {
     pub id: i32,
     pub user_id: i32,
-    pub case_id: i32,
+    pub case_id: Option<i32>,
     #[sqlx(rename = "type")]
     #[serde(rename = "type")]
     pub notification_type: String,
     pub sent_at: NaiveDateTime,
     pub read_at: Option<NaiveDateTime>,
+    #[sqlx(default)]
+    pub title: Option<String>,
+    #[sqlx(default)]
+    pub message: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
@@ -100,4 +104,13 @@ pub struct CourtStats {
     pub sittings_this_week: i64,
     pub total_sittings: i64,
     pub active_judges: i64,
+}
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+pub struct ActivityLogRow {
+    pub id: i32,
+    pub email: String,
+    pub case_id: Option<i32>,
+    pub notification_type: String,
+    pub sent_at: NaiveDateTime,
 }
