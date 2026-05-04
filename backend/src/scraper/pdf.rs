@@ -68,9 +68,14 @@ pub fn parse_court_list_text(text: &str, pdf_date: Option<NaiveDate>) -> Vec<Sit
     )
     .unwrap();
 
-    // Section header (Format B)
+    // Section header (Format B) — expanded to cover more Jamaican court PDF headings.
     let re_section = Regex::new(
-        r"(?i)^(ACTION MATTERS?|MOTIONS?|CHAMBERS? MATTERS?|VIDEO CONFERENCE|COMMERCIAL LIST|FIXED DATE CLAIM|PETITION)",
+        r"(?i)^(ACTION MATTERS?|MOTIONS?|CHAMBERS? MATTERS?|VIDEO CONFERENCE|COMMERCIAL LIST\
+|FIXED DATE CLAIMS?|PETITIONS?|JUDGMENT DELIVER(?:Y|IES)|ASSESSMENT OF DAMAGES?\
+|PART[- ]HEARD(?:\s+TRIALS?)?|URGENT MATTERS?|WINDING[- ]UP(?:\s+MATTERS?)?\
+|COMPANY MATTERS?|PROBATE MATTERS?|ADMIRALTY MATTERS?|TAXATION MATTERS?\
+|FAMILY MATTERS?|BANKRUPTCY(?:\s+MATTERS?)?|INTERLOCUTORY(?:\s+APPLICATIONS?)?\
+|RULE 42(?:\s+APPLICATIONS?)?)",
     )
     .unwrap();
 
@@ -299,8 +304,11 @@ fn is_noise(line: &str) -> bool {
     let upper = line.to_uppercase();
     // Document / page header boilerplate
     if upper.contains("SUPREME COURT OF JUDICATURE") { return true; }
+    if upper.contains("COURT OF APPEAL") && upper.contains("JAMAICA") { return true; }
     if upper.starts_with("LIST OF SITTINGS") { return true; }
+    if upper.starts_with("CAUSE LIST") || upper.starts_with("COURT LIST") { return true; }
     if upper == "COMMERCIAL DIVISION" || upper == "CIVIL DIVISION" { return true; }
+    if upper.starts_with("CRIMINAL DIVISION") { return true; }
     if upper == "IN OPEN COURT" || upper == "IN CHAMBERS" { return true; }
     // Courtroom line (we don't use it; judge comes from COR:)
     if upper.starts_with("COURTROOM NO") { return true; }
@@ -308,7 +316,18 @@ fn is_noise(line: &str) -> bool {
     // Consolidated/duration labels
     if upper == "CONSOLIDATED" { return true; }
     if upper.starts_with('(') && upper.ends_with(')') { return true; } // (1 day), (1 hr)
-    // Very short lines (single characters, page numbers)
+    // Page number lines: "PAGE 3", "- 3 -", lone digits
+    if upper.starts_with("PAGE ") { return true; }
+    if line.chars().all(|c| c.is_ascii_digit() || c == '-' || c == ' ') && line.len() <= 6 {
+        return true;
+    }
+    // Week / schedule header lines
+    if upper.starts_with("WEEK COMMENCING") { return true; }
+    // Divider / rule lines
+    if line.len() >= 3 && line.chars().all(|c| matches!(c, '-' | '=' | '_' | '*' | '~')) {
+        return true;
+    }
+    // Very short lines (single characters, stray punctuation)
     if line.len() <= 2 { return true; }
     false
 }
@@ -398,11 +417,36 @@ fn clean_judge_name(raw: &str) -> String {
     ];
     for p in &prefixes {
         if upper.starts_with(p) {
-            let name = raw[p.len()..].trim();
+            let name = normalize_name_case(raw[p.len()..].trim());
             return format!("Hon. Justice {name}");
         }
     }
-    format!("Hon. Justice {}", raw.trim())
+    format!("Hon. Justice {}", normalize_name_case(raw.trim()))
+}
+
+/// Convert a judge's name from ALL CAPS or mixed case to title case.
+///
+/// Handles hyphenated surnames ("JACKSON-HAISLEY" → "Jackson-Haisley") and
+/// single-letter initials ("S." stays "S.").
+fn normalize_name_case(name: &str) -> String {
+    name.split_whitespace()
+        .map(|word| {
+            if word.contains('-') {
+                word.split('-').map(capitalize_word).collect::<Vec<_>>().join("-")
+            } else {
+                capitalize_word(word)
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn capitalize_word(word: &str) -> String {
+    let mut chars = word.chars();
+    match chars.next() {
+        None => String::new(),
+        Some(first) => first.to_uppercase().to_string() + &chars.as_str().to_lowercase(),
+    }
 }
 
 fn normalize_section(s: &str) -> String {
