@@ -11,6 +11,7 @@ pub mod runner;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::Path;
 use tokio::fs;
 
@@ -45,6 +46,14 @@ pub struct ScraperState {
     /// Parish Court court-list PDF URLs we have already processed.
     #[serde(default)]
     pub processed_parish_pdf_urls: Vec<String>,
+
+    // ── PDF download failure tracking (1e) ───────────────────────────────────
+    /// Counts how many times each judgment PDF URL has failed to download.
+    #[serde(default)]
+    pub pdf_download_failures: HashMap<String, u32>,
+    /// PDF URLs permanently skipped because they exceeded MAX_PDF_FAILURES.
+    #[serde(default)]
+    pub pdf_skipped: Vec<String>,
 }
 
 impl ScraperState {
@@ -93,7 +102,43 @@ impl ScraperState {
     pub fn parish_pdf_already_processed(&self, url: &str) -> bool {
         self.processed_parish_pdf_urls.iter().any(|u| u == url)
     }
+
+    // ── PDF failure helpers ───────────────────────────────────────────────────
+
+    pub fn is_pdf_skipped(&self, url: &str) -> bool {
+        self.pdf_skipped.iter().any(|u| u == url)
+    }
+
+    /// Record a failed download attempt.  Returns `true` if the URL has now
+    /// reached `MAX_PDF_FAILURES` and should be permanently skipped.
+    pub fn record_pdf_failure(&mut self, url: String) -> bool {
+        let count = self.pdf_download_failures.entry(url.clone()).or_insert(0);
+        *count += 1;
+        if *count >= MAX_PDF_FAILURES {
+            if !self.pdf_skipped.contains(&url) {
+                self.pdf_skipped.push(url);
+            }
+            return true;
+        }
+        false
+    }
+
+    /// Clear the failure counter for a URL that downloaded successfully.
+    pub fn clear_pdf_failure(&mut self, url: &str) {
+        self.pdf_download_failures.remove(url);
+    }
+
+    /// Permanently skip a URL — add to skip list and clear any failure counter.
+    pub fn skip_pdf_permanently(&mut self, url: &str) {
+        self.pdf_download_failures.remove(url);
+        if !self.pdf_skipped.iter().any(|u| u == url) {
+            self.pdf_skipped.push(url.to_string());
+        }
+    }
 }
+
+/// A PDF URL is permanently skipped once it has failed this many times.
+pub const MAX_PDF_FAILURES: u32 = 3;
 
 /// Shared HTTP client with polite headers.
 pub fn http_client() -> anyhow::Result<reqwest::Client> {
