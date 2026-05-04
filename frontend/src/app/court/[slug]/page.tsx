@@ -135,17 +135,17 @@ export default function CourtPage() {
               <>
                 <StatPill
                   label="Judgments"
-                  value={stats?.totalJudgments ?? judgments.length}
+                  value={stats?.total_judgments ?? judgments.length}
                   color="text-[#009B3A]"
                 />
                 <StatPill
                   label="Sittings this week"
-                  value={stats?.sittingsThisWeek ?? thisWeekSittings.length}
+                  value={stats?.sittings_this_week ?? thisWeekSittings.length}
                   color="text-[#FED100]"
                 />
                 <StatPill
                   label="Active judges"
-                  value={stats?.activeJudges ?? "—"}
+                  value={stats?.active_judges ?? "—"}
                   color="text-blue-400"
                 />
               </>
