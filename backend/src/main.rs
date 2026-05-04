@@ -5,7 +5,7 @@ mod middleware;
 mod scraper;
 mod utils;
 
-use std::sync::Arc;
+use std::sync::{atomic::AtomicBool, Arc};
 
 use axum::http::{HeaderValue, Method};
 use sqlx::PgPool;
@@ -20,6 +20,8 @@ use config::Config;
 pub struct AppState {
     pub db: PgPool,
     pub config: Arc<Config>,
+    /// Set to true while a manual (admin-triggered) scraper run is in progress.
+    pub scraper_running: Arc<AtomicBool>,
 }
 
 #[tokio::main]
@@ -42,10 +44,32 @@ async fn main() -> anyhow::Result<()> {
     sqlx::migrate!("./migrations").run(&pool).await?;
     info!("Migrations applied");
 
+    // Seed system_config from env so the env var acts as the initial source of truth.
+    // Subsequent runtime changes go to the DB; the .env file is never written at runtime.
+    if let Ok(cutoff_str) = std::env::var("JUDGMENT_CUTOFF_DATE") {
+        if let Err(e) =
+            db::queries::set_system_config(&pool, "judgment_cutoff_date", &cutoff_str).await
+        {
+            tracing::warn!("Failed to seed judgment_cutoff_date from env: {e}");
+        } else {
+            info!("judgment_cutoff_date seeded from env: {cutoff_str}");
+        }
+    }
+
+    // Bootstrap super_admin from ADMIN_EMAIL env var on every startup.
+    // Safe to run repeatedly — only upgrades the role if not already super_admin.
+    if let Ok(admin_email) = std::env::var("ADMIN_EMAIL") {
+        match db::queries::bootstrap_admin(&pool, &admin_email).await {
+            Ok(_) => info!("Admin bootstrapped: {admin_email}"),
+            Err(e) => tracing::warn!("Admin bootstrap failed: {e}"),
+        }
+    }
+
     // ── App state ─────────────────────────────────────────────────────────
     let state = AppState {
         db: pool.clone(),
         config: config.clone(),
+        scraper_running: Arc::new(AtomicBool::new(false)),
     };
 
     // ── CORS ──────────────────────────────────────────────────────────────
