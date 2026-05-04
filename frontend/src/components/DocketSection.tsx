@@ -22,7 +22,7 @@ interface DocketSectionProps {
   judgments: Judgment[];
   sittings: CourtSitting[];
   loading: boolean;
-  onUntrack: (caseId: number) => void;
+  onUntrack: (caseId: number, caseType: "judgment" | "sitting") => void;
 }
 
 /* ── Helpers ── */
@@ -67,7 +67,7 @@ function DocketCard({
   onUntrack,
 }: {
   item: DocketItem;
-  onUntrack: (caseId: number) => void;
+  onUntrack: (caseId: number, caseType: "judgment" | "sitting") => void;
 }) {
   const router = useRouter();
   const isSitting = item.userCase.case_type === "sitting";
@@ -122,7 +122,7 @@ function DocketCard({
       {/* Reveal: Remove button (behind card) */}
       <div className="absolute inset-y-0 right-0 flex w-20 items-center justify-center rounded-r-xl bg-red-500/90">
         <button
-          onClick={() => onUntrack(item.userCase.case_id)}
+          onClick={() => onUntrack(item.userCase.case_id, item.userCase.case_type as "judgment" | "sitting")}
           className="flex flex-col items-center gap-1 text-white"
           aria-label="Remove from Docket"
         >
@@ -182,7 +182,7 @@ function DocketCard({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onUntrack(item.userCase.case_id);
+                onUntrack(item.userCase.case_id, item.userCase.case_type as "judgment" | "sitting");
               }}
               className="shrink-0 rounded-md p-0.5 text-white/20 hover:text-white/70 hover:bg-white/[0.06] transition-colors md:opacity-0 md:group-hover:opacity-100"
               aria-label="Remove"
