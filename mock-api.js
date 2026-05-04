@@ -2,6 +2,18 @@ const http = require("http");
 
 const PORT = 3001;
 
+// ── JWT-shaped mock token (decodable by getRoleFromToken in Navbar.tsx) ────────
+
+const MOCK_PAYLOAD = Buffer.from(
+  JSON.stringify({ role: "super_admin", id: 1, email: "admin@courtwatchja.com", exp: 9999999999 }),
+)
+  .toString("base64")
+  .replace(/=/g, "")
+  .replace(/\+/g, "-")
+  .replace(/\//g, "_");
+
+const MOCK_JWT = `eyJhbGciOiJIUzI1NiJ9.${MOCK_PAYLOAD}.mock_signature`;
+
 // ── Fake data ───────────────────────────────────────────────────────────────────
 
 const fakeJudgments = [
@@ -89,6 +101,34 @@ const fakeJudgments = [
     created_at: "2026-01-23T00:00:00Z",
     updated_at: "2026-01-23T00:00:00Z",
   },
+  {
+    id: 7,
+    case_number: "2025/CCAP/00034",
+    title: "Roberts v National Commercial Bank",
+    judge_name: "Hon. Justice Sykes",
+    court: "Court of Appeal",
+    date: "2025-11-12",
+    pdf_url: null,
+    local_pdf_path: null,
+    summary_text:
+      "Appeal regarding disputed mortgage enforcement proceedings. The Court of Appeal granted a stay pending full hearing.",
+    created_at: "2025-11-13T00:00:00Z",
+    updated_at: "2025-11-13T00:00:00Z",
+  },
+  {
+    id: 8,
+    case_number: "2026/PCAP/00011",
+    title: "Williams v Kingston & St. Andrew Corporation",
+    judge_name: "Hon. Justice Brown",
+    court: "Parish Court",
+    date: "2026-02-05",
+    pdf_url: null,
+    local_pdf_path: null,
+    summary_text:
+      "Nuisance claim regarding an unlicensed structure built adjacent to claimant's property. Parish Court ordered removal within 60 days.",
+    created_at: "2026-02-06T00:00:00Z",
+    updated_at: "2026-02-06T00:00:00Z",
+  },
 ];
 
 const fakeJudges = [
@@ -140,9 +180,17 @@ const fakeJudges = [
     created_at: "2024-01-01T00:00:00Z",
     updated_at: "2024-01-01T00:00:00Z",
   },
+  {
+    id: 7,
+    name: "Hon. Justice Brown",
+    court: "Parish Court",
+    total_cases: 6,
+    created_at: "2024-01-01T00:00:00Z",
+    updated_at: "2024-01-01T00:00:00Z",
+  },
 ];
 
-const fakeCourtSittings = [
+let fakeCourtSittings = [
   {
     id: 1,
     case_number: "SU2022CD00537",
@@ -235,12 +283,82 @@ const fakeCourtSittings = [
     pdf_source_url: null,
     created_at: "2026-04-22T00:00:00Z",
   },
+  {
+    id: 8,
+    case_number: "PC2026/00045",
+    title: "Campbell v Marley Industries Ltd",
+    judge_name: "Hon. Justice Brown",
+    court_division: "Parish Court",
+    event_type: "Hearing",
+    event_date: "2026-05-09",
+    event_time: "09:00:00",
+    lawyers: "Campbell & Associates",
+    pdf_source_url: null,
+    created_at: "2026-04-22T00:00:00Z",
+  },
+  {
+    id: 9,
+    case_number: "PC2026/00067",
+    title: "Thomas v Attorney General (Parish Court)",
+    judge_name: "Hon. Justice Brown",
+    court_division: "Parish Court",
+    event_type: "Mention",
+    event_date: "2026-05-12",
+    event_time: "10:30:00",
+    lawyers: "Legal Aid Council",
+    pdf_source_url: null,
+    created_at: "2026-04-23T00:00:00Z",
+  },
 ];
 
-// ── In-memory user cases (stateful across requests, resets on restart) ──────────
+// ── Court-filter helper — mirrors backend sitting_court_filter logic ───────────
+
+function sittingMatchesCourt(sitting, court) {
+  if (!court) return true;
+  const c = court.toLowerCase();
+  const div = (sitting.court_division ?? "").toLowerCase();
+  if (c.includes("appeal")) return div.includes("appeal");
+  if (c.includes("parish")) return div.includes("parish");
+  // Supreme Court — exclude appeal and parish
+  return !div.includes("appeal") && !div.includes("parish");
+}
+
+// ── In-memory stores ──────────────────────────────────────────────────────────
 
 let userCasesStore = [];
 let nextUserCaseId = 1;
+
+let notificationsStore = [];
+let nextNotifId = 1;
+
+let mockUsers = [
+  { id: 1, email: "admin@courtwatchja.com", role: "super_admin", created_at: "2024-01-01T00:00:00Z" },
+  { id: 2, email: "user@courtwatchja.com", role: "user", created_at: "2024-01-02T00:00:00Z" },
+];
+let nextUserId = 3;
+
+let mockConfig = [
+  { key: "cutoff_date", value: "2024-01-01", updated_at: "2026-05-01T00:00:00Z" },
+  { key: "max_pdf_failures", value: "3", updated_at: "2026-05-01T00:00:00Z" },
+];
+
+let mockScraperState = {
+  is_running: false,
+  processed_sc_count: 142,
+  processed_coa_count: 58,
+  processed_parish_count: 23,
+  last_sc_scraped: "2026-05-04T08:30:00Z",
+  last_coa_scraped: "2026-05-04T08:45:00Z",
+  next_judgment_page: 6,
+  next_appeal_page: 3,
+  next_parish_page: 2,
+  pdf_failures: {
+    "https://supremecourt.gov.jm/broken-link-1.pdf": 2,
+    "https://supremecourt.gov.jm/broken-link-2.pdf": 1,
+  },
+  pdf_skipped: ["https://supremecourt.gov.jm/not-a-court-list.pdf"],
+  pdf_skipped_count: 1,
+};
 
 // ── Helpers ──────────────────────────────────────────────────────────────────────
 
@@ -261,6 +379,10 @@ function json(res, data, status = 200) {
   res.end(JSON.stringify(data));
 }
 
+let nextSittingId = fakeCourtSittings.length + 1;
+let nextJudgmentId = fakeJudgments.length + 1;
+let judgmentsMutable = [...fakeJudgments];
+
 // ── Server ────────────────────────────────────────────────────────────────────────
 
 const server = http.createServer((req, res) => {
@@ -277,12 +399,43 @@ const server = http.createServer((req, res) => {
   const path = url.pathname;
   console.log(`${req.method} ${path}`);
 
+  // ── Auth ──────────────────────────────────────────────────────────────────────
+
+  if (req.method === "POST" && path === "/api/auth/login") {
+    parseBody(req, ({ email, password }) => {
+      if (email && password) {
+        return json(res, { token: MOCK_JWT });
+      }
+      return json(res, { error: "Invalid credentials" }, 401);
+    });
+    return;
+  }
+
+  if (req.method === "POST" && path === "/api/auth/signup") {
+    parseBody(req, ({ email, password }) => {
+      if (email && password) {
+        return json(res, { token: MOCK_JWT });
+      }
+      return json(res, { error: "Invalid data" }, 400);
+    });
+    return;
+  }
+
+  if (req.method === "GET" && path === "/api/auth/me") {
+    return json(res, {
+      id: 1,
+      email: "admin@courtwatchja.com",
+      role: "super_admin",
+      created_at: "2024-01-01T00:00:00Z",
+    });
+  }
+
   // ── Judgments ─────────────────────────────────────────────────────────────────
 
   if (req.method === "GET" && path === "/api/judgments") {
     const q = url.searchParams.get("q");
     const court = url.searchParams.get("court");
-    let results = [...fakeJudgments];
+    let results = [...judgmentsMutable];
     if (court) results = results.filter((j) => j.court === court);
     if (q) {
       const ql = q.toLowerCase();
@@ -293,12 +446,12 @@ const server = http.createServer((req, res) => {
           j.judge_name?.toLowerCase().includes(ql),
       );
     }
-    return json(res, { judgments: results });
+    return json(res, { judgments: results, total: results.length });
   }
 
   if (req.method === "GET" && /^\/api\/judgments\/\d+$/.test(path)) {
     const id = parseInt(path.split("/").pop());
-    const judgment = fakeJudgments.find((j) => j.id === id);
+    const judgment = judgmentsMutable.find((j) => j.id === id);
     if (judgment) return json(res, { judgment });
     return json(res, { error: "Not found" }, 404);
   }
@@ -316,7 +469,7 @@ const server = http.createServer((req, res) => {
   if (req.method === "GET" && /^\/api\/judges\/\d+$/.test(path)) {
     const id = parseInt(path.split("/").pop());
     const judge = fakeJudges.find((j) => j.id === id);
-    if (judge) return json(res, { judge, judgments: fakeJudgments });
+    if (judge) return json(res, { judge, judgments: judgmentsMutable });
     return json(res, { error: "Not found" }, 404);
   }
 
@@ -328,10 +481,7 @@ const server = http.createServer((req, res) => {
     const dateFrom = url.searchParams.get("date_from");
     const dateTo = url.searchParams.get("date_to");
     let results = [...fakeCourtSittings];
-    if (court)
-      results = results.filter((s) =>
-        s.court_division?.toLowerCase().includes(court.toLowerCase()),
-      );
+    if (court) results = results.filter((s) => sittingMatchesCourt(s, court));
     if (dateFrom) results = results.filter((s) => (s.event_date ?? "") >= dateFrom);
     if (dateTo) results = results.filter((s) => (s.event_date ?? "") <= dateTo);
     if (q) {
@@ -367,13 +517,15 @@ const server = http.createServer((req, res) => {
     const today = new Date().toISOString().split("T")[0];
     const weekEnd = new Date(Date.now() + 7 * 86_400_000).toISOString().split("T")[0];
 
-    const totalJudgments = fakeJudgments.filter((j) => j.court === court).length;
-    const sittingsThisWeek = fakeCourtSittings.filter(
+    const total_judgments = judgmentsMutable.filter((j) => j.court === court).length;
+    const courtSittings = fakeCourtSittings.filter((s) => sittingMatchesCourt(s, court));
+    const sittings_this_week = courtSittings.filter(
       (s) => (s.event_date ?? "") >= today && (s.event_date ?? "") <= weekEnd,
     ).length;
-    const activeJudges = fakeJudges.filter((j) => j.court === court).length;
+    const total_sittings = courtSittings.length;
+    const active_judges = fakeJudges.filter((j) => j.court === court).length;
 
-    return json(res, { court, totalJudgments, sittingsThisWeek, activeJudges });
+    return json(res, { court, total_judgments, sittings_this_week, total_sittings, active_judges });
   }
 
   // ── User Cases ────────────────────────────────────────────────────────────────
@@ -385,7 +537,9 @@ const server = http.createServer((req, res) => {
   if (req.method === "POST" && path === "/api/user/cases") {
     parseBody(req, ({ case_id, case_type = "judgment" }) => {
       if (case_id == null) return json(res, { error: "case_id required" }, 400);
-      const existing = userCasesStore.find((c) => c.case_id === case_id);
+      const existing = userCasesStore.find(
+        (c) => c.case_id === case_id && c.case_type === case_type,
+      );
       if (!existing) {
         userCasesStore.push({
           id: nextUserCaseId++,
@@ -402,40 +556,281 @@ const server = http.createServer((req, res) => {
 
   if (req.method === "DELETE" && /^\/api\/user\/cases\/\d+$/.test(path)) {
     const case_id = parseInt(path.split("/").pop());
-    userCasesStore = userCasesStore.filter((c) => c.case_id !== case_id);
+    const case_type = url.searchParams.get("case_type") || "judgment";
+    userCasesStore = userCasesStore.filter(
+      (c) => !(c.case_id === case_id && c.case_type === case_type),
+    );
     return json(res, { success: true });
   }
 
   // ── Notifications ─────────────────────────────────────────────────────────────
 
   if (req.method === "GET" && path === "/api/notifications") {
-    return json(res, { notifications: [] });
+    return json(res, { notifications: notificationsStore.filter((n) => n.user_id === 1) });
   }
 
-  // ── Auth ──────────────────────────────────────────────────────────────────────
-
-  if (req.method === "POST" && path === "/api/auth/login") {
-    parseBody(req, ({ email, password }) => {
-      if (email && password) {
-        return json(res, { token: "mock-jwt-token-" + Date.now() });
-      }
-      return json(res, { error: "Invalid credentials" }, 401);
-    });
-    return;
+  if (req.method === "GET" && path === "/api/notifications/unread-count") {
+    const count = notificationsStore.filter(
+      (n) => n.user_id === 1 && !n.read_at,
+    ).length;
+    return json(res, { count });
   }
 
-  if (req.method === "POST" && path === "/api/auth/signup") {
-    parseBody(req, ({ email, password }) => {
-      if (email && password) {
-        return json(res, { token: "mock-jwt-token-" + Date.now() });
-      }
-      return json(res, { error: "Invalid data" }, 400);
-    });
-    return;
+  if (req.method === "POST" && path === "/api/notifications/mark-read") {
+    notificationsStore = notificationsStore.map((n) =>
+      n.user_id === 1 ? { ...n, read_at: new Date().toISOString() } : n,
+    );
+    return json(res, { updated: 1 });
+  }
+
+  if (req.method === "POST" && /^\/api\/notifications\/\d+\/mark-read$/.test(path)) {
+    const id = parseInt(path.split("/")[3]);
+    notificationsStore = notificationsStore.map((n) =>
+      n.id === id ? { ...n, read_at: new Date().toISOString() } : n,
+    );
+    return json(res, { marked: true });
   }
 
   if (req.method === "PUT" && path === "/api/user/preferences") {
     parseBody(req, () => json(res, { success: true }));
+    return;
+  }
+
+  // ── Admin: Users ──────────────────────────────────────────────────────────────
+
+  if (req.method === "GET" && path === "/api/admin/users") {
+    return json(res, { users: mockUsers });
+  }
+
+  if (req.method === "PUT" && /^\/api\/admin\/users\/\d+\/role$/.test(path)) {
+    const id = parseInt(path.split("/")[4]);
+    parseBody(req, ({ role }) => {
+      const u = mockUsers.find((u) => u.id === id);
+      if (!u) return json(res, { error: "Not found" }, 404);
+      u.role = role;
+      return json(res, { id: u.id, email: u.email, role: u.role });
+    });
+    return;
+  }
+
+  if (req.method === "DELETE" && /^\/api\/admin\/users\/\d+$/.test(path)) {
+    const id = parseInt(path.split("/").pop());
+    const idx = mockUsers.findIndex((u) => u.id === id);
+    if (idx === -1) return json(res, { error: "Not found" }, 404);
+    mockUsers.splice(idx, 1);
+    return json(res, { deleted: true });
+  }
+
+  // ── Admin: Config ──────────────────────────────────────────────────────────────
+
+  if (req.method === "GET" && path === "/api/admin/config") {
+    return json(res, { config: mockConfig });
+  }
+
+  if (req.method === "PUT" && /^\/api\/admin\/config\/.+$/.test(path)) {
+    const key = decodeURIComponent(path.split("/").pop());
+    parseBody(req, ({ value }) => {
+      const entry = mockConfig.find((c) => c.key === key);
+      if (entry) {
+        entry.value = value;
+        entry.updated_at = new Date().toISOString();
+      } else {
+        mockConfig.push({ key, value, updated_at: new Date().toISOString() });
+      }
+      return json(res, { key, value, updated: true });
+    });
+    return;
+  }
+
+  // ── Admin: Scraper ────────────────────────────────────────────────────────────
+
+  if (req.method === "GET" && path === "/api/admin/scraper/state") {
+    return json(res, mockScraperState);
+  }
+
+  if (req.method === "POST" && path === "/api/admin/scraper/trigger") {
+    if (mockScraperState.is_running) {
+      return json(res, { error: "Scraper already running" }, 400);
+    }
+    mockScraperState.is_running = true;
+    setTimeout(() => {
+      mockScraperState.is_running = false;
+    }, 3000);
+    return json(res, { started: true, message: "Scraper started in background" });
+  }
+
+  if (req.method === "DELETE" && path === "/api/admin/scraper/skipped") {
+    parseBody(req, ({ url }) => {
+      delete mockScraperState.pdf_failures[url];
+      mockScraperState.pdf_skipped = mockScraperState.pdf_skipped.filter((u) => u !== url);
+      mockScraperState.pdf_skipped_count = mockScraperState.pdf_skipped.length;
+      return json(res, { removed: true, url });
+    });
+    return;
+  }
+
+  if (req.method === "POST" && path === "/api/admin/scraper/skip") {
+    parseBody(req, ({ url }) => {
+      delete mockScraperState.pdf_failures[url];
+      if (!mockScraperState.pdf_skipped.includes(url)) {
+        mockScraperState.pdf_skipped.push(url);
+        mockScraperState.pdf_skipped_count++;
+      }
+      return json(res, { skipped: true, url });
+    });
+    return;
+  }
+
+  // ── Admin: Data — Judgments ───────────────────────────────────────────────────
+
+  if (req.method === "GET" && path === "/api/admin/data/judgments") {
+    const page = parseInt(url.searchParams.get("page") || "1");
+    const limit = parseInt(url.searchParams.get("limit") || "50");
+    const offset = (page - 1) * limit;
+    const paginated = judgmentsMutable.slice(offset, offset + limit);
+    return json(res, { judgments: paginated, total: judgmentsMutable.length });
+  }
+
+  if (req.method === "POST" && path === "/api/admin/data/judgments") {
+    parseBody(req, (body) => {
+      if (!body.case_number) return json(res, { error: "case_number required" }, 400);
+      const j = {
+        id: nextJudgmentId++,
+        case_number: body.case_number,
+        title: body.title ?? null,
+        judge_name: body.judge_name ?? null,
+        court: body.court ?? null,
+        date: body.date ?? null,
+        pdf_url: body.pdf_url ?? null,
+        local_pdf_path: null,
+        summary_text: body.summary_text ?? null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      judgmentsMutable.unshift(j);
+      return json(res, { judgment: j });
+    });
+    return;
+  }
+
+  if (req.method === "PUT" && /^\/api\/admin\/data\/judgments\/\d+$/.test(path)) {
+    const id = parseInt(path.split("/").pop());
+    parseBody(req, (body) => {
+      const idx = judgmentsMutable.findIndex((j) => j.id === id);
+      if (idx === -1) return json(res, { error: "Not found" }, 404);
+      judgmentsMutable[idx] = {
+        ...judgmentsMutable[idx],
+        ...body,
+        id,
+        updated_at: new Date().toISOString(),
+      };
+      return json(res, { judgment: judgmentsMutable[idx] });
+    });
+    return;
+  }
+
+  if (req.method === "DELETE" && /^\/api\/admin\/data\/judgments\/\d+$/.test(path)) {
+    const id = parseInt(path.split("/").pop());
+    const before = judgmentsMutable.length;
+    judgmentsMutable = judgmentsMutable.filter((j) => j.id !== id);
+    return json(res, { deleted: judgmentsMutable.length < before });
+  }
+
+  // ── Admin: Data — Sittings ────────────────────────────────────────────────────
+
+  if (req.method === "GET" && path === "/api/admin/data/sittings") {
+    const page = parseInt(url.searchParams.get("page") || "1");
+    const limit = parseInt(url.searchParams.get("limit") || "50");
+    const offset = (page - 1) * limit;
+    const paginated = fakeCourtSittings.slice(offset, offset + limit);
+    return json(res, { sittings: paginated, total: fakeCourtSittings.length });
+  }
+
+  if (req.method === "POST" && path === "/api/admin/data/sittings") {
+    parseBody(req, (body) => {
+      const s = {
+        id: nextSittingId++,
+        case_number: body.case_number ?? null,
+        title: body.title ?? null,
+        judge_name: body.judge_name ?? null,
+        court_division: body.court_division ?? null,
+        event_type: body.event_type ?? null,
+        event_date: body.event_date ?? null,
+        event_time: body.event_time ?? null,
+        lawyers: body.lawyers ?? null,
+        pdf_source_url: body.pdf_source_url ?? null,
+        created_at: new Date().toISOString(),
+      };
+      fakeCourtSittings.unshift(s);
+      return json(res, { sitting: s });
+    });
+    return;
+  }
+
+  if (req.method === "PUT" && /^\/api\/admin\/data\/sittings\/\d+$/.test(path)) {
+    const id = parseInt(path.split("/").pop());
+    parseBody(req, (body) => {
+      const idx = fakeCourtSittings.findIndex((s) => s.id === id);
+      if (idx === -1) return json(res, { error: "Not found" }, 404);
+      fakeCourtSittings[idx] = { ...fakeCourtSittings[idx], ...body, id };
+      return json(res, { sitting: fakeCourtSittings[idx] });
+    });
+    return;
+  }
+
+  if (req.method === "DELETE" && /^\/api\/admin\/data\/sittings\/\d+$/.test(path)) {
+    const id = parseInt(path.split("/").pop());
+    const before = fakeCourtSittings.length;
+    fakeCourtSittings = fakeCourtSittings.filter((s) => s.id !== id);
+    return json(res, { deleted: fakeCourtSittings.length < before });
+  }
+
+  // ── Admin: Logs ───────────────────────────────────────────────────────────────
+
+  if (req.method === "GET" && path === "/api/admin/logs") {
+    const activity = notificationsStore.slice(0, 100).map((n) => ({
+      id: n.id,
+      email: "admin@courtwatchja.com",
+      case_id: n.case_id,
+      notification_type: n.type,
+      sent_at: n.sent_at,
+    }));
+    return json(res, { activity });
+  }
+
+  // ── Admin: Announce ───────────────────────────────────────────────────────────
+
+  if (req.method === "POST" && path === "/api/admin/announce") {
+    parseBody(req, ({ title, message }) => {
+      if (!title || !message) return json(res, { error: "title and message required" }, 400);
+      const user_count = mockUsers.length;
+      mockUsers.forEach((u) => {
+        notificationsStore.push({
+          id: nextNotifId++,
+          user_id: u.id,
+          case_id: null,
+          type: "announcement",
+          title,
+          message,
+          sent_at: new Date().toISOString(),
+          read_at: null,
+        });
+      });
+      return json(res, { sent: true, user_count });
+    });
+    return;
+  }
+
+  // ── Admin: Upload PDF ─────────────────────────────────────────────────────────
+
+  if (req.method === "POST" && path === "/api/admin/upload-pdf") {
+    parseBody(req, ({ filename, doc_type, court }) => {
+      console.log(`  Upload: ${filename} | type=${doc_type} | court=${court}`);
+      return json(res, {
+        extracted: 0,
+        message: "Upload received. Processing will run on next scheduled scrape.",
+      });
+    });
     return;
   }
 
@@ -446,5 +841,6 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => {
   console.log(`✅  Mock API running at http://localhost:${PORT}/api`);
-  console.log(`    Endpoints: judgments, court-sittings, judges, user/cases, court-stats`);
+  console.log(`    Token role: super_admin (JWT-shaped, decodable by frontend)`);
+  console.log(`    Endpoints: judgments, court-sittings, judges, user/cases, court-stats, admin/*`);
 });
