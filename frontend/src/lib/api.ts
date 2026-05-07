@@ -3,8 +3,12 @@ import {
   AdminUser,
   CourtSitting,
   Judge,
+  JudgeConnection,
   Judgment,
   Notification,
+  ParishCaseDetail,
+  ParishCourtCase,
+  ParishSummary,
   ScraperStatus,
   SystemConfigEntry,
   User,
@@ -79,11 +83,32 @@ export const apiClient = {
     return request("/auth/me");
   },
 
+  // ── Profile ─────────────────────────────────────────────────────────────
+  async updateProfile(body: {
+    email?: string;
+    current_password: string;
+    new_password?: string;
+  }): Promise<User> {
+    return request("/user/profile", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    });
+  },
+
   // ── Judgments ───────────────────────────────────────────────────────────
-  async getJudgments(q?: string, court?: string): Promise<{ judgments: Judgment[]; total: number }> {
+  async getJudgments(
+    q?: string,
+    court?: string,
+    judge?: string,
+    page?: number,
+    limit?: number,
+  ): Promise<{ judgments: Judgment[]; total: number }> {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
     if (court) params.set("court", court);
+    if (judge) params.set("judge", judge);
+    if (page != null) params.set("page", String(page));
+    if (limit != null) params.set("limit", String(limit));
     const qs = params.toString();
     return request(`/judgments${qs ? `?${qs}` : ""}`);
   },
@@ -98,12 +123,14 @@ export const apiClient = {
     court?: string;
     date_from?: string;
     date_to?: string;
+    judge?: string;
   }): Promise<{ sittings: CourtSitting[] }> {
     const params = new URLSearchParams();
     if (opts?.q) params.set("q", opts.q);
     if (opts?.court) params.set("court", opts.court);
     if (opts?.date_from) params.set("date_from", opts.date_from);
     if (opts?.date_to) params.set("date_to", opts.date_to);
+    if (opts?.judge) params.set("judge", opts.judge);
     const qs = params.toString();
     return request(`/court-sittings${qs ? `?${qs}` : ""}`);
   },
@@ -124,6 +151,10 @@ export const apiClient = {
 
   async getJudge(id: string): Promise<{ judge: Judge; judgments: Judgment[] }> {
     return request(`/judges/${id}`);
+  },
+
+  async getJudgeConnections(): Promise<{ connections: JudgeConnection[] }> {
+    return request("/judge-connections");
   },
 
   // ── User Cases ──────────────────────────────────────────────────────────
@@ -215,6 +246,10 @@ export const apiClient = {
 
   async adminTriggerScraper(): Promise<{ started: boolean; message: string }> {
     return request("/admin/scraper/trigger", { method: "POST" });
+  },
+
+  async adminDeepScrape(): Promise<{ started: boolean; message: string }> {
+    return request("/admin/deep-scrape", { method: "POST" });
   },
 
   async adminRemoveSkippedPdf(url: string): Promise<{ removed: boolean }> {
@@ -336,6 +371,30 @@ export const apiClient = {
       method: "POST",
       body: JSON.stringify(data),
     });
+  },
+
+  // ── Parish Court Cases ────────────────────────────────────────────────────
+  async getParishCases(opts?: {
+    parish?: string;
+    q?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{ cases: ParishCourtCase[]; total: number }> {
+    const params = new URLSearchParams();
+    if (opts?.parish) params.set("parish", opts.parish);
+    if (opts?.q) params.set("q", opts.q);
+    if (opts?.page) params.set("page", String(opts.page));
+    if (opts?.limit) params.set("limit", String(opts.limit));
+    const qs = params.toString();
+    return request(`/parish-cases${qs ? `?${qs}` : ""}`);
+  },
+
+  async getParishCase(id: number): Promise<ParishCaseDetail> {
+    return request(`/parish-cases/${id}`);
+  },
+
+  async getParishSummary(): Promise<{ summary: ParishSummary[] }> {
+    return request("/parish-summary");
   },
 
   // ── Admin: Announce ───────────────────────────────────────────────────────

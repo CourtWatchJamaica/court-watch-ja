@@ -76,9 +76,18 @@ function TodaySittings({ sittings, loading }: TodaySittingsProps) {
 
   return (
     <section>
-      <div className="mb-3 flex items-center gap-2">
-        <Calendar className="h-4 w-4 text-[#FED100]" />
-        <h2 className="text-sm font-semibold text-foreground">{label}</h2>
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Calendar className="h-4 w-4 text-[#FED100]" />
+          <h2 className="text-sm font-semibold text-foreground">{label}</h2>
+        </div>
+        <button
+          onClick={() => router.push("/court-sittings/today")}
+          className="flex items-center gap-1 text-[11px] font-medium text-[#FED100]/55 hover:text-[#FED100] transition-colors"
+        >
+          View All
+          <ArrowUpRight className="h-3 w-3" />
+        </button>
       </div>
 
       {loading ? (

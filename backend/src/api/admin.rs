@@ -31,9 +31,7 @@ pub struct UserRow {
     pub created_at: String,
 }
 
-pub async fn list_users(
-    State(state): State<AppState>,
-) -> Result<Json<UsersResponse>, AppError> {
+pub async fn list_users(State(state): State<AppState>) -> Result<Json<UsersResponse>, AppError> {
     let users = queries::admin_list_users(&state.db).await?;
     Ok(Json(UsersResponse {
         users: users
@@ -68,7 +66,9 @@ pub async fn set_user_role(
     let updated = queries::admin_set_user_role(&state.db, user_id, &body.role)
         .await?
         .ok_or(AppError::NotFound)?;
-    Ok(Json(json!({ "id": updated.id, "email": updated.email, "role": updated.role })))
+    Ok(Json(
+        json!({ "id": updated.id, "email": updated.email, "role": updated.role }),
+    ))
 }
 
 pub async fn delete_user(
@@ -77,7 +77,9 @@ pub async fn delete_user(
     Path(user_id): Path<i32>,
 ) -> Result<Json<Value>, AppError> {
     if caller_id == user_id {
-        return Err(AppError::BadRequest("Cannot delete your own account".into()));
+        return Err(AppError::BadRequest(
+            "Cannot delete your own account".into(),
+        ));
     }
     let deleted = queries::admin_delete_user(&state.db, user_id).await?;
     if !deleted {
@@ -88,9 +90,7 @@ pub async fn delete_user(
 
 // ── Config ─────────────────────────────────────────────────────────────────
 
-pub async fn get_config(
-    State(state): State<AppState>,
-) -> Result<Json<Value>, AppError> {
+pub async fn get_config(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
     let rows = queries::admin_list_config(&state.db).await?;
     Ok(Json(json!({ "config": rows })))
 }
@@ -109,14 +109,14 @@ pub async fn set_config(
         return Err(AppError::BadRequest("Value cannot be empty".into()));
     }
     queries::set_system_config(&state.db, &key, &body.value).await?;
-    Ok(Json(json!({ "key": key, "value": body.value, "updated": true })))
+    Ok(Json(
+        json!({ "key": key, "value": body.value, "updated": true }),
+    ))
 }
 
 // ── Scraper ────────────────────────────────────────────────────────────────
 
-pub async fn get_scraper_state(
-    State(state): State<AppState>,
-) -> Result<Json<Value>, AppError> {
+pub async fn get_scraper_state(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
     let scraper_state = ScraperState::load(&state.config.scraper_state_path).await;
     let is_running = state.scraper_running.load(Ordering::SeqCst);
 
@@ -136,9 +136,7 @@ pub async fn get_scraper_state(
     })))
 }
 
-pub async fn trigger_scraper(
-    State(state): State<AppState>,
-) -> Result<Json<Value>, AppError> {
+pub async fn trigger_scraper(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
     if state.scraper_running.load(Ordering::SeqCst) {
         return Err(AppError::BadRequest("Scraper is already running".into()));
     }
@@ -155,7 +153,56 @@ pub async fn trigger_scraper(
         flag.store(false, Ordering::SeqCst);
     });
 
-    Ok(Json(json!({ "started": true, "message": "Scraper started in background" })))
+    Ok(Json(
+        json!({ "started": true, "message": "Scraper started in background" }),
+    ))
+}
+
+pub async fn deep_scrape(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
+    if state.scraper_running.load(Ordering::SeqCst) {
+        return Err(AppError::BadRequest("Scraper is already running".into()));
+    }
+    state.scraper_running.store(true, Ordering::SeqCst);
+
+    let pool = state.db.clone();
+    let config = state.config.clone();
+    let flag = state.scraper_running.clone();
+
+    tokio::spawn(async move {
+        // Lower the cutoff so scrapers go back to 2020
+        if let Err(e) =
+            crate::db::queries::set_system_config(&pool, "judgment_cutoff_date", "2020-01-01")
+                .await
+        {
+            tracing::error!("[DeepScrape] Failed to lower cutoff: {e}");
+        }
+        tracing::info!("[DeepScrape] Cutoff set to 2020-01-01 — starting full backfill");
+
+        if let Err(e) = crate::scraper::runner::run_all(&pool, &config).await {
+            tracing::error!("[DeepScrape] run_all failed: {e}");
+        }
+
+        match crate::db::queries::seed_judges_from_judgments(&pool).await {
+            Ok(n) => tracing::info!("[DeepScrape] Judge seed: {n} row(s) upserted"),
+            Err(e) => tracing::error!("[DeepScrape] Judge seed failed: {e}"),
+        }
+
+        // Restore the cutoff
+        if let Err(e) =
+            crate::db::queries::set_system_config(&pool, "judgment_cutoff_date", "2026-01-01")
+                .await
+        {
+            tracing::error!("[DeepScrape] Failed to restore cutoff: {e}");
+        }
+        tracing::info!("[DeepScrape] Cutoff restored to 2026-01-01. Deep scrape complete.");
+
+        flag.store(false, Ordering::SeqCst);
+    });
+
+    Ok(Json(json!({
+        "started": true,
+        "message": "Deep backfill started (cutoff → 2020-01-01, restores to 2026-01-01 when done)"
+    })))
 }
 
 #[derive(Deserialize)]
@@ -185,8 +232,12 @@ pub struct PageParams {
     #[serde(default = "default_limit")]
     pub limit: i64,
 }
-fn default_page() -> i64 { 1 }
-fn default_limit() -> i64 { 50 }
+fn default_page() -> i64 {
+    1
+}
+fn default_limit() -> i64 {
+    50
+}
 
 pub async fn list_judgments(
     State(state): State<AppState>,
@@ -281,9 +332,14 @@ pub async fn update_sitting(
         .event_time
         .as_deref()
         .filter(|s| !s.is_empty())
-        .map(|s| NaiveTime::parse_from_str(s, "%H:%M:%S").or_else(|_| NaiveTime::parse_from_str(s, "%H:%M")))
+        .map(|s| {
+            NaiveTime::parse_from_str(s, "%H:%M:%S")
+                .or_else(|_| NaiveTime::parse_from_str(s, "%H:%M"))
+        })
         .transpose()
-        .map_err(|_| AppError::BadRequest("Invalid time format; expected HH:MM or HH:MM:SS".into()))?;
+        .map_err(|_| {
+            AppError::BadRequest("Invalid time format; expected HH:MM or HH:MM:SS".into())
+        })?;
 
     let sitting = queries::admin_update_sitting(
         &state.db,
@@ -312,9 +368,7 @@ pub async fn delete_sitting(
 
 // ── Logs ───────────────────────────────────────────────────────────────────
 
-pub async fn get_activity_log(
-    State(state): State<AppState>,
-) -> Result<Json<Value>, AppError> {
+pub async fn get_activity_log(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
     let rows = queries::admin_recent_activity(&state.db, 100).await?;
     Ok(Json(json!({ "activity": rows })))
 }
@@ -454,7 +508,7 @@ pub async fn announce(
 #[derive(Deserialize)]
 pub struct UploadPdfBody {
     pub filename: String,
-    pub content: String, // base64-encoded PDF bytes
+    pub content: String,  // base64-encoded PDF bytes
     pub doc_type: String, // "judgment" | "court_list"
     pub court: String,
 }

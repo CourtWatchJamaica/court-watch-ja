@@ -1,45 +1,59 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import Navbar from "@/components/Navbar";
-import JudgeCard3D from "@/components/JudgeCard3D";
+import JudicialConstellation from "@/components/JudicialConstellation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiClient } from "@/lib/api";
-import { Judge } from "@/lib/types";
+import { Judge, JudgeConnection } from "@/lib/types";
 import { Users } from "lucide-react";
 
-function SkeletonJudgeCard() {
+function ConstellationSkeleton() {
   return (
-    <div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-black/20">
-      <Skeleton className="h-[200px] w-full rounded-none bg-white/[0.04]" />
-      <div className="space-y-2 p-4">
-        <Skeleton className="h-3.5 w-3/4 bg-white/[0.06]" />
-        <Skeleton className="h-2.5 w-1/2 bg-white/[0.04]" />
+    <div className="flex flex-col" style={{ height: "calc(100vh - 8rem)" }}>
+      {/* Search bar skeleton */}
+      <div className="px-1 pb-4 shrink-0">
+        <Skeleton className="h-11 w-full rounded-xl bg-white/[0.05]" />
+      </div>
+      {/* Canvas skeleton */}
+      <div className="relative flex-1 rounded-2xl overflow-hidden border border-white/[0.05] bg-[#050510]">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/[0.08] border-t-[#009B3A]" />
+          <p className="text-[11px] text-white/20">Loading judicial constellation…</p>
+        </div>
+      </div>
+      {/* Legend skeleton */}
+      <div className="flex gap-4 px-5 py-3">
+        {[1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-3 w-24 rounded bg-white/[0.04]" />
+        ))}
       </div>
     </div>
   );
 }
 
 export default function JudgesPage() {
-  const router = useRouter();
   const [judges, setJudges] = useState<Judge[]>([]);
+  const [connections, setConnections] = useState<JudgeConnection[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchJudges = async () => {
-      try {
-        const { judges: data } = await apiClient.getJudges();
-        setJudges(data);
-      } catch (error) {
-        console.error("Failed to fetch judges:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+    // Fetch judges and connections independently so a failure in one
+    // cannot block or mask the other. Loading clears when judges settle.
+    apiClient
+      .getJudges()
+      .then((res) => {
+        console.log("[Constellation] judges received:", res.judges?.length ?? 0);
+        setJudges(res.judges ?? []);
+      })
+      .catch((err) => console.error("[Constellation] getJudges failed:", err))
+      .finally(() => setLoading(false));
 
-    fetchJudges();
+    apiClient
+      .getJudgeConnections()
+      .then((res) => setConnections(res.connections ?? []))
+      .catch((err) => console.error("[Constellation] getJudgeConnections failed:", err));
   }, []);
 
   return (
@@ -47,51 +61,36 @@ export default function JudgesPage() {
       <div className="min-h-screen bg-[#07070f]">
         <Navbar />
 
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-28 md:pb-12">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-28 md:pb-10">
           {/* ── Header ── */}
-          <div className="mb-8">
-            <div className="mb-3 flex items-center gap-2">
+          <div className="mb-5">
+            <div className="mb-2 flex items-center gap-2">
               <Users className="h-4 w-4 text-[#009B3A]" />
               <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#009B3A]">
                 Judicial Directory
               </span>
             </div>
-            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-white">
-              Jamaican Judiciary
-            </h1>
-            <p className="mt-1.5 text-sm text-white/40">
-              {loading
-                ? "Loading registry…"
-                : `${judges.length} judge${judges.length !== 1 ? "s" : ""} in the registry`}
+            <div className="flex items-end justify-between gap-4">
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+                The Judicial Constellation
+              </h1>
+              {!loading && (
+                <p className="text-[11px] text-white/30 shrink-0 pb-0.5">
+                  {judges.length} judge{judges.length !== 1 ? "s" : ""} · {connections.length} connection{connections.length !== 1 ? "s" : ""}
+                </p>
+              )}
+            </div>
+            <p className="mt-1 text-sm text-white/35">
+              Each star is a judge — size reflects caseload, colour reflects court.
             </p>
           </div>
 
-          {/* ── Grid ── */}
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {loading ? (
-              Array.from({ length: 6 }).map((_, i) => (
-                <SkeletonJudgeCard key={i} />
-              ))
-            ) : judges.length > 0 ? (
-              judges.map((judge) => (
-                <JudgeCard3D
-                  key={judge.id}
-                  judge={judge}
-                  onClick={() => router.push(`/judges/${judge.id}`)}
-                />
-              ))
-            ) : (
-              <div className="col-span-full flex flex-col items-center justify-center rounded-2xl border border-white/[0.05] bg-[#0d0d1a] py-20 text-center px-8">
-                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#009B3A]/[0.07] ring-1 ring-[#009B3A]/20">
-                  <Users className="h-7 w-7 text-[#009B3A]/50" />
-                </div>
-                <p className="text-sm font-semibold text-white/50">No judges in the registry yet</p>
-                <p className="mt-1.5 text-xs text-white/25 max-w-[220px] leading-relaxed">
-                  The judicial directory is populated when cases are scraped.
-                </p>
-              </div>
-            )}
-          </div>
+          {/* ── Constellation or skeleton ── */}
+          {loading ? (
+            <ConstellationSkeleton />
+          ) : (
+            <JudicialConstellation judges={judges} connections={connections} />
+          )}
         </main>
       </div>
     </AuthGuard>

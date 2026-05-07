@@ -65,6 +65,19 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
+    // Extract judge names from CoA PDFs that are already on disk (fast, no network I/O).
+    // Must run before seed_judges_from_judgments so the newly extracted names are included.
+    if let Err(e) = scraper::runner::backfill_coa_judge_names(&pool).await {
+        tracing::warn!("Startup CoA judge backfill failed: {e}");
+    }
+
+    // Sync judges table from judgments on every startup (idempotent – ON CONFLICT DO NOTHING).
+    // Runs after the backfill so CoA judge names extracted above are captured.
+    match db::queries::seed_judges_from_judgments(&pool).await {
+        Ok(n) => info!("Judge sync complete ({n} new row(s))"),
+        Err(e) => tracing::warn!("Judge seed failed: {e}"),
+    }
+
     // ── App state ─────────────────────────────────────────────────────────
     let state = AppState {
         db: pool.clone(),

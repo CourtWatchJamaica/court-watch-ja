@@ -93,6 +93,11 @@ export interface UserCase {
   created_at: string;
 }
 
+export interface JudgeConnection {
+  judge_a_id: number;
+  judge_b_id: number;
+}
+
 export interface Notification {
   id: number;
   user_id: number;
@@ -102,4 +107,35 @@ export interface Notification {
   read_at: string | null;
   title?: string | null;
   message?: string | null;
+}
+
+export interface ParishCourtCase {
+  id: number;
+  parish: string;
+  accused_name: string | null;
+  offence: string | null;
+  status: string | null;
+  week_of: string | null; // "YYYY-MM-DD"
+  pdf_source_url: string | null;
+  created_at: string;
+}
+
+export interface ParishSummary {
+  name: string;
+  total_cases: number;
+}
+
+export interface ParishCaseTallies {
+  violent: number;
+  property: number;
+  drugs: number;
+  other: number;
+}
+
+export interface ParishCaseDetail {
+  case: ParishCourtCase;
+  related: ParishCourtCase[];
+  all_charges: ParishCourtCase[];
+  total_count: number;
+  offence_tallies: ParishCaseTallies;
 }

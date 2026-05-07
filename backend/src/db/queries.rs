@@ -95,6 +95,26 @@ pub async fn admin_delete_user(pool: &PgPool, user_id: i32) -> sqlx::Result<bool
     Ok(result.rows_affected() > 0)
 }
 
+pub async fn update_user_profile(
+    pool: &PgPool,
+    user_id: i32,
+    new_email: Option<&str>,
+    new_password_hash: Option<&str>,
+) -> sqlx::Result<Option<User>> {
+    sqlx::query_as::<_, User>(
+        "UPDATE users
+         SET email         = COALESCE($2, email),
+             password_hash = COALESCE($3, password_hash)
+         WHERE id = $1
+         RETURNING id, email, password_hash, role, created_at",
+    )
+    .bind(user_id)
+    .bind(new_email)
+    .bind(new_password_hash)
+    .fetch_optional(pool)
+    .await
+}
+
 pub async fn bootstrap_admin(pool: &PgPool, email: &str) -> sqlx::Result<()> {
     sqlx::query(
         "UPDATE users SET role = 'super_admin' WHERE email = $1 AND role != 'super_admin'",
@@ -345,8 +365,32 @@ pub async fn list_judgments(
     page: i64,
     limit: i64,
     court: Option<&str>,
+    judge: Option<&str>,
 ) -> sqlx::Result<(Vec<Judgment>, i64)> {
     let offset = (page - 1).max(0) * limit;
+
+    // Judge-specific path: bypass court constraint, return that judge's judgments.
+    if let Some(judge_name) = judge {
+        let sql = format!(
+            "SELECT {J} FROM judgments
+             WHERE judge_name = $1
+             ORDER BY date DESC NULLS LAST, created_at DESC
+             LIMIT $2 OFFSET $3"
+        );
+        let rows = sqlx::query_as::<_, Judgment>(&sql)
+            .bind(judge_name)
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(pool)
+            .await?;
+        let total: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM judgments WHERE judge_name = $1")
+                .bind(judge_name)
+                .fetch_one(pool)
+                .await?;
+        return Ok((rows, total));
+    }
+
     let effective_court = court.unwrap_or("Supreme Court");
 
     if let Some(q) = query.filter(|q| !q.is_empty()) {
@@ -486,15 +530,58 @@ pub async fn judgments_needing_pdf(pool: &PgPool) -> sqlx::Result<Vec<Judgment>>
     sqlx::query_as::<_, Judgment>(&sql).fetch_all(pool).await
 }
 
+/// Set `judge_name` only when it is currently NULL — safe to call repeatedly.
+pub async fn set_judgment_judge_name(
+    pool: &PgPool,
+    judgment_id: i32,
+    judge_name: &str,
+) -> sqlx::Result<()> {
+    sqlx::query(
+        "UPDATE judgments SET judge_name = $1, updated_at = NOW()
+         WHERE id = $2 AND judge_name IS NULL",
+    )
+    .bind(judge_name)
+    .bind(judgment_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// CoA judgments that have a local PDF but no judge name yet.
+pub async fn coa_judgments_needing_judge_name(pool: &PgPool) -> sqlx::Result<Vec<Judgment>> {
+    let sql = format!(
+        "SELECT {J} FROM judgments
+         WHERE court = 'Court of Appeal'
+           AND judge_name IS NULL
+           AND local_pdf_path IS NOT NULL"
+    );
+    sqlx::query_as::<_, Judgment>(&sql).fetch_all(pool).await
+}
+
 // ── Judges ─────────────────────────────────────────────────────────────────
 
 pub async fn list_judges(pool: &PgPool, court: Option<&str>) -> sqlx::Result<Vec<JudgeWithCount>> {
+    // judgments.judge_name can be a comma-separated list ("Smith JA, Jones JA").
+    // The CTE expands every judgment's judge_name into one row per individual name
+    // using unnest(string_to_array(...)).  We then do a plain equality LEFT JOIN so
+    // sqlx never sees a correlated ARRAY(SELECT ...) subquery in a JOIN condition
+    // (which causes sqlx to return zero rows even though psql returns correct data).
     if let Some(c) = court {
         sqlx::query_as::<_, JudgeWithCount>(
-            "SELECT j.id, j.name, j.court, COUNT(jm.id) AS total_cases
-             FROM judges j
-             LEFT JOIN judgments jm ON jm.judge_name = j.name
-             WHERE j.court = $1
+            "WITH expanded AS (
+                 SELECT jm.id AS judgment_id,
+                        TRIM(jn.name) AS single_name
+                 FROM   judgments jm
+                 CROSS JOIN LATERAL
+                        unnest(string_to_array(jm.judge_name, ',')) AS jn(name)
+                 WHERE  jm.judge_name IS NOT NULL
+                   AND  TRIM(jm.judge_name) <> ''
+             )
+             SELECT j.id, j.name, j.court,
+                    COUNT(DISTINCT e.judgment_id) AS total_cases
+             FROM   judges j
+             LEFT JOIN expanded e ON e.single_name = TRIM(j.name)
+             WHERE  j.court = $1
              GROUP BY j.id, j.name, j.court
              ORDER BY j.name",
         )
@@ -503,9 +590,19 @@ pub async fn list_judges(pool: &PgPool, court: Option<&str>) -> sqlx::Result<Vec
         .await
     } else {
         sqlx::query_as::<_, JudgeWithCount>(
-            "SELECT j.id, j.name, j.court, COUNT(jm.id) AS total_cases
-             FROM judges j
-             LEFT JOIN judgments jm ON jm.judge_name = j.name
+            "WITH expanded AS (
+                 SELECT jm.id AS judgment_id,
+                        TRIM(jn.name) AS single_name
+                 FROM   judgments jm
+                 CROSS JOIN LATERAL
+                        unnest(string_to_array(jm.judge_name, ',')) AS jn(name)
+                 WHERE  jm.judge_name IS NOT NULL
+                   AND  TRIM(jm.judge_name) <> ''
+             )
+             SELECT j.id, j.name, j.court,
+                    COUNT(DISTINCT e.judgment_id) AS total_cases
+             FROM   judges j
+             LEFT JOIN expanded e ON e.single_name = TRIM(j.name)
              GROUP BY j.id, j.name, j.court
              ORDER BY j.name",
         )
@@ -525,8 +622,15 @@ pub async fn get_judgments_by_judge(
     pool: &PgPool,
     judge_name: &str,
 ) -> sqlx::Result<Vec<Judgment>> {
+    // Match judgments where the judge appears anywhere in the comma-separated judge_name field.
     let sql = format!(
-        "SELECT {J} FROM judgments WHERE judge_name = $1 ORDER BY date DESC NULLS LAST"
+        "SELECT {J} FROM judgments
+         WHERE judge_name IS NOT NULL
+           AND $1 = ANY(
+                 ARRAY(SELECT TRIM(p)
+                       FROM unnest(string_to_array(judge_name, ',')) p)
+               )
+         ORDER BY date DESC NULLS LAST"
     );
     sqlx::query_as::<_, Judgment>(&sql)
         .bind(judge_name)
@@ -539,13 +643,189 @@ pub async fn upsert_judge(pool: &PgPool, name: &str, court: Option<&str>) -> sql
         "INSERT INTO judges (name, court, updated_at)
          VALUES ($1, $2, NOW())
          ON CONFLICT (name) DO UPDATE SET
-           court      = COALESCE(EXCLUDED.court, judges.court),
+           -- Keep the existing court if one is already set; only fill in a NULL.
+           -- This prevents a less-specific scraper from overwriting a known assignment.
+           court      = COALESCE(judges.court, EXCLUDED.court),
            updated_at = NOW()
          RETURNING *",
     )
     .bind(name)
     .bind(court)
     .fetch_one(pool)
+    .await
+}
+
+/// Remove obviously non-judge entries that scrapers may introduce.
+///
+/// Safe to call repeatedly — matches only entries that cannot be real judge names:
+///   • names with embedded newlines (multi-row scrape artefact)
+///   • names with commas (multi-judge bench stored as single row)
+///   • names longer than 60 characters (no real judge name is this long)
+///   • names containing legal-document phrases that are never part of a name
+pub async fn cleanup_judges_table(pool: &PgPool) -> sqlx::Result<u64> {
+    let result = sqlx::query(
+        "DELETE FROM judges WHERE
+             name ~ E'\\n'
+             OR name LIKE '%,%'
+             OR name = 'Supreme Court'
+             OR length(name) > 60
+             OR name ~* '\\m(mode\\s+of|last\\s+updated|court\\s+judges|formal\\s+mode|\
+                            puisne|date\\s+of\\s+appointment|in\\s+writing|\
+                            your\\s+honou?r|dear\\s+chief|my\\s+lord)\\M'",
+    )
+    .execute(pool)
+    .await?;
+    Ok(result.rows_affected())
+}
+
+pub async fn seed_judges_from_judgments(pool: &PgPool) -> sqlx::Result<u64> {
+    // ── Diagnostic: count distinct judge names per court in judgments ────────
+    let sc_src: i64 = sqlx::query_scalar(
+        "SELECT COUNT(DISTINCT TRIM(judge_name)) FROM judgments
+         WHERE court = 'Supreme Court' AND judge_name IS NOT NULL AND TRIM(judge_name) <> ''",
+    )
+    .fetch_one(pool)
+    .await
+    .unwrap_or(0);
+
+    let coa_src: i64 = sqlx::query_scalar(
+        "SELECT COUNT(DISTINCT TRIM(judge_name)) FROM judgments
+         WHERE court = 'Court of Appeal' AND judge_name IS NOT NULL AND TRIM(judge_name) <> ''",
+    )
+    .fetch_one(pool)
+    .await
+    .unwrap_or(0);
+
+    let parish_src: i64 = sqlx::query_scalar(
+        "SELECT COUNT(DISTINCT TRIM(judge_name)) FROM judgments
+         WHERE court = 'Parish Court' AND judge_name IS NOT NULL AND TRIM(judge_name) <> ''",
+    )
+    .fetch_one(pool)
+    .await
+    .unwrap_or(0);
+
+    tracing::info!(
+        "Seed diagnostic — distinct judge_name values in judgments: \
+         SC={sc_src}, CoA={coa_src}, Parish={parish_src}"
+    );
+
+    // ── Pre-insert cleanup: remove corrupted rows from previous bad runs ────
+    cleanup_judges_table(pool).await.ok();
+
+    // ── Single-pass upsert ───────────────────────────────────────────────────
+    // DISTINCT ON (TRIM(clean_name)) + ORDER BY TRIM(clean_name), date DESC
+    // deduplicates leading/trailing-whitespace variants before conflicting on
+    // the unique name index.  DO UPDATE overwrites any previous wrong-court
+    // assignment (fixes judges bulk-inserted as SC on an earlier run).
+    let result = sqlx::query(
+        "INSERT INTO judges (name, court, updated_at)
+         SELECT DISTINCT ON (TRIM(clean_name))
+             TRIM(clean_name) AS name,
+             court,
+             NOW()            AS updated_at
+         FROM (
+             SELECT
+                 court,
+                 date,
+                 unnest(
+                     string_to_array(
+                         regexp_replace(COALESCE(judge_name, ''), ' and ', ',', 'ig'),
+                         ','
+                     )
+                 ) AS clean_name
+             FROM judgments
+             WHERE judge_name IS NOT NULL AND TRIM(judge_name) <> ''
+         ) expanded
+         WHERE TRIM(clean_name) <> ''
+         ORDER BY TRIM(clean_name), date DESC NULLS LAST
+         ON CONFLICT (name) DO UPDATE SET
+             court      = EXCLUDED.court,
+             updated_at = NOW()",
+    )
+    .execute(pool)
+    .await?;
+
+    let rows = result.rows_affected();
+    tracing::info!("Seed: {rows} judge row(s) upserted (inserts + court corrections)");
+
+    // ── Post-insert confirmation ─────────────────────────────────────────────
+    let sc_now: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM judges WHERE court = 'Supreme Court'",
+    )
+    .fetch_one(pool)
+    .await
+    .unwrap_or(0);
+
+    let coa_now: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM judges WHERE court = 'Court of Appeal'",
+    )
+    .fetch_one(pool)
+    .await
+    .unwrap_or(0);
+
+    let parish_now: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM judges WHERE court = 'Parish Court'",
+    )
+    .fetch_one(pool)
+    .await
+    .unwrap_or(0);
+
+    tracing::info!(
+        "Seed result — judges table: SC={sc_now}, CoA={coa_now}, Parish={parish_now}"
+    );
+
+    Ok(rows)
+}
+
+pub async fn list_judge_connections(pool: &PgPool) -> sqlx::Result<Vec<JudgeConnection>> {
+    sqlx::query_as::<_, JudgeConnection>(
+        "WITH jc AS (
+             -- Expand each judgment's judge_name into individual judge IDs.
+             -- Handles 'A and B', 'A, B', and 'A, B and C' formats.
+             SELECT
+                 jm.case_number,
+                 j.id AS judge_id
+             FROM judgments jm
+             CROSS JOIN LATERAL unnest(
+                 string_to_array(
+                     regexp_replace(COALESCE(jm.judge_name, ''), ' and ', ',', 'ig'),
+                     ','
+                 )
+             ) AS raw_name
+             JOIN judges j ON j.name = TRIM(raw_name)
+             WHERE jm.judge_name IS NOT NULL
+               AND TRIM(jm.judge_name) <> ''
+         ),
+         case_pairs AS (
+             -- Judges who co-appear on the same case_number.
+             SELECT
+                 LEAST(a.judge_id, b.judge_id)         AS judge_a_id,
+                 GREATEST(a.judge_id, b.judge_id)      AS judge_b_id,
+                 COUNT(DISTINCT a.case_number)::bigint  AS count
+             FROM jc a
+             JOIN jc b ON a.case_number = b.case_number AND a.judge_id < b.judge_id
+             GROUP BY 1, 2
+         ),
+         court_pairs AS (
+             -- Same-court pairs ensure visual connectivity when case co-authorship is sparse.
+             SELECT
+                 j1.id     AS judge_a_id,
+                 j2.id     AS judge_b_id,
+                 1::bigint AS count
+             FROM judges j1
+             JOIN judges j2 ON j1.court = j2.court AND j1.id < j2.id
+             WHERE j1.court IS NOT NULL
+         )
+         SELECT judge_a_id, judge_b_id, MAX(count) AS count
+         FROM (
+             SELECT * FROM case_pairs
+             UNION ALL
+             SELECT * FROM court_pairs
+         ) combined
+         GROUP BY judge_a_id, judge_b_id
+         ORDER BY judge_a_id, judge_b_id",
+    )
+    .fetch_all(pool)
     .await
 }
 
@@ -665,7 +945,21 @@ pub async fn list_court_sittings(
     date_from: Option<NaiveDate>,
     date_to: Option<NaiveDate>,
     court: Option<&str>,
+    judge: Option<&str>,
 ) -> sqlx::Result<Vec<CourtSitting>> {
+    // Judge-specific path: return all sittings for that judge without court constraint.
+    if let Some(judge_name) = judge {
+        let sql = format!(
+            "SELECT {S} FROM court_sittings
+             WHERE judge_name = $1
+             ORDER BY event_date DESC NULLS LAST, event_time NULLS LAST"
+        );
+        return sqlx::query_as::<_, CourtSitting>(&sql)
+            .bind(judge_name)
+            .fetch_all(pool)
+            .await;
+    }
+
     let court_filter = court.map(sitting_court_filter);
 
     match (date_from, date_to, court_filter) {
@@ -740,7 +1034,7 @@ pub async fn list_court_sittings(
         (None, None, Some(filter)) => {
             let sql = format!(
                 "SELECT {S} FROM court_sittings
-                 WHERE {filter}
+                 WHERE event_date >= CURRENT_DATE AND {filter}
                  ORDER BY event_date, event_time NULLS LAST"
             );
             sqlx::query_as::<_, CourtSitting>(&sql)
@@ -749,7 +1043,9 @@ pub async fn list_court_sittings(
         }
         (None, None, None) => {
             let sql = format!(
-                "SELECT {S} FROM court_sittings ORDER BY event_date, event_time NULLS LAST"
+                "SELECT {S} FROM court_sittings
+                 WHERE event_date >= CURRENT_DATE
+                 ORDER BY event_date, event_time NULLS LAST"
             );
             sqlx::query_as::<_, CourtSitting>(&sql)
                 .fetch_all(pool)
@@ -1080,4 +1376,189 @@ pub async fn check_notifications(pool: &PgPool) {
             changed.len()
         );
     }
+}
+
+// ── Parish Court Cases ─────────────────────────────────────────────────────
+
+const PC: &str = "id, parish, accused_name, offence, status, week_of, pdf_source_url, created_at";
+
+pub async fn list_parish_cases(
+    pool: &PgPool,
+    parish: Option<&str>,
+    q: Option<&str>,
+    page: i64,
+    limit: i64,
+) -> sqlx::Result<(Vec<ParishCourtCase>, i64)> {
+    let offset = (page - 1).max(0) * limit;
+
+    let (rows, total) = match (parish, q) {
+        (Some(p), Some(search)) => {
+            let pattern = format!("%{}%", search.to_lowercase());
+            let sql = format!(
+                "SELECT {PC} FROM parish_court_cases
+                 WHERE parish = $1
+                   AND (LOWER(accused_name) LIKE $2 OR LOWER(offence) LIKE $2)
+                 ORDER BY week_of DESC NULLS LAST, id DESC
+                 LIMIT $3 OFFSET $4"
+            );
+            let rows = sqlx::query_as::<_, ParishCourtCase>(&sql)
+                .bind(p)
+                .bind(&pattern)
+                .bind(limit)
+                .bind(offset)
+                .fetch_all(pool)
+                .await?;
+            let total: i64 = sqlx::query_scalar(
+                "SELECT COUNT(*) FROM parish_court_cases
+                 WHERE parish = $1 AND (LOWER(accused_name) LIKE $2 OR LOWER(offence) LIKE $2)",
+            )
+            .bind(p)
+            .bind(&pattern)
+            .fetch_one(pool)
+            .await?;
+            (rows, total)
+        }
+        (Some(p), None) => {
+            let sql = format!(
+                "SELECT {PC} FROM parish_court_cases
+                 WHERE parish = $1
+                 ORDER BY week_of DESC NULLS LAST, id DESC
+                 LIMIT $2 OFFSET $3"
+            );
+            let rows = sqlx::query_as::<_, ParishCourtCase>(&sql)
+                .bind(p)
+                .bind(limit)
+                .bind(offset)
+                .fetch_all(pool)
+                .await?;
+            let total: i64 =
+                sqlx::query_scalar("SELECT COUNT(*) FROM parish_court_cases WHERE parish = $1")
+                    .bind(p)
+                    .fetch_one(pool)
+                    .await?;
+            (rows, total)
+        }
+        (None, Some(search)) => {
+            let pattern = format!("%{}%", search.to_lowercase());
+            let sql = format!(
+                "SELECT {PC} FROM parish_court_cases
+                 WHERE LOWER(accused_name) LIKE $1 OR LOWER(offence) LIKE $1 OR LOWER(parish) LIKE $1
+                 ORDER BY week_of DESC NULLS LAST, id DESC
+                 LIMIT $2 OFFSET $3"
+            );
+            let rows = sqlx::query_as::<_, ParishCourtCase>(&sql)
+                .bind(&pattern)
+                .bind(limit)
+                .bind(offset)
+                .fetch_all(pool)
+                .await?;
+            let total: i64 = sqlx::query_scalar(
+                "SELECT COUNT(*) FROM parish_court_cases
+                 WHERE LOWER(accused_name) LIKE $1 OR LOWER(offence) LIKE $1 OR LOWER(parish) LIKE $1",
+            )
+            .bind(&pattern)
+            .fetch_one(pool)
+            .await?;
+            (rows, total)
+        }
+        (None, None) => {
+            let sql = format!(
+                "SELECT {PC} FROM parish_court_cases
+                 ORDER BY week_of DESC NULLS LAST, id DESC
+                 LIMIT $1 OFFSET $2"
+            );
+            let rows = sqlx::query_as::<_, ParishCourtCase>(&sql)
+                .bind(limit)
+                .bind(offset)
+                .fetch_all(pool)
+                .await?;
+            let total: i64 =
+                sqlx::query_scalar("SELECT COUNT(*) FROM parish_court_cases")
+                    .fetch_one(pool)
+                    .await?;
+            (rows, total)
+        }
+    };
+
+    Ok((rows, total))
+}
+
+pub async fn parish_summary(pool: &PgPool) -> sqlx::Result<Vec<ParishSummary>> {
+    sqlx::query_as::<_, ParishSummary>(
+        "SELECT parish AS name, COUNT(*) AS total_cases
+         FROM parish_court_cases
+         GROUP BY parish
+         ORDER BY parish",
+    )
+    .fetch_all(pool)
+    .await
+}
+
+pub async fn list_all_charges_for_accused(
+    pool: &PgPool,
+    accused_name: &str,
+) -> sqlx::Result<Vec<ParishCourtCase>> {
+    sqlx::query_as::<_, ParishCourtCase>(&format!(
+        "SELECT {PC} FROM parish_court_cases
+         WHERE accused_name = $1
+         ORDER BY week_of DESC NULLS LAST, parish, id"
+    ))
+    .bind(accused_name)
+    .fetch_all(pool)
+    .await
+}
+
+pub async fn get_parish_case(pool: &PgPool, id: i32) -> sqlx::Result<Option<ParishCourtCase>> {
+    sqlx::query_as::<_, ParishCourtCase>(&format!(
+        "SELECT {PC} FROM parish_court_cases WHERE id = $1"
+    ))
+    .bind(id)
+    .fetch_optional(pool)
+    .await
+}
+
+pub async fn list_related_parish_charges(
+    pool: &PgPool,
+    exclude_id: i32,
+    accused_name: &str,
+    parish: &str,
+    week_of: NaiveDate,
+) -> sqlx::Result<Vec<ParishCourtCase>> {
+    sqlx::query_as::<_, ParishCourtCase>(&format!(
+        "SELECT {PC} FROM parish_court_cases
+         WHERE accused_name = $1 AND parish = $2 AND week_of = $3 AND id != $4
+         ORDER BY id"
+    ))
+    .bind(accused_name)
+    .bind(parish)
+    .bind(week_of)
+    .bind(exclude_id)
+    .fetch_all(pool)
+    .await
+}
+
+pub async fn upsert_parish_case(
+    pool: &PgPool,
+    parish: &str,
+    accused_name: Option<&str>,
+    offence: Option<&str>,
+    status: Option<&str>,
+    week_of: Option<NaiveDate>,
+    pdf_source_url: &str,
+) -> sqlx::Result<()> {
+    sqlx::query(
+        "INSERT INTO parish_court_cases
+             (parish, accused_name, offence, status, week_of, pdf_source_url)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT DO NOTHING",
+    )
+    .bind(parish)
+    .bind(accused_name)
+    .bind(offence)
+    .bind(status)
+    .bind(week_of)
+    .bind(pdf_source_url)
+    .execute(pool)
+    .await?;
+    Ok(())
 }

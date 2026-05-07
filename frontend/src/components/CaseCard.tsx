@@ -26,8 +26,8 @@ export default function CaseCard({ judgment, onClick, isTracked, onTrack }: Case
           <h3 className="font-semibold text-white/85 text-[13px] leading-snug group-hover:text-white transition-colors line-clamp-2 flex-1">
             {judgment.title || judgment.case_number}
           </h3>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <Badge className="bg-[#009B3A]/12 text-[#009B3A] border border-[#009B3A]/25 text-[10px] font-mono px-1.5 py-0 h-5 rounded-md">
+          <div className="flex items-center gap-1.5 shrink-0 min-w-0">
+            <Badge className="bg-[#009B3A]/12 text-[#009B3A] border border-[#009B3A]/25 text-[10px] font-mono px-1.5 py-0 h-auto min-h-5 rounded-md break-all whitespace-normal leading-tight min-w-0">
               {judgment.case_number}
             </Badge>
             {onTrack && (

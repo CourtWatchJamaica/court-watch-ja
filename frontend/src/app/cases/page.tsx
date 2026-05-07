@@ -11,7 +11,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { apiClient } from "@/lib/api";
 import { Judgment, CourtSitting } from "@/lib/types";
 import { useTracking } from "@/lib/tracking-context";
-import { FileText, Scale, Calendar, SearchX } from "lucide-react";
+import {
+  FileText,
+  Scale,
+  Calendar,
+  SearchX,
+  MapPin,
+  ChevronDown,
+  Loader2,
+} from "lucide-react";
+
+const LIMIT = 50;
 
 type Tab = "judgments" | "sittings";
 
@@ -40,7 +50,11 @@ function TabToggle({ active, onChange }: { active: Tab; onChange: (t: Tab) => vo
           <Icon className="h-5 w-5 shrink-0" strokeWidth={active === id ? 2.2 : 1.8} />
           <div className="text-left">
             <p className="text-[15px] font-semibold leading-none">{label}</p>
-            <p className={`mt-1 text-[11px] leading-none ${active === id ? "text-white/65" : "text-white/30"}`}>
+            <p
+              className={`mt-1 text-[11px] leading-none ${
+                active === id ? "text-white/65" : "text-white/30"
+              }`}
+            >
               {sub}
             </p>
           </div>
@@ -125,22 +139,61 @@ export default function CasesPage() {
   const { isTracked, track, untrack } = useTracking();
   const [activeTab, setActiveTab] = useState<Tab>("judgments");
   const [query, setQuery] = useState("");
-  const [judgments, setJudgments] = useState<Judgment[]>([]);
-  const [sittings, setSittings] = useState<CourtSitting[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  const fetchData = useCallback(async (q: string, tab: Tab) => {
-    setLoading(true);
-    try {
-      if (tab === "judgments") {
-        const res = await apiClient.getJudgments(q || undefined);
-        setJudgments(res.judgments);
+  // Judgments — server-side pagination
+  const [judgments, setJudgments] = useState<Judgment[]>([]);
+  const [judgementsTotal, setJudgementsTotal] = useState(0);
+  const [judgmentsPage, setJudgmentsPage] = useState(1);
+
+  // Sittings — client-side show-more (backend returns full filtered list)
+  const [sittings, setSittings] = useState<CourtSitting[]>([]);
+  const [sittingsShown, setSittingsShown] = useState(LIMIT);
+
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  const fetchJudgments = useCallback(
+    async (q: string, page: number, append: boolean) => {
+      if (append) {
+        setLoadingMore(true);
       } else {
-        const res = await apiClient.getCourtSittings({ q: q || undefined });
-        setSittings(res.sittings);
+        setLoading(true);
+        setJudgmentsPage(1);
       }
+      try {
+        const res = await apiClient.getJudgments(
+          q || undefined,
+          undefined,
+          undefined,
+          page,
+          LIMIT,
+        );
+        setJudgementsTotal(res.total);
+        setJudgments((prev) =>
+          append ? [...prev, ...res.judgments] : res.judgments,
+        );
+      } catch (err) {
+        console.error("Failed to fetch judgments:", err);
+      } finally {
+        if (append) setLoadingMore(false);
+        else setLoading(false);
+      }
+    },
+    [],
+  );
+
+  const fetchSittings = useCallback(async (q: string) => {
+    setLoading(true);
+    setSittingsShown(LIMIT);
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      const res = await apiClient.getCourtSittings({
+        q: q || undefined,
+        date_from: q ? undefined : today,
+      });
+      setSittings(res.sittings);
     } catch (err) {
-      console.error("Failed to fetch:", err);
+      console.error("Failed to fetch sittings:", err);
     } finally {
       setLoading(false);
     }
@@ -154,8 +207,12 @@ export default function CasesPage() {
     const initialTab = (params.get("tab") as Tab) || "judgments";
     setQuery(initialQ);
     setActiveTab(initialTab);
-    fetchData(initialQ, initialTab);
-  }, [fetchData]);
+    if (initialTab === "judgments") {
+      void fetchJudgments(initialQ, 1, false);
+    } else {
+      void fetchSittings(initialQ);
+    }
+  }, [fetchJudgments, fetchSittings]);
 
   const syncUrl = useCallback((q: string, tab: Tab) => {
     if (typeof window === "undefined") return;
@@ -163,29 +220,66 @@ export default function CasesPage() {
     if (q) params.set("q", q);
     if (tab !== "judgments") params.set("tab", tab);
     const qs = params.toString();
-    window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
+    window.history.replaceState(
+      null,
+      "",
+      qs ? `?${qs}` : window.location.pathname,
+    );
   }, []);
 
   const handleSearch = useCallback(
     (q: string) => {
       setQuery(q);
       syncUrl(q, activeTab);
-      fetchData(q, activeTab);
+      if (activeTab === "judgments") {
+        void fetchJudgments(q, 1, false);
+      } else {
+        void fetchSittings(q);
+      }
     },
-    [fetchData, activeTab, syncUrl],
+    [activeTab, fetchJudgments, fetchSittings, syncUrl],
   );
 
   const handleTabChange = (tab: Tab) => {
     setActiveTab(tab);
     syncUrl(query, tab);
-    fetchData(query, tab);
+    if (tab === "judgments") {
+      void fetchJudgments(query, 1, false);
+    } else {
+      void fetchSittings(query);
+    }
   };
 
   const handleClearSearch = () => {
     setQuery("");
     syncUrl("", activeTab);
-    fetchData("", activeTab);
+    if (activeTab === "judgments") {
+      void fetchJudgments("", 1, false);
+    } else {
+      void fetchSittings("");
+    }
   };
+
+  const handleLoadMore = useCallback(() => {
+    if (activeTab === "judgments") {
+      const nextPage = judgmentsPage + 1;
+      setJudgmentsPage(nextPage);
+      void fetchJudgments(query, nextPage, true);
+    } else {
+      setSittingsShown((prev) => prev + LIMIT);
+    }
+  }, [activeTab, judgmentsPage, query, fetchJudgments]);
+
+  const hasMoreJudgments = judgments.length < judgementsTotal;
+  const visibleSittings = sittings.slice(0, sittingsShown);
+  const hasMoreSittings = sittingsShown < sittings.length;
+  const hasMore =
+    activeTab === "judgments" ? hasMoreJudgments : hasMoreSittings;
+
+  const shownCount =
+    activeTab === "judgments" ? judgments.length : visibleSittings.length;
+  const totalCount =
+    activeTab === "judgments" ? judgementsTotal : sittings.length;
 
   return (
     <AuthGuard>
@@ -204,6 +298,17 @@ export default function CasesPage() {
               Search Cases
             </h1>
             <TabToggle active={activeTab} onChange={handleTabChange} />
+
+            {/* Parish Court shortcut */}
+            <div className="mt-3 flex">
+              <button
+                onClick={() => router.push("/parish-court")}
+                className="flex items-center gap-2 rounded-full border border-[#CD7F32]/30 bg-[#CD7F32]/10 px-4 py-2 text-[12px] font-semibold text-[#CD7F32] hover:bg-[#CD7F32]/20 hover:border-[#CD7F32]/50 transition-colors"
+              >
+                <MapPin className="h-3.5 w-3.5" />
+                Parish Court
+              </button>
+            </div>
           </div>
 
           {/* Search */}
@@ -222,10 +327,13 @@ export default function CasesPage() {
 
           {/* Result count */}
           {!loading && (
-            <p className="mb-4 text-[11px] text-white/25">
+            <p className="mb-4 text-[11px] text-muted-foreground">
+              {shownCount < totalCount
+                ? `Showing ${shownCount} of ${totalCount}`
+                : `${totalCount}`}{" "}
               {activeTab === "judgments"
-                ? `${judgments.length} judgment${judgments.length !== 1 ? "s" : ""}`
-                : `${sittings.length} sitting${sittings.length !== 1 ? "s" : ""}`}
+                ? `judgment${totalCount !== 1 ? "s" : ""}`
+                : `sitting${totalCount !== 1 ? "s" : ""}`}
               {query ? ` matching "${query}"` : ""}
             </p>
           )}
@@ -238,39 +346,76 @@ export default function CasesPage() {
               ))}
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {activeTab === "judgments" ? (
-                judgments.length > 0 ? (
-                  judgments.map((j) => (
-                    <CaseCard
-                      key={j.id}
-                      judgment={j}
-                      onClick={() => router.push(`/cases/${j.id}`)}
-                      isTracked={isTracked(j.id, "judgment")}
+            <>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {activeTab === "judgments" ? (
+                  judgments.length > 0 ? (
+                    judgments.map((j) => (
+                      <CaseCard
+                        key={j.id}
+                        judgment={j}
+                        onClick={() => router.push(`/cases/${j.id}`)}
+                        isTracked={isTracked(j.id, "judgment")}
+                        onTrack={(id) =>
+                          isTracked(id, "judgment")
+                            ? untrack(id)
+                            : track(id, "judgment")
+                        }
+                      />
+                    ))
+                  ) : (
+                    <EmptyState
+                      tab="judgments"
+                      hasQuery={!!query}
+                      onClear={handleClearSearch}
+                    />
+                  )
+                ) : visibleSittings.length > 0 ? (
+                  visibleSittings.map((s) => (
+                    <SittingCard
+                      key={s.id}
+                      sitting={s}
+                      onClick={() => router.push(`/cases/sittings/${s.id}`)}
+                      isTracked={isTracked(s.id, "sitting")}
                       onTrack={(id) =>
-                        isTracked(id, "judgment") ? untrack(id) : track(id, "judgment")
+                        isTracked(id, "sitting")
+                          ? untrack(id)
+                          : track(id, "sitting")
                       }
                     />
                   ))
                 ) : (
-                  <EmptyState tab="judgments" hasQuery={!!query} onClear={handleClearSearch} />
-                )
-              ) : sittings.length > 0 ? (
-                sittings.map((s) => (
-                  <SittingCard
-                    key={s.id}
-                    sitting={s}
-                    onClick={() => router.push(`/cases/sittings/${s.id}`)}
-                    isTracked={isTracked(s.id, "sitting")}
-                    onTrack={(id) =>
-                      isTracked(id, "sitting") ? untrack(id) : track(id, "sitting")
-                    }
+                  <EmptyState
+                    tab="sittings"
+                    hasQuery={!!query}
+                    onClear={handleClearSearch}
                   />
-                ))
-              ) : (
-                <EmptyState tab="sittings" hasQuery={!!query} onClear={handleClearSearch} />
+                )}
+              </div>
+
+              {/* Load More */}
+              {hasMore && (
+                <div className="mt-8 flex justify-center">
+                  <button
+                    onClick={handleLoadMore}
+                    disabled={loadingMore}
+                    className="flex items-center gap-2 rounded-xl border border-white/[0.10] bg-white/[0.04] px-6 py-3 text-sm font-semibold text-white/60 hover:bg-white/[0.08] hover:text-white/90 active:scale-[0.97] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loadingMore ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Loading…
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="h-4 w-4" />
+                        Load More
+                      </>
+                    )}
+                  </button>
+                </div>
               )}
-            </div>
+            </>
           )}
         </main>
       </div>

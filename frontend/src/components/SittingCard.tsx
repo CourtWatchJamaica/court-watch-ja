@@ -43,7 +43,7 @@ export default function SittingCard({ sitting, onClick, isTracked, onTrack }: Si
               {sitting.title || sitting.case_number || "Untitled Sitting"}
             </h3>
             {sitting.case_number && sitting.title && (
-              <p className="mt-1 text-[10px] font-mono text-[#FED100]/50">
+              <p className="mt-1 text-[10px] font-mono text-[#FED100]/50 break-all whitespace-normal">
                 {sitting.case_number}
               </p>
             )}

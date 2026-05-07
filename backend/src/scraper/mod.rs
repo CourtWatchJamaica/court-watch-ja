@@ -5,6 +5,7 @@ pub mod judgment_detail;
 pub mod judgments;
 pub mod judges;
 pub mod parish_court;
+pub mod parish_court_judges;
 pub mod parish_court_lists;
 pub mod pdf;
 pub mod runner;
@@ -46,6 +47,9 @@ pub struct ScraperState {
     /// Parish Court court-list PDF URLs we have already processed.
     #[serde(default)]
     pub processed_parish_pdf_urls: Vec<String>,
+    /// When we last scraped the Parish Court judges directory.
+    #[serde(default)]
+    pub last_parish_judges_scraped_at: Option<DateTime<Utc>>,
 
     // ── PDF download failure tracking (1e) ───────────────────────────────────
     /// Counts how many times each judgment PDF URL has failed to download.
@@ -54,6 +58,17 @@ pub struct ScraperState {
     /// PDF URLs permanently skipped because they exceeded MAX_PDF_FAILURES.
     #[serde(default)]
     pub pdf_skipped: Vec<String>,
+
+    // ── CoA judge-name backfill timestamp ────────────────────────────────────
+    /// When we last ran the CoA judgment scraper specifically to backfill NULL
+    /// judge_name fields.  Used to throttle re-runs (max once per 12 h).
+    #[serde(default)]
+    pub last_coa_judge_backfill_at: Option<DateTime<Utc>>,
+
+    // ── Parish Court case-list PDFs ───────────────────────────────────────────
+    /// PDF URLs from parish case lists we have already parsed into parish_court_cases.
+    #[serde(default)]
+    pub processed_parish_case_pdf_urls: Vec<String>,
 }
 
 impl ScraperState {
@@ -101,6 +116,16 @@ impl ScraperState {
 
     pub fn parish_pdf_already_processed(&self, url: &str) -> bool {
         self.processed_parish_pdf_urls.iter().any(|u| u == url)
+    }
+
+    pub fn mark_parish_case_pdf_processed(&mut self, url: String) {
+        if !self.processed_parish_case_pdf_urls.contains(&url) {
+            self.processed_parish_case_pdf_urls.push(url);
+        }
+    }
+
+    pub fn parish_case_pdf_already_processed(&self, url: &str) -> bool {
+        self.processed_parish_case_pdf_urls.iter().any(|u| u == url)
     }
 
     // ── PDF failure helpers ───────────────────────────────────────────────────

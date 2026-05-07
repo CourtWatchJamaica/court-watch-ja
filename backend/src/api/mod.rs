@@ -3,9 +3,12 @@ pub mod auth;
 pub mod court_sittings;
 pub mod court_stats;
 pub mod errors;
+pub mod judge_connections;
 pub mod judgments;
 pub mod judges;
+pub mod maintenance;
 pub mod notifications;
+pub mod parish_cases;
 pub mod tracking;
 
 pub fn court_slug_to_name(slug: &str) -> &'static str {
@@ -37,15 +40,21 @@ pub fn router(state: AppState) -> Router {
     // ── Public ────────────────────────────────────────────────────────────
     let public = Router::new()
         .route("/api/auth/signup", post(auth::signup))
-        .route("/api/auth/login", post(auth::login));
+        .route("/api/auth/login", post(auth::login))
+        .route("/api/maintenance/status", get(maintenance::status))
+        .route("/api/parish-cases", get(parish_cases::list_parish_cases))
+        .route("/api/parish-cases/:id", get(parish_cases::get_parish_case_by_id))
+        .route("/api/parish-summary", get(parish_cases::parish_summary));
 
     // ── Protected (any authenticated user) ───────────────────────────────
     let protected = Router::new()
         .route("/api/auth/me", get(auth::me))
+        .route("/api/user/profile", put(auth::update_profile))
         .route("/api/judgments", get(judgments::list_judgments))
         .route("/api/judgments/:id", get(judgments::get_judgment))
         .route("/api/judges", get(judges::list_judges))
         .route("/api/judges/:id", get(judges::get_judge))
+        .route("/api/judge-connections", get(judge_connections::list_judge_connections))
         .route("/api/user/cases", get(tracking::get_user_cases))
         .route("/api/user/cases", post(tracking::add_user_case))
         .route("/api/user/cases/:case_id", delete(tracking::remove_user_case))
@@ -69,6 +78,7 @@ pub fn router(state: AppState) -> Router {
         .route("/api/admin/config/:key", put(admin::set_config))
         .route("/api/admin/scraper/state", get(admin::get_scraper_state))
         .route("/api/admin/scraper/trigger", post(admin::trigger_scraper))
+        .route("/api/admin/deep-scrape", post(admin::deep_scrape))
         .route("/api/admin/scraper/skipped", delete(admin::remove_skipped_pdf))
         .route("/api/admin/scraper/skip", post(admin::skip_pdf))
         .route("/api/admin/data/judgments", get(admin::list_judgments))

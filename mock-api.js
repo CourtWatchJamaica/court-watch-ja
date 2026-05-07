@@ -129,6 +129,48 @@ const fakeJudgments = [
     created_at: "2026-02-06T00:00:00Z",
     updated_at: "2026-02-06T00:00:00Z",
   },
+  {
+    id: 9,
+    case_number: "2026/CCAP/00128",
+    title: "Jamwest Resort Limited v Mango Beach Holdings",
+    judge_name: "Hon. Justice D. Batts",
+    court: "Court of Appeal",
+    date: "2026-04-28",
+    pdf_url: null,
+    local_pdf_path: null,
+    summary_text:
+      "Appeal from the Supreme Court concerning the validity of a commercial lease agreement in the tourism sector. The Court of Appeal dismissed the appeal and upheld the finding that the lease was validly terminated for non-payment of rent.",
+    created_at: "2026-04-29T00:00:00Z",
+    updated_at: "2026-04-29T00:00:00Z",
+  },
+  {
+    id: 11,
+    case_number: "2026/CCAP/00145",
+    title: "National Insurance Fund v ISSA Trust Co Ltd",
+    judge_name: "Hon. Justice Sykes",
+    court: "Court of Appeal",
+    date: "2026-05-02",
+    pdf_url: null,
+    local_pdf_path: null,
+    summary_text:
+      "Appeal arising from a dispute over pension benefit entitlements. The Court of Appeal allowed the appeal in part and remitted the quantum issue to the Supreme Court for fresh determination on the evidence.",
+    created_at: "2026-05-03T00:00:00Z",
+    updated_at: "2026-05-03T00:00:00Z",
+  },
+  {
+    id: 12,
+    case_number: "2026/HCV/00528",
+    title: "Carib Cement Co Ltd v Portland Parish Council",
+    judge_name: "Hon. Justice McDonald-Bishop",
+    court: "Supreme Court",
+    date: "2026-05-04",
+    pdf_url: null,
+    local_pdf_path: null,
+    summary_text:
+      "Judicial review of the Parish Council's decision to deny a quarrying permit. The court quashed the decision and directed a fresh hearing with proper notice to affected parties.",
+    created_at: "2026-05-05T00:00:00Z",
+    updated_at: "2026-05-05T00:00:00Z",
+  },
 ];
 
 const fakeJudges = [
@@ -258,6 +300,32 @@ let fakeCourtSittings = [
     created_at: "2026-04-20T00:00:00Z",
   },
   {
+    id: 10,
+    case_number: "SU2026CD00190",
+    title: "Jamaican Producers Group Ltd v Caribbean Producers (Jamaica) Ltd",
+    judge_name: "Hon. Justice S. Jackson-Haisley",
+    court_division: "Commercial Division",
+    event_type: "Case management conference",
+    event_date: "2026-05-05",
+    event_time: "09:00:00",
+    lawyers: "Hart Muirhead Fatta; Myers Fletcher & Gordon",
+    pdf_source_url: null,
+    created_at: "2026-04-28T00:00:00Z",
+  },
+  {
+    id: 11,
+    case_number: "SU2026HCV00501",
+    title: "National Water Commission v Kingston Properties Ltd",
+    judge_name: "Hon. Justice G. Brown",
+    court_division: "Civil Division",
+    event_type: "Mention",
+    event_date: "2026-05-05",
+    event_time: "11:00:00",
+    lawyers: "DunnCox; Rattray Patterson Rattray",
+    pdf_source_url: null,
+    created_at: "2026-04-28T00:00:00Z",
+  },
+  {
     id: 6,
     case_number: "SU2025CA00088",
     title: "Roberts v National Commercial Bank",
@@ -309,7 +377,82 @@ let fakeCourtSittings = [
     pdf_source_url: null,
     created_at: "2026-04-23T00:00:00Z",
   },
+  {
+    id: 12,
+    case_number: "SU2025CA00193",
+    title: "ISSA Trust Co Ltd v National Insurance Fund",
+    judge_name: "Hon. Justice Sykes",
+    court_division: "Court of Appeal",
+    event_type: "Judgment delivery",
+    event_date: "2026-05-14",
+    event_time: "10:00:00",
+    lawyers: "Nunes Schoefield DeLeon & Company; Rattray Patterson Rattray",
+    pdf_source_url: null,
+    created_at: "2026-04-29T00:00:00Z",
+  },
+  {
+    id: 13,
+    case_number: "SU2025CA00201",
+    title: "Carib Cement Company v Construction Workers Union",
+    judge_name: "Hon. Justice D. Batts",
+    court_division: "Court of Appeal",
+    event_type: "Hearing",
+    event_date: "2026-05-19",
+    event_time: "09:30:00",
+    lawyers: "Chambers of Simister Law; Myers Fletcher & Gordon",
+    pdf_source_url: null,
+    created_at: "2026-04-30T00:00:00Z",
+  },
 ];
+
+// ── Parish Court Cases ────────────────────────────────────────────────────────
+
+const fakeParishCases = [
+  { id: 1, parish: "Kingston", accused_name: "Brown, Devon", offence: "Unlawful wounding", status: "M", week_of: "2026-05-05", pdf_source_url: null, created_at: "2026-05-05T00:00:00Z" },
+  { id: 2, parish: "Kingston", accused_name: "Smith, Marcia", offence: "Larceny from the person", status: "H", week_of: "2026-05-05", pdf_source_url: null, created_at: "2026-05-05T00:00:00Z" },
+  { id: 3, parish: "Kingston", accused_name: "Williams, Andre", offence: "Possession of ganja", status: "P", week_of: "2026-05-05", pdf_source_url: null, created_at: "2026-05-05T00:00:00Z" },
+  { id: 4, parish: "St. Andrew", accused_name: "Campbell, Rohan", offence: "Robbery with aggravation", status: "T", week_of: "2026-05-05", pdf_source_url: null, created_at: "2026-05-05T00:00:00Z" },
+  { id: 5, parish: "St. Andrew", accused_name: "Gordon, Keisha", offence: "Obtaining by fraud", status: "A", week_of: "2026-04-28", pdf_source_url: null, created_at: "2026-04-28T00:00:00Z" },
+  { id: 6, parish: "St. James", accused_name: "Reid, Fitzroy", offence: "Possession of firearm", status: "M", week_of: "2026-05-05", pdf_source_url: null, created_at: "2026-05-05T00:00:00Z" },
+  { id: 7, parish: "St. James", accused_name: "Thomas, Calvin", offence: "Dangerous drug trafficking", status: "H", week_of: "2026-05-05", pdf_source_url: null, created_at: "2026-05-05T00:00:00Z" },
+  { id: 8, parish: "St. James", accused_name: "Allen, Suzette", offence: "Housebreaking and larceny", status: "T", week_of: "2026-04-28", pdf_source_url: null, created_at: "2026-04-28T00:00:00Z" },
+  { id: 9, parish: "Manchester", accused_name: "Clarke, Errol", offence: "Assault with intent to rob", status: "M", week_of: "2026-05-05", pdf_source_url: null, created_at: "2026-05-05T00:00:00Z" },
+  { id: 10, parish: "Manchester", accused_name: "Black, Natoya", offence: "Possession of cocaine", status: "P", week_of: "2026-05-05", pdf_source_url: null, created_at: "2026-05-05T00:00:00Z" },
+  { id: 11, parish: "Clarendon", accused_name: "Davis, Winston", offence: "Malicious destruction of property", status: "A", week_of: "2026-04-28", pdf_source_url: null, created_at: "2026-04-28T00:00:00Z" },
+  { id: 12, parish: "Clarendon", accused_name: "Henry, Petronia", offence: "Larceny as a servant", status: "H", week_of: "2026-05-05", pdf_source_url: null, created_at: "2026-05-05T00:00:00Z" },
+  { id: 13, parish: "St. Catherine", accused_name: "Morrison, Delroy", offence: "Murder", status: "M", week_of: "2026-05-05", pdf_source_url: null, created_at: "2026-05-05T00:00:00Z" },
+  { id: 14, parish: "St. Catherine", accused_name: "Green, Audrey", offence: "Possession of ganja for own use", status: "F", week_of: "2026-05-05", pdf_source_url: null, created_at: "2026-05-05T00:00:00Z" },
+  { id: 15, parish: "St. Catherine", accused_name: "White, Orville", offence: "Rape", status: "T", week_of: "2026-04-28", pdf_source_url: null, created_at: "2026-04-28T00:00:00Z" },
+  { id: 16, parish: "Westmoreland", accused_name: "Jackson, Marvette", offence: "Shooting with intent", status: "H", week_of: "2026-05-05", pdf_source_url: null, created_at: "2026-05-05T00:00:00Z" },
+  { id: 17, parish: "Westmoreland", accused_name: "Brown, Sheryl", offence: "Praedial larceny", status: "M", week_of: "2026-04-28", pdf_source_url: null, created_at: "2026-04-28T00:00:00Z" },
+  { id: 18, parish: "St. Elizabeth", accused_name: "Lewis, Courtney", offence: "Assault occasioning actual bodily harm", status: "A", week_of: "2026-05-05", pdf_source_url: null, created_at: "2026-05-05T00:00:00Z" },
+  { id: 19, parish: "St. Ann", accused_name: "Walker, Donovan", offence: "Dangerous drug possession", status: "P", week_of: "2026-05-05", pdf_source_url: null, created_at: "2026-05-05T00:00:00Z" },
+  { id: 20, parish: "St. Ann", accused_name: "Thompson, Yvonne", offence: "Obtaining money by false pretences", status: "H", week_of: "2026-04-28", pdf_source_url: null, created_at: "2026-04-28T00:00:00Z" },
+  { id: 21, parish: "Portland", accused_name: "Scott, Dwayne", offence: "Burglary", status: "T", week_of: "2026-05-05", pdf_source_url: null, created_at: "2026-05-05T00:00:00Z" },
+  { id: 22, parish: "St. Mary", accused_name: "Edwards, Paulette", offence: "Careless driving causing death", status: "M", week_of: "2026-05-05", pdf_source_url: null, created_at: "2026-05-05T00:00:00Z" },
+  { id: 23, parish: "St. Thomas", accused_name: "Bailey, Garfield", offence: "Manslaughter", status: "H", week_of: "2026-05-05", pdf_source_url: null, created_at: "2026-05-05T00:00:00Z" },
+  { id: 24, parish: "Trelawny", accused_name: "Palmer, Juliet", offence: "Forgery", status: "A", week_of: "2026-04-28", pdf_source_url: null, created_at: "2026-04-28T00:00:00Z" },
+  { id: 25, parish: "Hanover", accused_name: "Robinson, Lenroy", offence: "Larceny", status: "D", week_of: "2026-04-28", pdf_source_url: null, created_at: "2026-04-28T00:00:00Z" },
+  { id: 26, parish: "Kingston", accused_name: "Johnson, Michael", offence: "Shooting wounding", status: "T", week_of: "2026-04-28", pdf_source_url: null, created_at: "2026-04-28T00:00:00Z" },
+  { id: 27, parish: "St. Andrew", accused_name: "Wright, Claudette", offence: "Possession of prohibited weapon", status: "M", week_of: "2026-04-28", pdf_source_url: null, created_at: "2026-04-28T00:00:00Z" },
+  { id: 28, parish: "Manchester", accused_name: "Myers, Cornelius", offence: "Sexual intercourse with a person under 16", status: "H", week_of: "2026-04-28", pdf_source_url: null, created_at: "2026-04-28T00:00:00Z" },
+  { id: 29, parish: "St. Catherine", accused_name: "Francis, Leroy", offence: "Ganja cultivation", status: "P", week_of: "2026-04-28", pdf_source_url: null, created_at: "2026-04-28T00:00:00Z" },
+  { id: 30, parish: "Clarendon", accused_name: "Burke, Annmarie", offence: "Theft by agent", status: "C", week_of: "2026-04-21", pdf_source_url: null, created_at: "2026-04-21T00:00:00Z" },
+];
+
+// ── Offence categorisation helper — mirrors backend/frontend logic ────────────
+
+function mockCategorise(offence) {
+  if (!offence) return "other";
+  const o = offence.toLowerCase();
+  if (["murder","manslaughter","assault","wounding","robbery","rape","sexual",
+       "grievous","gun","firearm","shooting","stabbing","arson"].some((k) => o.includes(k))) return "violent";
+  if (["ganja","cannabis","cocaine","drug","possession of prohib","traffick",
+       "dangerous drug"].some((k) => o.includes(k))) return "drugs";
+  if (["larceny","theft","burglary","housebreaking","fraud","forgery","obtaining",
+       "malicious","damage","possession of sto"].some((k) => o.includes(k))) return "property";
+  return "other";
+}
 
 // ── Court-filter helper — mirrors backend sitting_court_filter logic ───────────
 
@@ -379,8 +522,8 @@ function json(res, data, status = 200) {
   res.end(JSON.stringify(data));
 }
 
-let nextSittingId = fakeCourtSittings.length + 1;
-let nextJudgmentId = fakeJudgments.length + 1;
+let nextSittingId = Math.max(...fakeCourtSittings.map((s) => s.id)) + 1;
+let nextJudgmentId = Math.max(...fakeJudgments.map((j) => j.id)) + 1;
 let judgmentsMutable = [...fakeJudgments];
 
 // ── Server ────────────────────────────────────────────────────────────────────────
@@ -398,6 +541,76 @@ const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   const path = url.pathname;
   console.log(`${req.method} ${path}`);
+
+  // ── Maintenance / Health ──────────────────────────────────────────────────────
+
+  if (req.method === "GET" && path === "/api/maintenance/status") {
+    return json(res, { maintenance_mode: false });
+  }
+
+  // ── Parish Court Cases ────────────────────────────────────────────────────────
+
+  const parishCaseByIdMatch = path.match(/^\/api\/parish-cases\/(\d+)$/);
+  if (req.method === "GET" && parishCaseByIdMatch) {
+    const id = parseInt(parishCaseByIdMatch[1], 10);
+    const c = fakeParishCases.find((x) => x.id === id);
+    if (!c) return json(res, { error: "Not found" }, 404);
+
+    const related = fakeParishCases.filter(
+      (r) =>
+        r.id !== id &&
+        r.accused_name === c.accused_name &&
+        r.parish === c.parish &&
+        r.week_of === c.week_of,
+    );
+
+    const all_charges = fakeParishCases
+      .filter((r) => r.accused_name === c.accused_name && r.parish === c.parish)
+      .sort((a, b) => (b.week_of ?? "").localeCompare(a.week_of ?? "") || a.id - b.id);
+
+    const offence_tallies = { violent: 0, property: 0, drugs: 0, other: 0 };
+    for (const ch of all_charges) {
+      offence_tallies[mockCategorise(ch.offence)]++;
+    }
+
+    return json(res, {
+      case: c,
+      related,
+      all_charges,
+      total_count: all_charges.length,
+      offence_tallies,
+    });
+  }
+
+  if (req.method === "GET" && path === "/api/parish-cases") {
+    const parish = url.searchParams.get("parish");
+    const q = url.searchParams.get("q")?.toLowerCase();
+    const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10));
+    const limit = Math.min(200, Math.max(1, parseInt(url.searchParams.get("limit") || "50", 10)));
+
+    let results = [...fakeParishCases];
+    if (parish) results = results.filter((c) => c.parish === parish);
+    if (q) results = results.filter(
+      (c) =>
+        c.accused_name?.toLowerCase().includes(q) ||
+        c.offence?.toLowerCase().includes(q) ||
+        c.parish.toLowerCase().includes(q),
+    );
+    const total = results.length;
+    const offset = (page - 1) * limit;
+    return json(res, { cases: results.slice(offset, offset + limit), total });
+  }
+
+  if (req.method === "GET" && path === "/api/parish-summary") {
+    const counts = {};
+    for (const c of fakeParishCases) {
+      counts[c.parish] = (counts[c.parish] || 0) + 1;
+    }
+    const summary = Object.entries(counts)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([name, total_cases]) => ({ name, total_cases }));
+    return json(res, { summary });
+  }
 
   // ── Auth ──────────────────────────────────────────────────────────────────────
 
@@ -435,8 +648,10 @@ const server = http.createServer((req, res) => {
   if (req.method === "GET" && path === "/api/judgments") {
     const q = url.searchParams.get("q");
     const court = url.searchParams.get("court");
+    const judge = url.searchParams.get("judge");
     let results = [...judgmentsMutable];
     if (court) results = results.filter((j) => j.court === court);
+    if (judge) results = results.filter((j) => j.judge_name === judge);
     if (q) {
       const ql = q.toLowerCase();
       results = results.filter(
@@ -446,6 +661,12 @@ const server = http.createServer((req, res) => {
           j.judge_name?.toLowerCase().includes(ql),
       );
     }
+    results.sort((a, b) => {
+      if (!a.date && !b.date) return 0;
+      if (!a.date) return 1;
+      if (!b.date) return -1;
+      return b.date.localeCompare(a.date);
+    });
     return json(res, { judgments: results, total: results.length });
   }
 
@@ -469,8 +690,31 @@ const server = http.createServer((req, res) => {
   if (req.method === "GET" && /^\/api\/judges\/\d+$/.test(path)) {
     const id = parseInt(path.split("/").pop());
     const judge = fakeJudges.find((j) => j.id === id);
-    if (judge) return json(res, { judge, judgments: judgmentsMutable });
+    if (judge) {
+      const filtered = judgmentsMutable
+        .filter((j) => j.judge_name === judge.name)
+        .sort((a, b) => {
+          if (!a.date && !b.date) return 0;
+          if (!a.date) return 1;
+          if (!b.date) return -1;
+          return b.date.localeCompare(a.date);
+        });
+      return json(res, { judge, judgments: filtered });
+    }
     return json(res, { error: "Not found" }, 404);
+  }
+
+  if (req.method === "GET" && path === "/api/judge-connections") {
+    const connections = [];
+    // Derive connections from judges who share the same court (co-bench)
+    for (let i = 0; i < fakeJudges.length; i++) {
+      for (let j = i + 1; j < fakeJudges.length; j++) {
+        if (fakeJudges[i].court && fakeJudges[i].court === fakeJudges[j].court) {
+          connections.push({ judge_a_id: fakeJudges[i].id, judge_b_id: fakeJudges[j].id });
+        }
+      }
+    }
+    return json(res, { connections });
   }
 
   // ── Court Sittings ────────────────────────────────────────────────────────────
@@ -480,8 +724,10 @@ const server = http.createServer((req, res) => {
     const court = url.searchParams.get("court");
     const dateFrom = url.searchParams.get("date_from");
     const dateTo = url.searchParams.get("date_to");
+    const judge = url.searchParams.get("judge");
     let results = [...fakeCourtSittings];
     if (court) results = results.filter((s) => sittingMatchesCourt(s, court));
+    if (judge) results = results.filter((s) => s.judge_name === judge);
     if (dateFrom) results = results.filter((s) => (s.event_date ?? "") >= dateFrom);
     if (dateTo) results = results.filter((s) => (s.event_date ?? "") <= dateTo);
     if (q) {
@@ -493,6 +739,16 @@ const server = http.createServer((req, res) => {
           s.judge_name?.toLowerCase().includes(ql),
       );
     }
+    if (!dateFrom && !dateTo) {
+      const today = new Date().toISOString().split("T")[0];
+      results = results.filter((s) => !s.event_date || s.event_date >= today);
+    }
+    results.sort((a, b) => {
+      if (!a.event_date && !b.event_date) return 0;
+      if (!a.event_date) return 1;
+      if (!b.event_date) return -1;
+      return a.event_date.localeCompare(b.event_date);
+    });
     return json(res, { sittings: results });
   }
 
@@ -783,6 +1039,15 @@ const server = http.createServer((req, res) => {
     const before = fakeCourtSittings.length;
     fakeCourtSittings = fakeCourtSittings.filter((s) => s.id !== id);
     return json(res, { deleted: fakeCourtSittings.length < before });
+  }
+
+  // ── Admin: Stats ─────────────────────────────────────────────────────────────
+
+  if (req.method === "GET" && path === "/api/admin/stats") {
+    return json(res, {
+      pending_notifications: 0,
+      last_scrape_at: new Date().toISOString(),
+    });
   }
 
   // ── Admin: Logs ───────────────────────────────────────────────────────────────

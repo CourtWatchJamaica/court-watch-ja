@@ -9,7 +9,7 @@ use tracing::{error, info, warn};
 
 use super::{
     appeal_court, appeal_court_lists, court_lists, judges, judgments, parish_court,
-    parish_court_lists, ScraperState, MAX_PDF_FAILURES,
+    parish_court_judges, ScraperState, MAX_PDF_FAILURES,
 };
 use crate::{config::Config, db::queries};
 
@@ -48,6 +48,13 @@ pub async fn start(pool: PgPool, config: Arc<Config>) -> anyhow::Result<()> {
 pub async fn run_catchup_check(pool: &PgPool, config: &Config) -> anyhow::Result<()> {
     let today = Utc::now().date_naive();
     let stale_threshold = Duration::days(7);
+    // Judges scrapers and CoA backfill are throttled: at most once per 12 h in catchup.
+    // This prevents a boot-loop when a scraper produces 0 valid results (e.g. the
+    // Parish Court protocol page has no judge names after cleanup).
+    let throttle = Duration::hours(12);
+
+    // ── Load ScraperState early — needed for throttle checks ─────────────────
+    let mut state = ScraperState::load(&config.scraper_state_path).await;
 
     // ── Supreme Court judgments ──────────────────────────────────────────────
     let sc_judgment_date = queries::most_recent_judgment_date_by_court(pool, "Supreme Court")
@@ -100,17 +107,87 @@ pub async fn run_catchup_check(pool: &PgPool, config: &Config) -> anyhow::Result
         .map(|d| today - d > stale_threshold)
         .unwrap_or(true);
 
+    // ── Parish Court cases — always run when table is empty ─────────────────
+    let parish_cases_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM parish_court_cases")
+            .fetch_one(pool)
+            .await
+            .unwrap_or(0);
+    let parish_cases_empty = parish_cases_count == 0;
+
+    // ── Judge-count checks (throttled) ───────────────────────────────────────
+    let coa_judge_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM judges WHERE court = 'Court of Appeal'")
+            .fetch_one(pool)
+            .await
+            .unwrap_or(0);
+    // Only trigger if count is 0 AND we haven't attempted recently.
+    let coa_judges_missing = coa_judge_count == 0
+        && state
+            .last_appeal_judges_scraped_at
+            .map(|t| Utc::now() - t > throttle)
+            .unwrap_or(true);
+
+    // ── CoA judge-name backfill (throttled) ──────────────────────────────────
+    // Triggers when CoA judgments have NULL judge_name; re-runs the CoA scraper so
+    // the updated judgment_detail extractor can fill them in.  Throttled so a
+    // scraper that finds no names doesn't re-run on every boot.
+    let coa_null_judge_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM judgments WHERE court = 'Court of Appeal' AND judge_name IS NULL",
+    )
+    .fetch_one(pool)
+    .await
+    .unwrap_or(0);
+    let coa_needs_judge_backfill = coa_null_judge_count > 0
+        && state
+            .last_coa_judge_backfill_at
+            .map(|t| Utc::now() - t > throttle)
+            .unwrap_or(true);
+
+    // ── CoA PDF backfill — runs BEFORE the early-return, no throttle ─────────
+    // Separate from `coa_needs_judge_backfill`: this only reads already-downloaded
+    // local PDFs (no network I/O) so it is safe to run on every startup.
+    // The scraper-staleness check may still return early, but we must never skip
+    // this when local PDFs exist with missing judge names.
+    let coa_pdf_backfill_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM judgments
+         WHERE court = 'Court of Appeal'
+           AND judge_name    IS NULL
+           AND local_pdf_path IS NOT NULL",
+    )
+    .fetch_one(pool)
+    .await
+    .unwrap_or(0);
+
+    if coa_pdf_backfill_count > 0 {
+        info!(
+            "[CoA] {} judgment(s) have a local PDF but no judge name — running PDF backfill",
+            coa_pdf_backfill_count
+        );
+        if let Err(e) = backfill_coa_judge_names(pool).await {
+            error!("[CoA] PDF backfill error: {e}");
+        }
+        match queries::seed_judges_from_judgments(pool).await {
+            Ok(n) if n > 0 => info!("Judge sync complete ({n} new row(s))"),
+            Ok(_) => {}
+            Err(e) => warn!("Judge seed failed after CoA PDF backfill: {e}"),
+        }
+    }
+
     if !sc_judgments_stale
         && !coa_judgments_stale
         && !parish_judgments_stale
         && !sc_sittings_stale
         && !coa_sittings_stale
         && !parish_sittings_stale
+        && !coa_judges_missing
+        && !coa_needs_judge_backfill
+        && !parish_cases_empty
     {
         info!(
             "Catch-up check: all courts current. \
              SC judgments ({:?}), CoA judgments ({:?}), Parish judgments ({:?}), \
-             SC sittings ({:?}), CoA sittings ({:?}), Parish sittings ({:?}). Skipping.",
+             SC sittings ({:?}), CoA sittings ({:?}), Parish sittings ({:?}).",
             sc_judgment_date,
             coa_judgment_date,
             parish_judgment_date,
@@ -125,15 +202,16 @@ pub async fn run_catchup_check(pool: &PgPool, config: &Config) -> anyhow::Result
         "Catch-up check triggered — \
          sc_judgments_stale={sc_judgments_stale} (last={sc_judgment_date:?}), \
          coa_judgments_stale={coa_judgments_stale} (last={coa_judgment_date:?}), \
+         coa_needs_judge_backfill={coa_needs_judge_backfill} ({coa_null_judge_count} NULL), \
          parish_judgments_stale={parish_judgments_stale} (last={parish_judgment_date:?}), \
          sc_sittings_stale={sc_sittings_stale} (last={sc_sitting_date:?}), \
          coa_sittings_stale={coa_sittings_stale} (last={coa_sitting_date:?}), \
-         parish_sittings_stale={parish_sittings_stale} (last={parish_sitting_date:?})"
+         parish_sittings_stale={parish_sittings_stale} (last={parish_sitting_date:?})\
+        "
     );
 
     let cutoff = load_cutoff_from_db(pool, config).await;
     let client = super::http_client()?;
-    let mut state = ScraperState::load(&config.scraper_state_path).await;
 
     if sc_judgments_stale {
         info!(
@@ -151,13 +229,17 @@ pub async fn run_catchup_check(pool: &PgPool, config: &Config) -> anyhow::Result
         state.save(&config.scraper_state_path).await.ok();
     }
 
-    if coa_judgments_stale {
+    if coa_judgments_stale || coa_needs_judge_backfill {
         info!(
-            "Catch-up: running Court of Appeal judgment scraper (civil pg {}, criminal pg {})",
-            state.next_appeal_page, state.next_appeal_criminal_page
+            "Catch-up: running Court of Appeal judgment scraper \
+             (civil pg {}, criminal pg {}, null_judge_backfill={})",
+            state.next_appeal_page, state.next_appeal_criminal_page, coa_needs_judge_backfill
         );
         if let Err(e) = appeal_court::run(pool, &mut state, cutoff, &client).await {
             error!("Catch-up CoA judgment scraper error: {e}");
+        }
+        if coa_needs_judge_backfill {
+            state.last_coa_judge_backfill_at = Some(Utc::now());
         }
         state.save(&config.scraper_state_path).await.ok();
 
@@ -165,6 +247,16 @@ pub async fn run_catchup_check(pool: &PgPool, config: &Config) -> anyhow::Result
             error!("Catch-up CoA PDF download error: {e}");
         }
         state.save(&config.scraper_state_path).await.ok();
+
+        // Backfill judge names for CoA PDFs already on disk (including newly downloaded ones).
+        if let Err(e) = backfill_coa_judge_names(pool).await {
+            error!("Catch-up CoA judge name backfill error: {e}");
+        }
+        match queries::seed_judges_from_judgments(pool).await {
+            Ok(n) if n > 0 => info!("Judge sync complete ({n} new row(s))"),
+            Ok(_) => {}
+            Err(e) => warn!("Judge seed failed after CoA catch-up backfill: {e}"),
+        }
     }
 
     if parish_judgments_stale {
@@ -194,12 +286,33 @@ pub async fn run_catchup_check(pool: &PgPool, config: &Config) -> anyhow::Result
         state.save(&config.scraper_state_path).await.ok();
     }
 
-    if parish_sittings_stale {
-        info!("Catch-up: running Parish Court court-lists scraper");
-        if let Err(e) = parish_court_lists::run(pool, &mut state, &client, &config.pdf_dir).await {
-            error!("Catch-up Parish court-lists scraper error: {e}");
+    if coa_judges_missing {
+        info!("Catch-up: Court of Appeal has 0 judges — running CoA judges scraper");
+        if let Err(e) = appeal_court::run_judges(pool, &client).await {
+            error!("Catch-up CoA judges scraper error: {e}");
+        }
+        state.last_appeal_judges_scraped_at = Some(Utc::now());
+        state.save(&config.scraper_state_path).await.ok();
+    }
+
+    if parish_judgments_stale || parish_sittings_stale || parish_cases_empty {
+        info!(
+            "Catch-up: running Parish Court case scraper \
+             (parish_cases_empty={parish_cases_empty})"
+        );
+        if let Err(e) =
+            parish_court_judges::run(pool, &mut state, cutoff, &client, &config.pdf_dir).await
+        {
+            error!("Catch-up Parish case scraper error: {e}");
         }
         state.save(&config.scraper_state_path).await.ok();
+    }
+
+    // Remove any non-judge entries that scrapers may have introduced this run.
+    match queries::cleanup_judges_table(pool).await {
+        Ok(n) if n > 0 => info!("Judge cleanup: removed {n} non-judge row(s)"),
+        Ok(_) => {}
+        Err(e) => warn!("Judge cleanup failed: {e}"),
     }
 
     info!("Catch-up check complete.");
@@ -285,6 +398,16 @@ pub async fn run_all(pool: &PgPool, config: &Config) -> anyhow::Result<()> {
     }
     state.save(&config.scraper_state_path).await.ok();
 
+    // 6b. Backfill judge names for CoA PDFs already on disk
+    if let Err(e) = backfill_coa_judge_names(pool).await {
+        error!("[CoA] Judge name backfill error: {e}");
+    }
+    match queries::seed_judges_from_judgments(pool).await {
+        Ok(n) if n > 0 => info!("Judge sync complete ({n} new row(s))"),
+        Ok(_) => {}
+        Err(e) => warn!("Judge seed failed after CoA backfill: {e}"),
+    }
+
     // 7. Court of Appeal court lists (PDFs)
     info!("-- Starting Court of Appeal court-lists scraper");
     let coa_hearings =
@@ -318,7 +441,16 @@ pub async fn run_all(pool: &PgPool, config: &Config) -> anyhow::Result<()> {
         }
     }
 
-    // 9. Parish Court judgment scraper — graceful no-op if site unavailable
+    // 9. Parish Court case scraper (replaces defunct parish judges scraper)
+    info!("-- Starting Parish Court case scraper");
+    if let Err(e) =
+        parish_court_judges::run(pool, &mut state, cutoff, &client, &config.pdf_dir).await
+    {
+        error!("[Parish] Case scraper error: {e}");
+    }
+    state.save(&config.scraper_state_path).await.ok();
+
+    // 10. Parish Court judgment scraper — graceful no-op if site unavailable
     info!(
         "-- Starting Parish Court judgment scraper (page {})",
         state.next_parish_page
@@ -328,18 +460,12 @@ pub async fn run_all(pool: &PgPool, config: &Config) -> anyhow::Result<()> {
     }
     state.save(&config.scraper_state_path).await.ok();
 
-    // 10. Parish Court court lists (PDFs) — graceful no-op if site unavailable
-    info!("-- Starting Parish Court court-lists scraper");
-    let parish_hearings =
-        match parish_court_lists::run(pool, &mut state, &client, &config.pdf_dir).await {
-            Ok(n) => n,
-            Err(e) => {
-                error!("[Parish] Court-lists scraper error: {e}");
-                0
-            }
-        };
-    state.save(&config.scraper_state_path).await.ok();
-    info!("[Parish] Hearing sittings this run: {parish_hearings}");
+    // Remove any non-judge entries introduced by scrapers this run.
+    match queries::cleanup_judges_table(pool).await {
+        Ok(n) if n > 0 => info!("Judge cleanup: removed {n} non-judge row(s)"),
+        Ok(_) => {}
+        Err(e) => warn!("Judge cleanup failed: {e}"),
+    }
 
     // Spawn notification check non-blocking — scraper run is considered complete
     // regardless of how long the notification queries take.
@@ -372,6 +498,94 @@ async fn load_cutoff_from_db(pool: &PgPool, config: &Config) -> NaiveDate {
             config.judgment_cutoff_date
         }
     }
+}
+
+/// Read already-downloaded CoA PDFs and fill in any missing judge names.
+///
+/// Pure local I/O — no network requests.  Safe to call on every startup as a
+/// fast no-op when all judge names are already populated.
+pub async fn backfill_coa_judge_names(pool: &PgPool) -> anyhow::Result<()> {
+    use crate::{db::queries, utils::pdf as pdf_utils};
+
+    let pending = queries::coa_judgments_needing_judge_name(pool).await?;
+    if pending.is_empty() {
+        info!("[CoA] Backfill: no judgments need judge names — skipping");
+        return Ok(());
+    }
+    info!("[CoA] Backfilling judge names for {} judgment(s) with local PDFs", pending.len());
+
+    let mut extracted = 0usize;
+    let mut no_text = 0usize;
+    let mut no_match = 0usize;
+
+    for judgment in pending {
+        let Some(ref path) = judgment.local_pdf_path else { continue };
+        let bytes = match tokio::fs::read(path).await {
+            Ok(b) => b,
+            Err(e) => {
+                warn!("[CoA] {} — could not read PDF {path}: {e}", judgment.case_number);
+                no_text += 1;
+                continue;
+            }
+        };
+
+        // Try pdftotext first; fall back to OCR.
+        let pdftotext = pdf_utils::extract_text_from_bytes(&bytes)
+            .ok()
+            .filter(|t| !t.trim().is_empty());
+        let used_ocr = pdftotext.is_none();
+        let text_opt = pdftotext.or_else(|| pdf_utils::extract_text_ocr(&bytes));
+
+        let Some(ref text) = text_opt else {
+            warn!(
+                "[CoA] {} — no text extracted (method={})",
+                judgment.case_number,
+                if used_ocr { "ocr(failed)" } else { "pdftotext(failed)" }
+            );
+            no_text += 1;
+            continue;
+        };
+
+        let coram = super::judgment_detail::extract_coram_from_text(text);
+
+        if coram.is_none() {
+            // Log the first 300 chars so we can diagnose the pattern mismatch.
+            let preview: String = text.chars().take(300).collect();
+            let preview_clean = preview.replace('\n', "↵").replace('\r', "");
+            warn!(
+                "[CoA] {} — no judge match (method={}, text[..300]: {})",
+                judgment.case_number,
+                if used_ocr { "ocr" } else { "pdftotext" },
+                preview_clean
+            );
+            no_match += 1;
+            continue;
+        }
+
+        let coram = coram.unwrap();
+        match queries::set_judgment_judge_name(pool, judgment.id, &coram).await {
+            Ok(_) => {
+                info!(
+                    "[CoA] {} — backfilled '{}' (method={})",
+                    judgment.case_number,
+                    coram,
+                    if used_ocr { "ocr" } else { "pdftotext" }
+                );
+                extracted += 1;
+            }
+            Err(e) => {
+                error!(
+                    "[CoA] {} — failed to write judge_name: {e}",
+                    judgment.case_number
+                );
+            }
+        }
+    }
+
+    info!(
+        "[CoA] Backfill complete — extracted={extracted}, no_text={no_text}, no_match={no_match}"
+    );
+    Ok(())
 }
 
 async fn download_pending_pdfs(
@@ -433,6 +647,25 @@ async fn download_pending_pdfs(
                 } else {
                     info!("Saved PDF: {path_str}");
                     state.clear_pdf_failure(&full_url);
+                }
+
+                // For CoA judgments with no judge name yet, extract CORAM from the PDF text.
+                if judgment.court.as_deref() == Some("Court of Appeal")
+                    && judgment.judge_name.is_none()
+                {
+                    let text_opt = pdf_utils::extract_text_from_bytes(&bytes)
+                        .ok()
+                        .filter(|t| !t.trim().is_empty())
+                        .or_else(|| pdf_utils::extract_text_ocr(&bytes));
+                    if let Some(coram) = text_opt
+                        .as_deref()
+                        .and_then(super::judgment_detail::extract_coram_from_text)
+                    {
+                        match queries::set_judgment_judge_name(pool, judgment.id, &coram).await {
+                            Ok(_) => info!("[CoA] Extracted judge from PDF: {coram}"),
+                            Err(e) => error!("[CoA] Failed to set judge_name for {}: {e}", judgment.case_number),
+                        }
+                    }
                 }
             }
             Err(e) => {

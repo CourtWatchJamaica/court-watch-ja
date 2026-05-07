@@ -20,6 +20,20 @@ export const metadata: Metadata = {
   title: "CourtWatch JA — Jamaican Legal Case Tracker",
   description:
     "Track Jamaican court judgments, monitor cases, and stay informed on the latest legal decisions.",
+  openGraph: {
+    title: "CourtWatch JA — Jamaican Legal Case Tracker",
+    description:
+      "Track Jamaican court judgments, monitor cases, and stay informed on the latest legal decisions from Jamaica's Supreme Court, Court of Appeal, and Parish Courts.",
+    siteName: "CourtWatch JA",
+    locale: "en_JM",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "CourtWatch JA — Jamaican Legal Case Tracker",
+    description:
+      "Track Jamaican court judgments, monitor cases, and stay informed on the latest legal decisions.",
+  },
 };
 
 export default function RootLayout({

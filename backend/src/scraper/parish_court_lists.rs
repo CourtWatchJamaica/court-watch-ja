@@ -196,8 +196,18 @@ fn extract_parish_page_links(html: &str) -> Vec<String> {
     links
 }
 
+/// Substrings in the link text or filename that mark a non-court-list PDF to skip.
+const SKIP_SIGNALS: &[&str] = &[
+    "strategic", "business plan", "businessplan",
+    "judicature", "sentencing", "guideline",
+    "protocol", "proc.", "proc-",
+    "annual report", "annualreport",
+    "handbook", "manual", "policy",
+];
+
 /// Extract PDF links from a parish sub-page.
-/// Only keeps hrefs whose path ends with `.pdf` (case-insensitive).
+/// Keeps only hrefs whose path ends with `.pdf` AND whose link text / filename
+/// does not match any skip-signal keyword (strategic plans, procedure docs, etc.).
 fn extract_pdf_links_from_page(html: &str) -> Vec<String> {
     let doc = Html::parse_document(html);
     let sel = Selector::parse("a[href]").unwrap();
@@ -213,7 +223,25 @@ fn extract_pdf_links_from_page(html: &str) -> Vec<String> {
         let path_part = href.split('?').next().unwrap_or(href);
         let path_part = path_part.split('#').next().unwrap_or(path_part);
 
-        if path_part.to_lowercase().ends_with(".pdf") && !links.contains(&href.to_string()) {
+        if !path_part.to_lowercase().ends_with(".pdf") {
+            continue;
+        }
+
+        // Build a combined string from link text + filename for keyword matching.
+        let link_text = a.text().collect::<String>().to_lowercase();
+        let filename = path_part
+            .split('/')
+            .last()
+            .unwrap_or("")
+            .to_lowercase();
+        let combined = format!("{link_text} {filename}");
+
+        if SKIP_SIGNALS.iter().any(|s| combined.contains(s)) {
+            warn!("[Parish Hearings] Skipping non-sitting PDF: {href}");
+            continue;
+        }
+
+        if !links.contains(&href.to_string()) {
             links.push(href.to_string());
         }
     }

@@ -13,6 +13,7 @@ import {
   ExternalLink,
   SkipForward,
   RotateCcw,
+  Database,
 } from "lucide-react";
 
 function StatBox({
@@ -56,6 +57,7 @@ export default function AdminScraperPage() {
   const [status, setStatus] = useState<ScraperStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [triggering, setTriggering] = useState(false);
+  const [deepTriggering, setDeepTriggering] = useState(false);
   const [actionUrl, setActionUrl] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -92,6 +94,20 @@ export default function AdminScraperPage() {
       setError(e instanceof Error ? e.message : "Failed to trigger scraper");
     } finally {
       setTriggering(false);
+    }
+  };
+
+  const handleDeepScrape = async () => {
+    setDeepTriggering(true);
+    setError(null);
+    try {
+      const result = await apiClient.adminDeepScrape();
+      showToast("Deep backfill started – cutoff set to 2020-01-01");
+      if (result.started) setTimeout(fetchStatus, 1200);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to start deep scrape");
+    } finally {
+      setDeepTriggering(false);
     }
   };
 
@@ -259,6 +275,39 @@ export default function AdminScraperPage() {
             />
           </div>
         ) : null}
+      </div>
+
+      {/* Deep Scrape */}
+      <div className="mb-6 rounded-2xl border border-amber-400/15 bg-[#0d0d1a] p-5">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-400/10 ring-1 ring-amber-400/20">
+              <Database className="h-4 w-4 text-amber-400" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-white">
+                Deep Scrape (Backfill to 2020)
+              </p>
+              <p className="mt-0.5 text-[11px] text-white/35 leading-relaxed">
+                Temporarily lowers the judgment cutoff to 2020-01-01, runs all
+                scrapers in full, reseeds judges, then restores the cutoff to
+                2026-01-01. May take several minutes.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleDeepScrape}
+            disabled={deepTriggering || triggering || status?.is_running}
+            className="flex shrink-0 items-center gap-2 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-2.5 text-sm font-semibold text-amber-400 hover:bg-amber-400/20 hover:border-amber-400/50 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.97] transition-all duration-150 min-h-[44px]"
+          >
+            {deepTriggering ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Database className="h-4 w-4" />
+            )}
+            {deepTriggering ? "Starting…" : "Run Deep Scrape"}
+          </button>
+        </div>
       </div>
 
       {/* Pagination state */}

@@ -34,6 +34,13 @@ pub struct JudgeWithCount {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct JudgeConnection {
+    pub judge_a_id: i32,
+    pub judge_b_id: i32,
+    pub count: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Judgment {
     pub id: i32,
     pub case_number: String,
@@ -113,4 +120,22 @@ pub struct ActivityLogRow {
     pub case_id: Option<i32>,
     pub notification_type: String,
     pub sent_at: NaiveDateTime,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct ParishCourtCase {
+    pub id: i32,
+    pub parish: String,
+    pub accused_name: Option<String>,
+    pub offence: Option<String>,
+    pub status: Option<String>,
+    pub week_of: Option<NaiveDate>,
+    pub pdf_source_url: Option<String>,
+    pub created_at: NaiveDateTime,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct ParishSummary {
+    pub name: String,
+    pub total_cases: i64,
 }

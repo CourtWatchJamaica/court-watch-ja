@@ -26,7 +26,7 @@ use std::time::Duration;
 use tokio::time::sleep;
 use tracing::{info, warn};
 
-use super::{judgment_detail, judges, judgments::JudgmentRow, ScraperState};
+use super::{judges, judgment_detail, judgments::JudgmentRow, ScraperState};
 use crate::db::queries;
 
 /// Base URL for page navigation (www, with /index.php routing).
@@ -37,9 +37,8 @@ const PDF_BASE_URL: &str = "https://courtofappeal.gov.jm";
 
 const CIVIL_LISTING_URL: &str =
     "https://www.courtofappeal.gov.jm/index.php/civil-judgments-endorsement-and-memoranda";
-const CRIMINAL_LISTING_URL: &str =
-    "https://www.courtofappeal.gov.jm/index.php/criminal-judgments";
-const JUDGES_URL: &str = "https://www.courtofappeal.gov.jm/content/current-judges";
+const CRIMINAL_LISTING_URL: &str = "https://www.courtofappeal.gov.jm/index.php/criminal-judgments";
+const JUDGES_URL: &str = "https://www.courtofappeal.gov.jm/content/president-and-judges-appeal";
 const COURT_NAME: &str = "Court of Appeal";
 
 /// Known navigation-link phrases that appear in listing tables but are not cases.
@@ -118,9 +117,7 @@ async fn scrape_listing(
         .collect();
 
     if applicable.is_empty() {
-        info!(
-            "{log_prefix} no years >= cutoff year {cutoff_year} in dropdown — nothing to scrape"
-        );
+        info!("{log_prefix} no years >= cutoff year {cutoff_year} in dropdown — nothing to scrape");
         return 0;
     }
 
@@ -177,7 +174,10 @@ async fn scrape_one_url(
             }
         },
         Ok(r) => {
-            warn!("{log_prefix}{tag} {url} returned status {} — skipping", r.status());
+            warn!(
+                "{log_prefix}{tag} {url} returned status {} — skipping",
+                r.status()
+            );
             return (0, 0);
         }
         Err(e) => {
@@ -204,7 +204,7 @@ async fn scrape_one_url(
             }
         }
 
-        let (pdf_url, summary) = if let Some(ref detail_url) = row.detail_url {
+        let (pdf_url, summary, detail_judge) = if let Some(ref detail_url) = row.detail_url {
             let full_url = if detail_url.starts_with("http") {
                 detail_url.clone()
             } else {
@@ -212,14 +212,17 @@ async fn scrape_one_url(
             };
             sleep(Duration::from_secs(3)).await;
             match judgment_detail::fetch(client, &full_url).await {
-                Ok(d) => (d.pdf_url, d.summary_text),
+                Ok(d) => (d.pdf_url, d.summary_text, d.judge_name),
                 Err(e) => {
-                    warn!("{log_prefix}{tag} detail fetch failed for {}: {e}", row.case_number);
-                    (None, None)
+                    warn!(
+                        "{log_prefix}{tag} detail fetch failed for {}: {e}",
+                        row.case_number
+                    );
+                    (None, None, None)
                 }
             }
         } else {
-            (None, None)
+            (None, None, None)
         };
 
         let pdf_url = pdf_url.map(|u| normalize_coa_pdf_url(&u));
@@ -228,7 +231,7 @@ async fn scrape_one_url(
             pool,
             &row.case_number,
             row.title.as_deref(),
-            row.judge_name.as_deref(),
+            detail_judge.as_deref(),
             Some(COURT_NAME),
             row.date,
             pdf_url.as_deref(),
@@ -241,7 +244,10 @@ async fn scrape_one_url(
                 upserted += 1;
                 info!("{log_prefix}{tag} upserted: {}", row.case_number);
             }
-            Err(e) => warn!("{log_prefix}{tag} failed to upsert {}: {e}", row.case_number),
+            Err(e) => warn!(
+                "{log_prefix}{tag} failed to upsert {}: {e}",
+                row.case_number
+            ),
         }
     }
 
@@ -462,7 +468,10 @@ pub async fn run_judges(pool: &PgPool, client: &reqwest::Client) -> anyhow::Resu
             }
         },
         Ok(r) => {
-            warn!("[CoA] Judges page returned status {} — skipping", r.status());
+            warn!(
+                "[CoA] Judges page returned status {} — skipping",
+                r.status()
+            );
             return Ok(());
         }
         Err(e) => {

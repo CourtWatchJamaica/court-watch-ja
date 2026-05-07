@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { useParams } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import Navbar from "@/components/Navbar";
 import { apiClient } from "@/lib/api";
@@ -60,7 +61,6 @@ function DetailSkeleton() {
 
 export default function SittingDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const [sitting, setSitting] = useState<CourtSitting | null>(null);
   const [loading, setLoading] = useState(true);
   const { isTracked, track } = useTracking();
@@ -80,13 +80,13 @@ export default function SittingDetailPage() {
       <div className="min-h-screen bg-background">
         <Navbar />
         <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8 pb-32 md:pb-12">
-          <button
-            onClick={() => router.back()}
-            className="mb-7 flex items-center gap-1.5 text-[12px] font-medium text-white/40 hover:text-white/70 transition-colors"
+          <Link
+            href="/cases?tab=sittings"
+            className="mb-7 inline-flex items-center gap-1.5 text-[12px] font-medium text-[#FED100]/60 hover:text-[#FED100] transition-colors"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
-            Back
-          </button>
+            Back to Court Lists
+          </Link>
 
           {loading ? (
             <DetailSkeleton />

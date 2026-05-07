@@ -16,11 +16,17 @@ import {
   Check,
   X,
   ShieldCheck,
+  UserCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ThemeToggle from "@/components/ThemeToggle";
 import { apiClient } from "@/lib/api";
-import { useCourt, COURTS, COURT_TO_SLUG, type Court } from "@/lib/court-context";
+import {
+  useCourt,
+  COURTS,
+  COURT_TO_SLUG,
+  type Court,
+} from "@/lib/court-context";
 import { useChambers } from "@/lib/chambers-context";
 
 const DESKTOP_LINKS = [
@@ -51,7 +57,8 @@ function GavelIcon({ className }: { className?: string }) {
 
 function getRoleFromToken(): string | null {
   try {
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    const token =
+      typeof window !== "undefined" ? localStorage.getItem("token") : null;
     if (!token) return null;
     const b64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
     const payload = JSON.parse(atob(b64));
@@ -89,7 +96,10 @@ export default function Navbar() {
         setUnreadCount(count);
         if (prevCountRef.current !== null && count > prevCountRef.current) {
           const diff = count - prevCountRef.current;
-          const msg = diff === 1 ? "You have a new case update" : `${diff} new case updates`;
+          const msg =
+            diff === 1
+              ? "You have a new case update"
+              : `${diff} new case updates`;
           setNotifToast(msg);
           if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
           toastTimerRef.current = setTimeout(() => setNotifToast(null), 4000);
@@ -138,7 +148,6 @@ export default function Navbar() {
       <nav className="sticky top-[3px] z-50 border-b border-white/[0.07] bg-[#07070f]/92 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between gap-2">
-
             {/* Logo + Court Pills */}
             <div className="flex items-center gap-3 shrink-0">
               <Link href="/" className="flex items-center gap-2.5 shrink-0">
@@ -155,7 +164,14 @@ export default function Navbar() {
                 {COURTS.map((court) => (
                   <button
                     key={court}
-                    onClick={() => { setSelectedCourt(court); router.push(`/court/${COURT_TO_SLUG[court]}`); }}
+                    onClick={() => {
+                      setSelectedCourt(court);
+                      if (court === "Parish Court") {
+                        router.push("/parish-court");
+                      } else {
+                        router.push(`/court/${COURT_TO_SLUG[court]}`);
+                      }
+                    }}
                     className={[
                       "px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all duration-200 whitespace-nowrap",
                       selectedCourt === court
@@ -210,7 +226,9 @@ export default function Navbar() {
                 onClick={() => setCourtSheetOpen(true)}
                 className="lg:hidden flex items-center gap-1.5 rounded-full border border-[#009B3A]/40 bg-[#009B3A]/10 px-2.5 py-1.5 text-[11px] font-semibold text-[#009B3A] transition-colors hover:bg-[#009B3A]/20"
               >
-                <span className="max-w-[72px] truncate hidden sm:inline">{selectedCourt}</span>
+                <span className="max-w-[72px] truncate hidden sm:inline">
+                  {selectedCourt}
+                </span>
                 <span className="sm:hidden">Court</span>
                 <ChevronDown className="h-3 w-3 shrink-0" />
               </button>
@@ -228,6 +246,19 @@ export default function Navbar() {
                       {unreadCount > 9 ? "9+" : unreadCount}
                     </span>
                   )}
+                </Button>
+              </Link>
+              <Link href="/profile">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={`h-9 w-9 rounded-lg transition-colors ${
+                    pathname.startsWith("/profile")
+                      ? "text-[#009B3A] bg-[#009B3A]/10"
+                      : "text-white/40 hover:text-white hover:bg-white/[0.07]"
+                  }`}
+                >
+                  <UserCircle2 className="h-4 w-4" />
                 </Button>
               </Link>
               <Link href="/settings">
@@ -263,7 +294,12 @@ export default function Navbar() {
             { href: "/", icon: Home, label: "Home", id: "home" },
             { href: "/cases", icon: Briefcase, label: "Cases", id: "cases" },
             { href: "/judges", icon: Users, label: "Judges", id: "judges" },
-            { href: "/notifications", icon: BellRing, label: "Alerts", id: "alerts" },
+            {
+              href: "/notifications",
+              icon: BellRing,
+              label: "Alerts",
+              id: "alerts",
+            },
           ].map(({ href, icon: Icon, label, id }) => {
             const active = isActive(href);
             return (
@@ -277,14 +313,19 @@ export default function Navbar() {
                 }`}
               >
                 <div className="relative">
-                  <Icon className="h-[19px] w-[19px]" strokeWidth={active ? 2.2 : 1.8} />
+                  <Icon
+                    className="h-[19px] w-[19px]"
+                    strokeWidth={active ? 2.2 : 1.8}
+                  />
                   {id === "alerts" && unreadCount > 0 && (
                     <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#009B3A] text-[7px] font-bold text-white ring-[1.5px] ring-[#0d0d1a]">
                       {unreadCount > 9 ? "9+" : unreadCount}
                     </span>
                   )}
                 </div>
-                <span className="text-[9.5px] font-semibold tracking-wide leading-none">{label}</span>
+                <span className="text-[9.5px] font-semibold tracking-wide leading-none">
+                  {label}
+                </span>
               </Link>
             );
           })}
@@ -294,7 +335,9 @@ export default function Navbar() {
             className="relative flex flex-col items-center gap-[3px] rounded-[14px] px-[13px] py-2 transition-all duration-200 text-white/35 hover:text-white/70 hover:bg-white/[0.07]"
           >
             <GavelIcon className="h-[19px] w-[19px]" />
-            <span className="text-[9.5px] font-semibold tracking-wide leading-none">Chambers</span>
+            <span className="text-[9.5px] font-semibold tracking-wide leading-none">
+              Chambers
+            </span>
           </button>
         </nav>
       </div>
@@ -308,7 +351,9 @@ export default function Navbar() {
           />
           <div
             className="fixed bottom-0 inset-x-0 z-[75] rounded-t-2xl bg-[#0d0d1a] border-t border-white/[0.1] px-5 pt-5"
-            style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom, 0px))" }}
+            style={{
+              paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom, 0px))",
+            }}
           >
             <div className="mb-5 flex items-center justify-between">
               <p className="text-sm font-semibold text-white">Select Court</p>
@@ -326,7 +371,11 @@ export default function Navbar() {
                   onClick={() => {
                     setSelectedCourt(court);
                     setCourtSheetOpen(false);
-                    router.push(`/court/${COURT_TO_SLUG[court]}`);
+                    if (court === "Parish Court") {
+                      router.push("/parish-court");
+                    } else {
+                      router.push(`/court/${COURT_TO_SLUG[court]}`);
+                    }
                   }}
                   className={`flex w-full items-center gap-3 rounded-xl px-4 py-3.5 transition-all duration-150 text-left ${
                     selectedCourt === court
@@ -336,7 +385,9 @@ export default function Navbar() {
                 >
                   <Scale className="h-4 w-4 shrink-0" />
                   <span className="text-sm font-medium flex-1">{court}</span>
-                  {selectedCourt === court && <Check className="h-4 w-4 shrink-0" />}
+                  {selectedCourt === court && (
+                    <Check className="h-4 w-4 shrink-0" />
+                  )}
                 </button>
               ))}
             </div>

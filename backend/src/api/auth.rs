@@ -88,3 +88,61 @@ pub async fn me(
         created_at: user.created_at.to_string(),
     }))
 }
+
+#[derive(Deserialize)]
+pub struct UpdateProfileRequest {
+    pub email: Option<String>,
+    pub current_password: String,
+    pub new_password: Option<String>,
+}
+
+pub async fn update_profile(
+    State(state): State<AppState>,
+    Extension(user_id): Extension<i32>,
+    Json(body): Json<UpdateProfileRequest>,
+) -> Result<Json<MeResponse>, AppError> {
+    if body.email.is_none() && body.new_password.is_none() {
+        return Err(AppError::BadRequest("No changes provided".into()));
+    }
+
+    let user = queries::get_user_by_id(&state.db, user_id)
+        .await?
+        .ok_or(AppError::NotFound)?;
+
+    let valid = bcrypt::verify(&body.current_password, &user.password_hash)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    if !valid {
+        return Err(AppError::BadRequest("Current password is incorrect".into()));
+    }
+
+    let new_hash = if let Some(ref pw) = body.new_password {
+        if pw.len() < 8 {
+            return Err(AppError::BadRequest(
+                "New password must be at least 8 characters".into(),
+            ));
+        }
+        Some(
+            bcrypt::hash(pw, bcrypt::DEFAULT_COST)
+                .map_err(|e| AppError::Internal(e.to_string()))?,
+        )
+    } else {
+        None
+    };
+
+    let updated = queries::update_user_profile(
+        &state.db,
+        user_id,
+        body.email.as_deref(),
+        new_hash.as_deref(),
+    )
+    .await?
+    .ok_or(AppError::NotFound)?;
+
+    Ok(Json(MeResponse {
+        id: updated.id,
+        email: updated.email,
+        role: updated.role,
+        created_at: updated.created_at.to_string(),
+    }))
+}

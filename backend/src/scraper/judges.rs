@@ -86,7 +86,7 @@ fn extract_names_from_text(text: &str) -> Vec<String> {
 ///
 /// Handles hyphenated surnames ("JACKSON-HAISLEY" → "Jackson-Haisley") and
 /// single-letter initials ("S." → "S.").
-fn normalize_name_case(name: &str) -> String {
+pub fn normalize_name_case(name: &str) -> String {
     name.split_whitespace()
         .map(|word| {
             if word.contains('-') {
@@ -99,7 +99,7 @@ fn normalize_name_case(name: &str) -> String {
         .join(" ")
 }
 
-fn capitalize_word(word: &str) -> String {
+pub fn capitalize_word(word: &str) -> String {
     let mut chars = word.chars();
     match chars.next() {
         None => String::new(),

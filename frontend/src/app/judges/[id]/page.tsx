@@ -6,9 +6,19 @@ import AuthGuard from "@/components/AuthGuard";
 import Navbar from "@/components/Navbar";
 import CaseCard from "@/components/CaseCard";
 import { apiClient } from "@/lib/api";
-import { Judge, Judgment } from "@/lib/types";
+import { Judge, Judgment, CourtSitting } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Building2, Scale, FileText } from "lucide-react";
+import { ArrowLeft, Building2, Scale, FileText, Hash, CalendarDays, Calendar, Clock } from "lucide-react";
+
+/* ── Helpers ── */
+
+function fmtDate(d: string | null | undefined): string {
+  if (!d) return "—";
+  return new Date(`${d}T00:00:00`).toLocaleDateString("en-JM", {
+    month: "short",
+    year: "numeric",
+  });
+}
 
 /* ── Skeletons ── */
 
@@ -22,6 +32,11 @@ function SkeletonHeader() {
           <div className="h-6 w-2/3 rounded bg-muted" />
           <div className="h-3.5 w-1/3 rounded bg-muted" />
         </div>
+      </div>
+      <div className="mt-6 flex gap-3">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-14 flex-1 rounded-xl bg-muted" />
+        ))}
       </div>
       <div className="mt-8 h-px bg-muted" />
       <div className="mt-6 h-4 w-40 rounded bg-muted" />
@@ -44,6 +59,28 @@ function SkeletonCard() {
   );
 }
 
+/* ── Stat item ── */
+
+function StatItem({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string | number;
+}) {
+  return (
+    <div className="flex flex-1 items-center gap-3 rounded-xl border border-white/[0.07] bg-[#0d0d1a] px-4 py-3">
+      <Icon className="h-4 w-4 shrink-0 text-[#009B3A]/70" />
+      <div className="min-w-0">
+        <p className="text-[11px] text-white/35 leading-none mb-1">{label}</p>
+        <p className="text-[13px] font-semibold text-white leading-none truncate">{value}</p>
+      </div>
+    </div>
+  );
+}
+
 /* ── Page ── */
 
 export default function JudgeDetailPage() {
@@ -53,23 +90,33 @@ export default function JudgeDetailPage() {
 
   const [judge, setJudge] = useState<Judge | null>(null);
   const [judgments, setJudgments] = useState<Judgment[]>([]);
+  const [upcomingSittings, setUpcomingSittings] = useState<CourtSitting[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
-    const fetchJudge = async () => {
-      try {
-        const data = await apiClient.getJudge(id);
-        setJudge(data.judge);
-        setJudgments(data.judgments);
-      } catch {
-        setNotFound(true);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchJudge();
+    Promise.all([apiClient.getJudge(id), apiClient.getCourtSittings()])
+      .then(([judgeData, sittingsData]) => {
+        setJudge(judgeData.judge);
+        setJudgments(judgeData.judgments);
+        const today = new Date().toISOString().split("T")[0];
+        const upcoming = sittingsData.sittings
+          .filter(
+            (s) =>
+              s.judge_name === judgeData.judge.name &&
+              (s.event_date ?? "") >= today,
+          )
+          .sort((a, b) => (a.event_date ?? "").localeCompare(b.event_date ?? ""))
+          .slice(0, 2);
+        setUpcomingSittings(upcoming);
+      })
+      .catch(() => setNotFound(true))
+      .finally(() => setLoading(false));
   }, [id]);
+
+  /* Sorted newest-first by the API; first = newest, last = oldest */
+  const newestDate = judgments[0]?.date ?? null;
+  const oldestDate = judgments[judgments.length - 1]?.date ?? null;
 
   return (
     <AuthGuard>
@@ -114,8 +161,8 @@ export default function JudgeDetailPage() {
               </button>
 
               {/* Judge header */}
-              <div className="mb-8">
-                <div className="flex items-start gap-5">
+              <div className="mb-6">
+                <div className="flex items-start gap-5 mb-5">
                   <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-[#009B3A]/15 ring-1 ring-[#009B3A]/30">
                     <Scale className="h-8 w-8 text-[#009B3A]" />
                   </div>
@@ -136,9 +183,82 @@ export default function JudgeDetailPage() {
                     )}
                   </div>
                 </div>
+
+                {/* ── Stat bar ── */}
+                <div className="flex gap-3 flex-wrap sm:flex-nowrap">
+                  <StatItem
+                    icon={Hash}
+                    label="Total Cases"
+                    value={judge.total_cases ?? judgments.length}
+                  />
+                  <StatItem
+                    icon={CalendarDays}
+                    label="First Judgment"
+                    value={fmtDate(oldestDate)}
+                  />
+                  <StatItem
+                    icon={CalendarDays}
+                    label="Last Judgment"
+                    value={fmtDate(newestDate)}
+                  />
+                </div>
               </div>
 
               <div className="mb-6 h-px bg-border" />
+
+              {/* Upcoming Sittings */}
+              {upcomingSittings.length > 0 && (
+                <div className="mb-6">
+                  <div className="mb-3 flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-[#FED100]" />
+                    <h2 className="text-sm font-semibold">
+                      Upcoming Sittings
+                      <span className="ml-2 text-xs font-normal text-muted-foreground">
+                        ({upcomingSittings.length})
+                      </span>
+                    </h2>
+                  </div>
+                  <div className="space-y-2">
+                    {upcomingSittings.map((s) => (
+                      <div
+                        key={s.id}
+                        className="flex items-start gap-3 rounded-xl border border-white/[0.07] bg-[#0d0d1a] px-4 py-3"
+                      >
+                        <div className="shrink-0 pt-0.5">
+                          <Clock className="h-3.5 w-3.5 text-[#FED100]/60" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[12px] font-medium text-white/80 line-clamp-1">
+                            {s.title || s.case_number || "Sitting"}
+                          </p>
+                          <div className="mt-1 flex items-center gap-3 text-[10px] text-white/35">
+                            {s.event_date && (
+                              <span>
+                                {new Date(`${s.event_date}T00:00:00`).toLocaleDateString("en-JM", {
+                                  weekday: "short",
+                                  month: "short",
+                                  day: "numeric",
+                                })}
+                              </span>
+                            )}
+                            {s.event_time && (
+                              <span>
+                                {(() => {
+                                  const [h] = s.event_time.split(":");
+                                  const hour = parseInt(h, 10);
+                                  return `${hour % 12 || 12}:${s.event_time.split(":")[1]} ${hour >= 12 ? "PM" : "AM"}`;
+                                })()}
+                              </span>
+                            )}
+                            {s.court_division && <span>{s.court_division}</span>}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-6 h-px bg-border" />
+                </div>
+              )}
 
               {/* Judgments */}
               <div className="mb-5 flex items-center justify-between">
