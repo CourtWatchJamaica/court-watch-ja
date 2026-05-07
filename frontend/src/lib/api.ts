@@ -124,13 +124,17 @@ export const apiClient = {
     date_from?: string;
     date_to?: string;
     judge?: string;
-  }): Promise<{ sittings: CourtSitting[] }> {
+    page?: number;
+    limit?: number;
+  }): Promise<{ sittings: CourtSitting[]; total: number }> {
     const params = new URLSearchParams();
     if (opts?.q) params.set("q", opts.q);
     if (opts?.court) params.set("court", opts.court);
     if (opts?.date_from) params.set("date_from", opts.date_from);
     if (opts?.date_to) params.set("date_to", opts.date_to);
     if (opts?.judge) params.set("judge", opts.judge);
+    if (opts?.page != null) params.set("page", String(opts.page));
+    if (opts?.limit != null) params.set("limit", String(opts.limit));
     const qs = params.toString();
     return request(`/court-sittings${qs ? `?${qs}` : ""}`);
   },
@@ -377,12 +381,14 @@ export const apiClient = {
   async getParishCases(opts?: {
     parish?: string;
     q?: string;
+    category?: string;
     page?: number;
     limit?: number;
   }): Promise<{ cases: ParishCourtCase[]; total: number }> {
     const params = new URLSearchParams();
     if (opts?.parish) params.set("parish", opts.parish);
     if (opts?.q) params.set("q", opts.q);
+    if (opts?.category) params.set("category", opts.category);
     if (opts?.page) params.set("page", String(opts.page));
     if (opts?.limit) params.set("limit", String(opts.limit));
     const qs = params.toString();
