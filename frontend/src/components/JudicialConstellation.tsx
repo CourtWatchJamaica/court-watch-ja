@@ -14,7 +14,18 @@ import * as THREE from "three";
 import { useRouter } from "next/navigation";
 import { Judge, JudgeConnection, Judgment, CourtSitting } from "@/lib/types";
 import { apiClient } from "@/lib/api";
-import { Search, X, ExternalLink, Users, FileText, Calendar, Loader2 } from "lucide-react";
+import {
+  Search,
+  X,
+  ExternalLink,
+  Users,
+  FileText,
+  Calendar,
+  Loader2,
+  Globe,
+  Sparkles,
+  Link2,
+} from "lucide-react";
 
 /* ── Court colour palette ── */
 
@@ -30,17 +41,57 @@ const COURT_COLORS: Record<string, string> = {
   "Supreme Court": "#009B3A",
 };
 
-/* ── Random constellation positions ── */
+const LS_VIEW_KEY = "cw-constellation-view";
+const LS_CONNECTIONS_KEY = "cw-constellation-connections";
+
+/* ── Chief Justice detection ── */
+
+const isSykesJudge = (name: string): boolean => {
+  const n = name.toLowerCase();
+  return n.includes("sykes") || n.includes("chief justice");
+};
+
+const SYKES_MULTIPLIER = 1.8;
+
+/* ── Star sizing helpers (must mirror the size formula in ConstellationScene) ── */
+
+function computeStarSizes(judges: Judge[]): Map<number, number> {
+  const maxCases = Math.max(1, ...judges.map((j) => j.total_cases ?? 1));
+  const m = new Map<number, number>();
+  for (const j of judges) {
+    const base = 1.0 + ((j.total_cases ?? 1) / maxCases) * 1.2;
+    m.set(j.id, isSykesJudge(j.name) ? base * SYKES_MULTIPLIER : base);
+  }
+  return m;
+}
+
+// Outer-point radius of a star with the given size value.
+const starRadius = (size: number) => 0.5 * size;
+
+// Minimum centre-to-centre distance that avoids visual overlap.
+const minClearance = (ra: number, rb: number) =>
+  Math.max(0.7, ra + rb + 0.25);
+
+/* ── Random constellation positions (scatter view) ── */
 
 function computePositions(
   judges: Judge[],
 ): Map<number, [number, number, number]> {
   const map = new Map<number, [number, number, number]>();
-  const placed: [number, number, number][] = [];
-  const MIN_DIST = 0.7;
+  const sizes = computeStarSizes(judges);
+  const placed: Array<{ pos: [number, number, number]; r: number }> = [];
 
-  for (const judge of judges) {
-    // XOR-shift RNG seeded per judge ID — deterministic, never zero
+  // Sykes anchors first so every other star's collision check respects his radius.
+  const sorted = [...judges].sort((a, b) => {
+    if (isSykesJudge(a.name)) return -1;
+    if (isSykesJudge(b.name)) return 1;
+    return 0;
+  });
+
+  for (const judge of sorted) {
+    const ra = starRadius(sizes.get(judge.id) ?? 1.0);
+    const isSykes = isSykesJudge(judge.name);
+
     let s = (judge.id * 2654435761) >>> 0;
     if (s === 0) s = 1;
     const rand = () => {
@@ -51,41 +102,176 @@ function computePositions(
     };
 
     let best: [number, number, number] = [0, 0, 0];
-    let bestMinDist = -Infinity;
+    let bestClearance = -Infinity;
 
-    for (let attempt = 0; attempt < 64; attempt++) {
-      const r     = 2.5 + rand() * 2.0;
-      const theta = rand() * Math.PI * 2;
-      // phi biased toward equatorial plane: π/4 … 3π/4
-      const phi   = Math.PI / 4 + rand() * (Math.PI / 2);
+    for (let attempt = 0; attempt < 128; attempt++) {
+      let x: number, y: number, z: number;
 
-      const x = r * Math.sin(phi) * Math.cos(theta);
-      const y = r * Math.cos(phi);
-      const z = r * Math.sin(phi) * Math.sin(theta);
-      const candidate: [number, number, number] = [x, y, z];
-
-      const minD =
-        placed.length === 0
-          ? Infinity
-          : Math.min(
-              ...placed.map((p) =>
-                Math.hypot(p[0] - x, p[1] - y, p[2] - z),
-              ),
-            );
-
-      if (minD >= MIN_DIST) {
-        best = candidate;
-        break;
+      if (isSykes) {
+        // Sykes placed within 1.5 units of centre for visual dominance.
+        const r = rand() * 1.5;
+        const theta = rand() * Math.PI * 2;
+        const phi = Math.acos(2 * rand() - 1); // uniform spherical
+        x = r * Math.sin(phi) * Math.cos(theta);
+        y = r * Math.cos(phi);
+        z = r * Math.sin(phi) * Math.sin(theta);
+      } else {
+        // All others use the wider equatorial shell.
+        const r = 2.0 + rand() * 4.0;
+        const theta = rand() * Math.PI * 2;
+        const phi = Math.PI / 4 + rand() * (Math.PI / 2);
+        x = r * Math.sin(phi) * Math.cos(theta);
+        y = r * Math.cos(phi);
+        z = r * Math.sin(phi) * Math.sin(theta);
       }
-      if (minD > bestMinDist) {
-        bestMinDist = minD;
-        best = candidate;
+
+      let clearance = Infinity;
+      for (const p of placed) {
+        const d = Math.hypot(p.pos[0] - x, p.pos[1] - y, p.pos[2] - z);
+        clearance = Math.min(clearance, d - minClearance(ra, p.r));
+      }
+      if (placed.length === 0) clearance = Infinity;
+
+      if (clearance > bestClearance) {
+        bestClearance = clearance;
+        best = [x, y, z];
+        if (clearance >= 0) break;
       }
     }
 
-    placed.push(best);
+    placed.push({ pos: best, r: ra });
     map.set(judge.id, best);
   }
+
+  return map;
+}
+
+/* ── Galactic ring positions ── */
+
+// Minimum ring radius so that N uniformly-spaced stars of maxStarRadius never overlap.
+function minRingRadius(N: number, maxStarRadius: number): number {
+  if (N <= 1) return 0;
+  const chord = Math.max(0.7, 2 * maxStarRadius + 0.25);
+  return chord / (2 * Math.sin(Math.PI / N));
+}
+
+function computeGalacticPositions(
+  judges: Judge[],
+): Map<number, [number, number, number]> {
+  const map = new Map<number, [number, number, number]>();
+  if (judges.length === 0) return map;
+
+  const sizes = computeStarSizes(judges);
+  const rOf = (j: Judge) => starRadius(sizes.get(j.id) ?? 1.0);
+
+  // Deterministic ±0.3 vertical offset per judge.
+  const yOff = (j: Judge): number => {
+    let s = (j.id * 2654435761) >>> 0;
+    if (s === 0) s = 1;
+    s ^= s << 13;
+    s ^= s >>> 17;
+    s ^= s << 5;
+    return ((s >>> 0) / 0xffffffff - 0.5) * 0.6;
+  };
+
+  // Sykes anchors the exact centre; all rings orbit him.
+  const sykesJudge = judges.find((j) => isSykesJudge(j.name));
+  if (sykesJudge) {
+    map.set(sykesJudge.id, [0, 0, 0]);
+  }
+  const sykesR = sykesJudge ? rOf(sykesJudge) : 0;
+
+  // All non-Sykes judges are distributed across rings.
+  const rest = judges.filter((j) => !isSykesJudge(j.name));
+
+  const supreme = rest.filter((j) =>
+    (j.court ?? "").toLowerCase().includes("supreme"),
+  );
+  const appeal = rest.filter((j) =>
+    (j.court ?? "").toLowerCase().includes("appeal"),
+  );
+  const other = rest.filter(
+    (j) =>
+      !(j.court ?? "").toLowerCase().includes("supreme") &&
+      !(j.court ?? "").toLowerCase().includes("appeal"),
+  );
+
+  // Place a group on one or two concentric sub-rings as needed.
+  // baseR  – preferred ring radius (the "tier" anchor)
+  // prevEdgeR – outer edge of the previous tier; this ring must clear it
+  // Returns the outer edge (ringR + maxStarR) of the outermost sub-ring placed.
+  const placeGroup = (
+    group: Judge[],
+    baseR: number,
+    prevEdgeR: number,
+  ): number => {
+    if (group.length === 0) return prevEdgeR;
+
+    const maxR = Math.max(...group.map(rOf));
+    const N = group.length;
+
+    const singleR = Math.max(
+      baseR,
+      prevEdgeR + maxR + 0.25, // inter-ring gap: clear previous tier
+      minRingRadius(N, maxR),  // intra-ring gap: stars fit around the circle
+    );
+
+    // If a single ring would balloon past 2.5× the anchor, split into two sub-rings.
+    if (singleR > baseR * 2.5 && N > 4) {
+      const half = Math.ceil(N / 2);
+      const inner = group.slice(0, half);
+      const outer = group.slice(half);
+
+      const innerMaxR = Math.max(...inner.map(rOf));
+      const innerR = Math.max(
+        baseR,
+        prevEdgeR + innerMaxR + 0.25,
+        minRingRadius(inner.length, innerMaxR),
+      );
+      inner.forEach((judge, i) => {
+        const angle = (i / inner.length) * Math.PI * 2;
+        map.set(judge.id, [
+          innerR * Math.cos(angle),
+          yOff(judge),
+          innerR * Math.sin(angle),
+        ]);
+      });
+
+      const outerMaxR = Math.max(...outer.map(rOf));
+      const outerR = Math.max(
+        baseR * 1.4,
+        innerR + innerMaxR + outerMaxR + 0.25,
+        minRingRadius(outer.length, outerMaxR),
+      );
+      outer.forEach((judge, i) => {
+        const angle = (i / outer.length) * Math.PI * 2;
+        map.set(judge.id, [
+          outerR * Math.cos(angle),
+          yOff(judge),
+          outerR * Math.sin(angle),
+        ]);
+      });
+
+      return outerR + outerMaxR;
+    }
+
+    // Single ring.
+    group.forEach((judge, i) => {
+      const angle = (i / N) * Math.PI * 2;
+      map.set(judge.id, [
+        singleR * Math.cos(angle),
+        yOff(judge),
+        singleR * Math.sin(angle),
+      ]);
+    });
+    return singleR + maxR;
+  };
+
+  // Innermost ring must clear Sykes' radius; then chain outward.
+  const sykesEdge = sykesR + 0.25;
+  const coreEdge = placeGroup(supreme, 1.5, sykesEdge);
+  const innerEdge = placeGroup(appeal, 2.8, coreEdge);
+  placeGroup(other, 4.2, innerEdge);
 
   return map;
 }
@@ -96,6 +282,20 @@ function makeStarShape(outer: number, inner: number): THREE.Shape {
   const s = new THREE.Shape();
   for (let i = 0; i < 10; i++) {
     const a = (i * Math.PI) / 5 - Math.PI / 2;
+    const r = i % 2 === 0 ? outer : inner;
+    if (i === 0) s.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+    else s.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+  }
+  s.closePath();
+  return s;
+}
+
+/* ── 8-pointed star shape (Chief Justice only) ── */
+
+function makeOctaStarShape(outer: number, inner: number): THREE.Shape {
+  const s = new THREE.Shape();
+  for (let i = 0; i < 16; i++) {
+    const a = (i * Math.PI) / 8 - Math.PI / 2;
     const r = i % 2 === 0 ? outer : inner;
     if (i === 0) s.moveTo(Math.cos(a) * r, Math.sin(a) * r);
     else s.lineTo(Math.cos(a) * r, Math.sin(a) * r);
@@ -167,9 +367,11 @@ function ConstellationEdge({
   posB: [number, number, number];
 }) {
   const lineObj = useMemo(() => {
+    // Slight upward arc at the midpoint keeps the curve above star bodies
+    // without wandering away from the endpoints.
     const mid = new THREE.Vector3(
       (posA[0] + posB[0]) / 2,
-      (posA[1] + posB[1]) / 2 + 0.45,
+      (posA[1] + posB[1]) / 2 + 0.35,
       (posA[2] + posB[2]) / 2,
     );
     const curve = new THREE.QuadraticBezierCurve3(
@@ -177,12 +379,12 @@ function ConstellationEdge({
       mid,
       new THREE.Vector3(...posB),
     );
-    const pts = curve.getPoints(14);
+    const pts = curve.getPoints(20);
     const geo = new THREE.BufferGeometry().setFromPoints(pts);
     const mat = new THREE.LineBasicMaterial({
       color: "#FED100",
       transparent: true,
-      opacity: 0.16,
+      opacity: 0.20,
     });
     return new THREE.Line(geo, mat);
   }, [posA, posB]);
@@ -198,11 +400,16 @@ function ConstellationEdge({
   return <primitive object={lineObj} />;
 }
 
+/* ── Reusable scratch vector (avoids per-frame allocation) ── */
+const _lerpTarget = new THREE.Vector3();
+
 /* ── Individual judge star ── */
 
 interface StarProps {
   judge: Judge;
-  position: [number, number, number];
+  scatterPosition: [number, number, number];
+  galacticPosition: [number, number, number];
+  isGalactic: boolean;
   size: number;
   color: string;
   isSelected: boolean;
@@ -213,7 +420,9 @@ interface StarProps {
 
 function JudgeStar({
   judge,
-  position,
+  scatterPosition,
+  galacticPosition,
+  isGalactic,
   size,
   color,
   isSelected,
@@ -221,41 +430,64 @@ function JudgeStar({
   isSearchActive,
   onSelect,
 }: StarProps) {
+  const groupRef = useRef<THREE.Group>(null);
   const meshRef = useRef<THREE.Mesh>(null);
   const matRef = useRef<THREE.MeshStandardMaterial>(null);
-  const baseY = position[1];
+  // Initialise at the correct starting position to avoid jarring teleport on mount.
+  const currentPos = useRef(
+    isGalactic
+      ? new THREE.Vector3(...galacticPosition)
+      : new THREE.Vector3(...scatterPosition),
+  );
   const phase = judge.id * 1.37;
   const [hovered, setHovered] = useState(false);
+  const isSykes = isSykesJudge(judge.name);
 
   const geom = useMemo(() => {
-    const shape = makeStarShape(0.5 * size, 0.22 * size);
+    // Sykes gets an 8-pointed star with sharper points and deeper extrusion.
+    const shape = isSykes
+      ? makeOctaStarShape(0.5 * size, 0.15 * size)
+      : makeStarShape(0.5 * size, 0.22 * size);
     return new THREE.ExtrudeGeometry(shape, {
-      depth: 0.12 * size,
+      depth: isSykes ? 0.22 * size : 0.12 * size,
       bevelEnabled: true,
       bevelSize: 0.025 * size,
       bevelThickness: 0.025 * size,
       bevelSegments: 3,
     });
-  }, [size]);
+  }, [size, isSykes]);
 
   useEffect(() => () => geom.dispose(), [geom]);
 
   useFrame(({ clock }, delta) => {
-    if (!meshRef.current || !matRef.current) return;
+    if (!groupRef.current || !meshRef.current || !matRef.current) return;
 
-    meshRef.current.rotation.y += delta * (isSelected ? 2.2 : hovered ? 1.1 : 0.42);
+    // Smooth lerp toward target — exp-decay gives a natural ease-out over ~1.5 s.
+    const target = isGalactic ? galacticPosition : scatterPosition;
+    _lerpTarget.set(target[0], target[1], target[2]);
+    currentPos.current.lerp(_lerpTarget, 1 - Math.exp(-delta * 2.5));
+
+    groupRef.current.position.x = currentPos.current.x;
+    groupRef.current.position.y = currentPos.current.y;
+    groupRef.current.position.z = currentPos.current.z;
+
+    // Float effect on the mesh relative to the group.
     meshRef.current.position.y =
-      baseY + Math.sin(clock.elapsedTime * 0.65 + phase) * 0.085;
+      Math.sin(clock.elapsedTime * 0.65 + phase) * 0.085;
+
+    meshRef.current.rotation.y +=
+      delta * (isSelected ? 2.2 : hovered ? 1.1 : 0.42);
 
     const dimmed = isSearchActive && !isSearchMatch;
     const targetOpacity = dimmed ? 0.1 : 1.0;
+    const baseEmissive = isSykes ? 0.12 : 0.08; // Sykes glows 50% brighter
     const targetEmissive = dimmed
       ? 0.0
       : isSelected
         ? 0.55 + Math.sin(clock.elapsedTime * 3.2) * 0.28
         : hovered
           ? 0.28
-          : 0.08;
+          : baseEmissive;
 
     matRef.current.opacity += (targetOpacity - matRef.current.opacity) * 0.08;
     matRef.current.emissiveIntensity +=
@@ -264,7 +496,7 @@ function JudgeStar({
   });
 
   return (
-    <group position={[position[0], baseY, position[2]]}>
+    <group ref={groupRef} position={scatterPosition}>
       <mesh
         ref={meshRef}
         geometry={geom}
@@ -286,20 +518,24 @@ function JudgeStar({
           ref={matRef}
           color={color}
           emissive={color}
-          emissiveIntensity={0.08}
+          emissiveIntensity={isSykes ? 0.12 : 0.08}
           metalness={0.65}
           roughness={0.18}
         />
       </mesh>
 
-      {isSelected && (
+      {/* Sykes has a permanent outer glow; other stars only glow when selected */}
+      {(isSykes || isSelected) && (
         <mesh>
-          <sphereGeometry args={[size * 0.95, 12, 12]} />
-          <meshBasicMaterial color={color} transparent opacity={0.06} />
+          <sphereGeometry args={[size * (isSykes ? 1.2 : 0.95), 12, 12]} />
+          <meshBasicMaterial
+            color={color}
+            transparent
+            opacity={isSykes ? 0.09 : 0.06}
+          />
         </mesh>
       )}
 
-      {/* Own suggestion #1: floating name label on hover */}
       {hovered && !isSelected && (
         <Html
           position={[0, 0.5 * size + 0.35, 0]}
@@ -320,7 +556,7 @@ function JudgeStar({
               boxShadow: `0 2px 12px rgba(0,0,0,0.5), 0 0 8px ${color}20`,
             }}
           >
-            {judge.name}
+            {isSykes ? "Chief Justice Bryan Sykes" : judge.name}
           </div>
         </Html>
       )}
@@ -357,7 +593,10 @@ function CameraController({
 interface SceneProps {
   judges: Judge[];
   connections: JudgeConnection[];
-  positions: Map<number, [number, number, number]>;
+  scatterPositions: Map<number, [number, number, number]>;
+  galacticPositions: Map<number, [number, number, number]>;
+  isGalactic: boolean;
+  showConnections: boolean;
   selectedJudge: Judge | null;
   onSelect: (j: Judge | null) => void;
   searchQuery: string;
@@ -366,7 +605,10 @@ interface SceneProps {
 function ConstellationScene({
   judges,
   connections,
-  positions,
+  scatterPositions,
+  galacticPositions,
+  isGalactic,
+  showConnections,
   selectedJudge,
   onSelect,
   searchQuery,
@@ -381,15 +623,14 @@ function ConstellationScene({
 
   const cameraTarget = useMemo(() => {
     if (!selectedJudge) return null;
-    const pos = positions.get(selectedJudge.id);
+    const pos = isGalactic
+      ? galacticPositions.get(selectedJudge.id)
+      : scatterPositions.get(selectedJudge.id);
     if (!pos) return null;
     return new THREE.Vector3(pos[0], pos[1], pos[2]);
-  }, [selectedJudge, positions]);
+  }, [selectedJudge, isGalactic, scatterPositions, galacticPositions]);
 
-  const maxCases = useMemo(
-    () => Math.max(1, ...judges.map((j) => j.total_cases ?? 1)),
-    [judges],
-  );
+  const sizes = useMemo(() => computeStarSizes(judges), [judges]);
 
   const isSearchActive = searchQuery.trim().length > 0;
   const searchLower = searchQuery.toLowerCase();
@@ -409,17 +650,20 @@ function ConstellationScene({
       <Nebula />
       <ParticleField />
 
-      {connections.map((conn, i) => {
-        const posA = positions.get(conn.judge_a_id);
-        const posB = positions.get(conn.judge_b_id);
-        if (!posA || !posB) return null;
-        return <ConstellationEdge key={i} posA={posA} posB={posB} />;
-      })}
+      {/* Edges rendered only when the user has opted in */}
+      {showConnections &&
+        connections.map((conn, i) => {
+          const posA = scatterPositions.get(conn.judge_a_id);
+          const posB = scatterPositions.get(conn.judge_b_id);
+          if (!posA || !posB) return null;
+          return <ConstellationEdge key={i} posA={posA} posB={posB} />;
+        })}
 
       {judges.map((judge) => {
-        const pos = positions.get(judge.id);
-        if (!pos) return null;
-        const size = 1.0 + ((judge.total_cases ?? 1) / maxCases) * 1.2;
+        const scatter = scatterPositions.get(judge.id);
+        const galactic = galacticPositions.get(judge.id);
+        if (!scatter || !galactic) return null;
+        const size = sizes.get(judge.id) ?? 1.0;
         const isMatch =
           !isSearchActive ||
           judge.name.toLowerCase().includes(searchLower) ||
@@ -429,7 +673,9 @@ function ConstellationScene({
           <JudgeStar
             key={judge.id}
             judge={judge}
-            position={pos}
+            scatterPosition={scatter}
+            galacticPosition={galactic}
+            isGalactic={isGalactic}
             size={size}
             color={courtColor(judge.court)}
             isSelected={selectedJudge?.id === judge.id}
@@ -483,7 +729,6 @@ function JudgeInfoCard({
     .sort((a, b) => (a.event_date ?? "").localeCompare(b.event_date ?? ""))
     .slice(0, 3);
 
-  /* Own suggestion #2: slide-in entry animation */
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     const id = requestAnimationFrame(() => setMounted(true));
@@ -497,17 +742,18 @@ function JudgeInfoCard({
         borderColor: `${color}35`,
         maxHeight: "70%",
         opacity: mounted ? 1 : 0,
-        transform: mounted ? "translateY(0) scale(1)" : "translateY(10px) scale(0.97)",
-        transition: "opacity 0.22s ease, transform 0.22s cubic-bezier(0.4,0,0.2,1)",
+        transform: mounted
+          ? "translateY(0) scale(1)"
+          : "translateY(10px) scale(0.97)",
+        transition:
+          "opacity 0.22s ease, transform 0.22s cubic-bezier(0.4,0,0.2,1)",
       }}
     >
-      {/* Accent stripe */}
       <div
         className="h-[2px] w-full shrink-0"
         style={{ background: `linear-gradient(to right, ${color}, transparent)` }}
       />
 
-      {/* Header */}
       <div className="p-4 shrink-0">
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="flex-1 min-w-0">
@@ -532,13 +778,13 @@ function JudgeInfoCard({
           <div className="flex items-center gap-1.5">
             <Users className="h-3 w-3 text-white/25" />
             <span className="text-[11px] text-white/45">
-              {judge.total_cases} case{judge.total_cases !== 1 ? "s" : ""} on record
+              {judge.total_cases} case{judge.total_cases !== 1 ? "s" : ""} on
+              record
             </span>
           </div>
         )}
       </div>
 
-      {/* Scrollable body */}
       <div className="flex-1 overflow-y-auto px-4 pb-3 space-y-4 min-h-0">
         {dataLoading ? (
           <div className="flex items-center justify-center py-4">
@@ -566,10 +812,10 @@ function JudgeInfoCard({
                       </p>
                       {j.date && (
                         <p className="mt-0.5 text-[10px] text-white/30">
-                          {new Date(`${j.date}T00:00:00`).toLocaleDateString("en-JM", {
-                            month: "short",
-                            year: "numeric",
-                          })}
+                          {new Date(`${j.date}T00:00:00`).toLocaleDateString(
+                            "en-JM",
+                            { month: "short", year: "numeric" },
+                          )}
                         </p>
                       )}
                     </button>
@@ -598,7 +844,9 @@ function JudgeInfoCard({
                       </p>
                       {s.event_date && (
                         <p className="mt-0.5 text-[10px] text-white/30">
-                          {new Date(`${s.event_date}T00:00:00`).toLocaleDateString("en-JM", {
+                          {new Date(
+                            `${s.event_date}T00:00:00`,
+                          ).toLocaleDateString("en-JM", {
                             weekday: "short",
                             month: "short",
                             day: "numeric",
@@ -620,7 +868,6 @@ function JudgeInfoCard({
         )}
       </div>
 
-      {/* Footer — View Full Profile with glow + arrow shift */}
       <div className="px-4 pb-4 pt-2 shrink-0">
         <button
           onClick={() => router.push(`/judges/${judge.id}`)}
@@ -691,11 +938,12 @@ function MobileSheet({
       <div className="shrink-0" style={{ borderTop: `2px solid ${color}30` }}>
         <div
           className="h-[3px] w-1/2"
-          style={{ background: `linear-gradient(to right, ${color}, transparent)` }}
+          style={{
+            background: `linear-gradient(to right, ${color}, transparent)`,
+          }}
         />
       </div>
 
-      {/* Header */}
       <div className="px-5 pt-4 pb-2 shrink-0">
         <div className="flex items-start justify-between gap-3 mb-1">
           <div>
@@ -717,12 +965,12 @@ function MobileSheet({
         </div>
         {judge.total_cases !== undefined && (
           <p className="text-[12px] text-white/40">
-            {judge.total_cases} case{judge.total_cases !== 1 ? "s" : ""} on record
+            {judge.total_cases} case{judge.total_cases !== 1 ? "s" : ""} on
+            record
           </p>
         )}
       </div>
 
-      {/* Scrollable body */}
       <div className="flex-1 overflow-y-auto px-5 pb-2 space-y-4 min-h-0">
         {dataLoading ? (
           <div className="flex items-center justify-center py-6">
@@ -750,10 +998,10 @@ function MobileSheet({
                       </p>
                       {j.date && (
                         <p className="mt-1 text-[11px] text-white/30">
-                          {new Date(`${j.date}T00:00:00`).toLocaleDateString("en-JM", {
-                            month: "short",
-                            year: "numeric",
-                          })}
+                          {new Date(`${j.date}T00:00:00`).toLocaleDateString(
+                            "en-JM",
+                            { month: "short", year: "numeric" },
+                          )}
                         </p>
                       )}
                     </button>
@@ -782,7 +1030,9 @@ function MobileSheet({
                       </p>
                       {s.event_date && (
                         <p className="mt-1 text-[11px] text-white/30">
-                          {new Date(`${s.event_date}T00:00:00`).toLocaleDateString("en-JM", {
+                          {new Date(
+                            `${s.event_date}T00:00:00`,
+                          ).toLocaleDateString("en-JM", {
                             weekday: "short",
                             month: "short",
                             day: "numeric",
@@ -804,7 +1054,6 @@ function MobileSheet({
         )}
       </div>
 
-      {/* Footer — 44px min tap target + arrow shift */}
       <div className="px-5 pb-4 pt-2 shrink-0">
         <button
           onClick={() => router.push(`/judges/${judge.id}`)}
@@ -877,6 +1126,70 @@ function Legend() {
   );
 }
 
+/* ── View toggle pill ── */
+
+function ViewToggle({
+  isGalactic,
+  onToggle,
+}: {
+  isGalactic: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      aria-pressed={isGalactic}
+      aria-label={isGalactic ? "Switch to Scatter View" : "Switch to Galactic View"}
+      className={[
+        "flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2.5 text-[13px] font-medium",
+        "transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#009B3A]/50",
+        isGalactic
+          ? "border-[#009B3A]/50 bg-[#009B3A]/10 text-[#009B3A] shadow-[0_0_20px_rgba(0,155,58,0.18)]"
+          : "border-white/[0.1] bg-white/[0.05] text-white/55 hover:border-white/20 hover:text-white/80",
+      ].join(" ")}
+    >
+      {isGalactic ? (
+        <Globe className="h-4 w-4 shrink-0" />
+      ) : (
+        <Sparkles className="h-4 w-4 shrink-0" />
+      )}
+      <span className="hidden sm:block whitespace-nowrap">
+        {isGalactic ? "Galactic View" : "Scatter View"}
+      </span>
+    </button>
+  );
+}
+
+/* ── Connections toggle pill ── */
+
+function ConnectionsToggle({
+  showConnections,
+  onToggle,
+}: {
+  showConnections: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      aria-pressed={showConnections}
+      aria-label={showConnections ? "Hide connections" : "Show connections"}
+      className={[
+        "flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2.5 text-[13px] font-medium",
+        "transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FED100]/50",
+        showConnections
+          ? "border-[#FED100]/50 bg-[#FED100]/10 text-[#FED100] shadow-[0_0_20px_rgba(254,209,0,0.15)]"
+          : "border-white/[0.1] bg-white/[0.05] text-white/55 hover:border-white/20 hover:text-white/80",
+      ].join(" ")}
+    >
+      <Link2 className="h-4 w-4 shrink-0" />
+      <span className="hidden sm:block whitespace-nowrap">
+        {showConnections ? "Hide Connections" : "Show Connections"}
+      </span>
+    </button>
+  );
+}
+
 /* ── Main export ── */
 
 interface Props {
@@ -892,6 +1205,19 @@ export default function JudicialConstellation({ judges, connections }: Props) {
       ),
     [judges],
   );
+
+  // Persist view preference across sessions.
+  const [isGalactic, setIsGalactic] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(LS_VIEW_KEY) === "galactic";
+  });
+
+  // Connections default OFF; opt-in persisted.
+  const [showConnections, setShowConnections] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(LS_CONNECTIONS_KEY) === "on";
+  });
+
   const [selectedJudge, setSelectedJudge] = useState<Judge | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [webglOk, setWebglOk] = useState(true);
@@ -919,6 +1245,22 @@ export default function JudicialConstellation({ judges, connections }: Props) {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
+  const handleToggleView = useCallback(() => {
+    setIsGalactic((prev) => {
+      const next = !prev;
+      localStorage.setItem(LS_VIEW_KEY, next ? "galactic" : "scatter");
+      return next;
+    });
+  }, []);
+
+  const handleToggleConnections = useCallback(() => {
+    setShowConnections((prev) => {
+      const next = !prev;
+      localStorage.setItem(LS_CONNECTIONS_KEY, next ? "on" : "off");
+      return next;
+    });
+  }, []);
+
   /* Fetch judge-specific data whenever selection changes */
   useEffect(() => {
     if (!selectedJudge) {
@@ -932,8 +1274,12 @@ export default function JudicialConstellation({ judges, connections }: Props) {
       apiClient.getCourtSittings({ judge: selectedJudge.name }),
     ])
       .then(([jRes, sRes]) => {
-        setJudgeJudgments(jRes.status === "fulfilled" ? jRes.value.judgments : []);
-        setJudgeSittings(sRes.status === "fulfilled" ? sRes.value.sittings : []);
+        setJudgeJudgments(
+          jRes.status === "fulfilled" ? jRes.value.judgments : [],
+        );
+        setJudgeSittings(
+          sRes.status === "fulfilled" ? sRes.value.sittings : [],
+        );
       })
       .finally(() => setDataLoading(false));
   }, [selectedJudge]);
@@ -960,7 +1306,15 @@ export default function JudicialConstellation({ judges, connections }: Props) {
     }
   }, [searchQuery, filteredJudges]);
 
-  const positions = useMemo(() => computePositions(filteredJudges), [filteredJudges]);
+  const scatterPositions = useMemo(
+    () => computePositions(filteredJudges),
+    [filteredJudges],
+  );
+
+  const galacticPositions = useMemo(
+    () => computeGalacticPositions(filteredJudges),
+    [filteredJudges],
+  );
 
   const handleSelect = useCallback((judge: Judge | null) => {
     autoSelectedRef.current = false;
@@ -989,11 +1343,15 @@ export default function JudicialConstellation({ judges, connections }: Props) {
   return (
     <div
       className="dark flex flex-col"
-      style={{ height: "calc(100vh - 8rem)", colorScheme: "dark", background: "#050510" }}
+      style={{
+        height: "calc(100vh - 8rem)",
+        colorScheme: "dark",
+        background: "#050510",
+      }}
     >
-      {/* Search bar */}
-      <div className="px-1 pb-4 shrink-0">
-        <div className="relative">
+      {/* Search bar + view toggle */}
+      <div className="px-1 pb-4 shrink-0 flex gap-2">
+        <div className="relative flex-1">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-white/30 pointer-events-none" />
           <input
             type="text"
@@ -1011,6 +1369,12 @@ export default function JudicialConstellation({ judges, connections }: Props) {
             </button>
           )}
         </div>
+
+        <ViewToggle isGalactic={isGalactic} onToggle={handleToggleView} />
+        <ConnectionsToggle
+          showConnections={showConnections}
+          onToggle={handleToggleConnections}
+        />
       </div>
 
       {/* Canvas container */}
@@ -1025,7 +1389,10 @@ export default function JudicialConstellation({ judges, connections }: Props) {
             <ConstellationScene
               judges={filteredJudges}
               connections={connections}
-              positions={positions}
+              scatterPositions={scatterPositions}
+              galacticPositions={galacticPositions}
+              isGalactic={isGalactic}
+              showConnections={showConnections}
               selectedJudge={selectedJudge}
               onSelect={handleSelect}
               searchQuery={searchQuery}
@@ -1033,7 +1400,6 @@ export default function JudicialConstellation({ judges, connections }: Props) {
           </Suspense>
         </Canvas>
 
-        {/* Desktop info overlay — key forces remount + re-animates on judge change */}
         {selectedJudge && !isMobile && (
           <JudgeInfoCard
             key={selectedJudge.id}
@@ -1045,7 +1411,6 @@ export default function JudicialConstellation({ judges, connections }: Props) {
           />
         )}
 
-        {/* Hint text */}
         {!selectedJudge && filteredJudges.length > 0 && (
           <p className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 text-[10px] text-white/20 whitespace-nowrap">
             Tap a star to explore · Drag to rotate
@@ -1053,10 +1418,8 @@ export default function JudicialConstellation({ judges, connections }: Props) {
         )}
       </div>
 
-      {/* Legend */}
       <Legend />
 
-      {/* Mobile bottom sheet */}
       {selectedJudge && isMobile && (
         <>
           <div
