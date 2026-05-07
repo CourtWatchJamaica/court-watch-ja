@@ -56,6 +56,14 @@ pub async fn run_catchup_check(pool: &PgPool, config: &Config) -> anyhow::Result
     // ── Load ScraperState early — needed for throttle checks ─────────────────
     let mut state = ScraperState::load(&config.scraper_state_path).await;
 
+    // ── Stale court-list PDF eviction ────────────────────────────────────────
+    // Returns (sc_cleared, coa_cleared) — non-zero values force the corresponding
+    // court-lists scraper to run even if the staleness date check says it's current.
+    let (sc_evicted, coa_evicted) = evict_stale_court_list_pdfs(pool, &mut state).await;
+    if sc_evicted + coa_evicted > 0 {
+        state.save(&config.scraper_state_path).await.ok();
+    }
+
     // ── Supreme Court judgments ──────────────────────────────────────────────
     let sc_judgment_date = queries::most_recent_judgment_date_by_court(pool, "Supreme Court")
         .await
@@ -85,18 +93,44 @@ pub async fn run_catchup_check(pool: &PgPool, config: &Config) -> anyhow::Result
 
     // ── Supreme Court sittings ───────────────────────────────────────────────
     let sc_sitting_date = queries::most_recent_sitting_date(pool).await.ok().flatten();
+    // Force re-run if eviction cleared URLs above, or if any expected SC division
+    // is still missing — bypasses the stale-date check so scrapers can never be
+    // gated out while a division has zero rows.
+    let criminal_count = queries::count_sittings_by_division(pool, "Criminal")
+        .await
+        .ok()
+        .unwrap_or(0);
+    let sc_division_missing = criminal_count == 0;
+    if sc_division_missing {
+        info!("Forcing SC scraper — Criminal division still empty");
+    }
     let sc_sittings_stale = sc_sitting_date
         .map(|d| today - d > stale_threshold)
-        .unwrap_or(true);
+        .unwrap_or(true)
+        || sc_evicted > 0
+        || sc_division_missing;
 
     // ── Court of Appeal sittings ─────────────────────────────────────────────
     let coa_sitting_date = queries::most_recent_sitting_date_by_court(pool, "Court of Appeal")
         .await
         .ok()
         .flatten();
+    // Force re-run if CoA has no sittings at all — the date check can pass
+    // when Civil rows exist (stored under the wrong division) while the CoA
+    // scraper has never successfully populated 'Court of Appeal' rows.
+    let coa_total = queries::count_sittings_for_court(pool, "Court of Appeal")
+        .await
+        .ok()
+        .unwrap_or(0);
+    let coa_empty = coa_total == 0;
+    if coa_empty {
+        info!("Forcing CoA scraper — no Court of Appeal sittings yet");
+    }
     let coa_sittings_stale = coa_sitting_date
         .map(|d| today - d > stale_threshold)
-        .unwrap_or(true);
+        .unwrap_or(true)
+        || coa_evicted > 0
+        || coa_empty;
 
     // ── Parish Court sittings ────────────────────────────────────────────────
     let parish_sitting_date = queries::most_recent_sitting_date_by_court(pool, "Parish Court")
@@ -355,6 +389,16 @@ pub async fn run_all(pool: &PgPool, config: &Config) -> anyhow::Result<()> {
     state.save(&config.scraper_state_path).await.ok();
 
     // 3. Supreme Court court lists (PDFs)
+    // Clear stale processed-URL entries for any PDFs whose DB rows are all 'Civil'
+    // or where the Court of Appeal has zero rows (nuclear CoA reset).
+    let (sc_evicted, coa_evicted) = evict_stale_court_list_pdfs(pool, &mut state).await;
+    if sc_evicted + coa_evicted > 0 {
+        info!(
+            "  Stale eviction: {sc_evicted} SC + {coa_evicted} CoA URL(s) cleared before court-lists run"
+        );
+        state.save(&config.scraper_state_path).await.ok();
+    }
+
     info!("-- Starting Supreme Court court-lists scraper");
     if let Err(e) = court_lists::run(pool, &mut state, &client, &config.pdf_dir).await {
         error!("SC court-lists scraper error: {e}");
@@ -688,4 +732,196 @@ async fn download_pending_pdfs(
     }
 
     Ok(())
+}
+
+/// Checks DB state and clears processed-PDF entries that need re-scraping.
+///
+/// Three passes for Supreme Court:
+/// 1. **Nuclear per-division**: count = 0 → evict every keyword-matching SC URL.
+/// 2. **Aggressive Civil sweep**: when *any* SC division is missing, evict every
+///    processed SC URL that still has Civil rows — catches PDFs whose filenames
+///    contain no division keyword (e.g. a combined cause list named by date only).
+/// 3. **All-Civil fallback**: any SC URL where *all* rows are Civil (run always).
+///
+/// For Court of Appeal: nuclear when count = 0 (regardless of whether the
+/// processed list is empty), plus a domain-wide Civil sweep to delete rows from
+/// URLs that have already been dropped from the processed list.  When count > 0
+/// the per-URL Civil check runs as a secondary sweep.
+///
+/// `sitting_exists` checks (case_number, event_date, event_type) without a
+/// division filter, so stale Civil rows must be deleted *before* eviction or
+/// they silently block re-insertion of correctly-divided rows.
+///
+/// Returns `(sc_cleared, coa_cleared)`.
+async fn evict_stale_court_list_pdfs(
+    pool: &PgPool,
+    state: &mut ScraperState,
+) -> (usize, usize) {
+    // Expected SC divisions and the filename keywords that identify their PDFs.
+    const SC_DIVISIONS: &[(&str, &[&str])] = &[
+        ("Criminal",   &["criminal"]),
+        ("Gun Court",  &["gun"]),
+        ("Commercial", &["commercial"]),
+        ("Family",     &["family"]),
+    ];
+
+    let mut sc_to_evict: std::collections::HashSet<String> = Default::default();
+    let mut any_sc_division_missing = false;
+
+    // ── Pass 1: nuclear per-division ─────────────────────────────────────────
+    for (division, keywords) in SC_DIVISIONS {
+        let count = match queries::count_sittings_by_division(pool, division).await {
+            Ok(n) => n,
+            Err(e) => { warn!("Division count check failed for {division}: {e}"); continue; }
+        };
+        if count > 0 { continue; }
+
+        any_sc_division_missing = true;
+
+        let mut evicted = 0usize;
+        for url in state
+            .processed_pdf_urls
+            .iter()
+            .filter(|u| u.contains("supremecourt.gov.jm"))
+            .filter(|u| {
+                let lower = u.to_lowercase();
+                keywords.iter().any(|kw| lower.contains(kw))
+            })
+            .cloned()
+            .collect::<Vec<_>>()
+        {
+            match queries::delete_civil_sittings_for_url(pool, &url).await {
+                Ok(n) => {
+                    info!(
+                        "  Deleted {n} Civil row(s) from {} (missing: {division})",
+                        url.rsplit('/').next().unwrap_or(&url)
+                    );
+                    sc_to_evict.insert(url);
+                    evicted += 1;
+                }
+                Err(e) => warn!("  Failed to delete Civil rows for {url}: {e}"),
+            }
+        }
+        info!("Eviction: {division} — cleared {evicted} URL(s)");
+    }
+
+    // ── Pass 2: aggressive Civil sweep when any division is missing ───────────
+    // When a SC division has zero rows, any processed SC URL with Civil rows is a
+    // candidate — the PDF may contain that division's entries under the wrong label,
+    // even if its filename doesn't include the division keyword.
+    if any_sc_division_missing {
+        let mut extra = 0usize;
+        for url in state
+            .processed_pdf_urls
+            .iter()
+            .filter(|u| u.contains("supremecourt.gov.jm"))
+            .cloned()
+            .collect::<Vec<_>>()
+        {
+            if sc_to_evict.contains(&url) { continue; }
+            match queries::has_any_civil_sittings_for_url(pool, &url).await {
+                Ok(true) => {
+                    if let Err(e) = queries::delete_civil_sittings_for_url(pool, &url).await {
+                        warn!("  Failed to delete Civil rows for {url}: {e}");
+                    }
+                    sc_to_evict.insert(url);
+                    extra += 1;
+                }
+                Ok(false) => {}
+                Err(e) => warn!("DB check failed for {url}: {e}"),
+            }
+        }
+        if extra > 0 {
+            info!("Eviction: SC — cleared {extra} additional URL(s) with Civil rows (no-keyword sweep)");
+        }
+    }
+
+    // ── Pass 3: all-Civil fallback ────────────────────────────────────────────
+    for url in state
+        .processed_pdf_urls
+        .iter()
+        .filter(|u| u.contains("supremecourt.gov.jm"))
+        .cloned()
+        .collect::<Vec<_>>()
+    {
+        if sc_to_evict.contains(&url) { continue; }
+        match queries::has_only_civil_sittings_for_url(pool, &url).await {
+            Ok(true) => {
+                if let Err(e) = queries::delete_civil_sittings_for_url(pool, &url).await {
+                    warn!("Failed to delete stale Civil rows for {url}: {e}");
+                }
+                sc_to_evict.insert(url);
+            }
+            Ok(false) => {}
+            Err(e) => warn!("DB check failed for {url}: {e}"),
+        }
+    }
+
+    if !sc_to_evict.is_empty() {
+        state.processed_pdf_urls.retain(|u| !sc_to_evict.contains(u));
+    }
+    let sc_cleared = sc_to_evict.len();
+
+    // ── CoA eviction ─────────────────────────────────────────────────────────
+    let coa_cleared = match queries::count_sittings_for_court(pool, "Court of Appeal").await {
+        Ok(0) => {
+            // Nuclear: drain the processed list (even if already empty) and
+            // do a domain-wide sweep to delete Civil rows from URLs that may
+            // have been dropped from the list in a prior run.
+            let urls: Vec<String> = state.processed_appeal_pdf_urls.drain(..).collect();
+            for url in &urls {
+                if let Err(e) = queries::delete_civil_sittings_for_url(pool, url).await {
+                    warn!("  Failed to delete CoA Civil rows for {url}: {e}");
+                }
+            }
+            match queries::delete_civil_sittings_for_domain(pool, "courtofappeal.gov.jm").await {
+                Ok(n) if n > 0 => info!("Eviction: CoA — domain sweep deleted {n} stale Civil row(s)"),
+                Ok(_) => {}
+                Err(e) => warn!("CoA domain sweep failed: {e}"),
+            }
+            if urls.is_empty() {
+                info!("Eviction: No CoA URLs found in processed list (already clean)");
+                0
+            } else {
+                info!("Eviction: CoA — nuclear cleared all {} URL(s)", urls.len());
+                urls.len()
+            }
+        }
+        Ok(_) => {
+            // CoA count > 0: per-URL Civil check for any URL stored before the fix.
+            let mut coa_cleared = 0usize;
+            for url in state
+                .processed_appeal_pdf_urls
+                .iter()
+                .filter(|u| u.contains("courtofappeal.gov.jm"))
+                .cloned()
+                .collect::<Vec<_>>()
+            {
+                match queries::has_any_civil_sittings_for_url(pool, &url).await {
+                    Ok(true) => {
+                        if let Err(e) = queries::delete_civil_sittings_for_url(pool, &url).await {
+                            warn!("  Failed to delete stale CoA Civil rows for {url}: {e}");
+                        }
+                        state.processed_appeal_pdf_urls.retain(|u2| u2 != &url);
+                        coa_cleared += 1;
+                    }
+                    Ok(false) => {}
+                    Err(e) => warn!("DB check failed for {url}: {e}"),
+                }
+            }
+            if coa_cleared > 0 {
+                info!("Eviction: CoA — evicting {coa_cleared} URL(s) with Civil sittings");
+            }
+            coa_cleared
+        }
+        Err(e) => { warn!("CoA sitting count failed: {e}"); 0 }
+    };
+
+    if sc_cleared + coa_cleared > 0 {
+        info!(
+            "Stale eviction complete: {sc_cleared} SC + {coa_cleared} CoA URL(s) cleared; \
+             will be re-downloaded on next court-lists run."
+        );
+    }
+    (sc_cleared, coa_cleared)
 }
