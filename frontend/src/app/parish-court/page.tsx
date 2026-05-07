@@ -1,11 +1,22 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { ParishCourtCase, ParishSummary } from "@/lib/types";
 import AuthGuard from "@/components/AuthGuard";
-import { Search, X, MapPin, AlertTriangle, Home, Pill, Shield, ChevronRight, ArrowLeft } from "lucide-react";
+import {
+  Search,
+  X,
+  MapPin,
+  AlertTriangle,
+  Home,
+  Pill,
+  Shield,
+  ChevronRight,
+  ChevronLeft,
+  ArrowLeft,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 // ── Offence categorisation ────────────────────────────────────────────────────
@@ -80,37 +91,82 @@ const STATUS_LABELS: Record<string, string> = {
   E: "Estreat",
 };
 
+const LIMIT = 50;
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 function ParishCourtDashboard() {
   const router = useRouter();
   const [cases, setCases] = useState<ParishCourtCase[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
   const [summary, setSummary] = useState<ParishSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<Category | null>(null);
   const [selectedParish, setSelectedParish] = useState<string | null>(null);
+  const [categoryCounts, setCategoryCounts] = useState<Record<Category, number>>(
+    { Violent: 0, Property: 0, Drugs: 0, Other: 0 },
+  );
 
-  // Fetch summary once — parish card totals are global, not filtered
+  // ── Debounce search ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // ── Reset page when any filter changes ──────────────────────────────────────
+  useEffect(() => {
+    setPage(1);
+  }, [selectedParish, activeCategory, debouncedSearch]);
+
+  // ── Summary (parish card totals) ────────────────────────────────────────────
   useEffect(() => {
     apiClient.getParishSummary()
       .then((res) => setSummary(res.summary))
       .catch(() => {});
   }, []);
 
-  // Re-fetch cases whenever selectedParish changes; pass parish to API so
-  // the server does the filtering (avoids name-mismatch bugs client-side)
+  // ── Category counts — parish-scoped, no category/search filter ──────────────
+  // Keeps the filter buttons showing totals for the whole parish regardless of
+  // which category or search term is active.
+  useEffect(() => {
+    apiClient
+      .getParishCases({
+        limit: 1000,
+        ...(selectedParish ? { parish: selectedParish } : {}),
+      })
+      .then((res) => {
+        const counts: Record<Category, number> = {
+          Violent: 0, Property: 0, Drugs: 0, Other: 0,
+        };
+        for (const c of res.cases) counts[categorise(c.offence)] += 1;
+        setCategoryCounts(counts);
+      })
+      .catch(() => {});
+  }, [selectedParish]);
+
+  // ── Main paginated fetch ────────────────────────────────────────────────────
   useEffect(() => {
     let active = true;
     setLoading(true);
     apiClient
       .getParishCases({
-        limit: 200,
+        limit: LIMIT,
+        page,
         ...(selectedParish ? { parish: selectedParish } : {}),
+        ...(activeCategory ? { category: activeCategory } : {}),
+        ...(debouncedSearch ? { q: debouncedSearch } : {}),
       })
       .then((res) => {
         if (!active) return;
-        setCases(res.cases);
+        setCases(
+          [...res.cases].sort(
+            (a, b) => (b.week_of ?? "").localeCompare(a.week_of ?? ""),
+          ),
+        );
+        setTotal(res.total);
       })
       .catch(() => {})
       .finally(() => {
@@ -119,41 +175,15 @@ function ParishCourtDashboard() {
     return () => {
       active = false;
     };
-  }, [selectedParish]);
+  }, [page, selectedParish, activeCategory, debouncedSearch]);
 
-  const categoryCounts = useMemo(() => {
-    const counts: Record<Category, number> = {
-      Violent: 0,
-      Property: 0,
-      Drugs: 0,
-      Other: 0,
-    };
-    for (const c of cases) {
-      counts[categorise(c.offence)] += 1;
-    }
-    return counts;
-  }, [cases]);
-
-  // Parish filtering is now done server-side; only apply category + search here
-  const filtered = useMemo(() => {
-    let out = cases;
-    if (activeCategory) out = out.filter((c) => categorise(c.offence) === activeCategory);
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      out = out.filter(
-        (c) =>
-          c.accused_name?.toLowerCase().includes(q) ||
-          c.offence?.toLowerCase().includes(q) ||
-          c.parish.toLowerCase().includes(q),
-      );
-    }
-    return out;
-  }, [cases, activeCategory, search]);
+  const totalPages = Math.max(1, Math.ceil(total / LIMIT));
 
   const clearFilters = useCallback(() => {
     setSearch("");
     setActiveCategory(null);
     setSelectedParish(null);
+    setPage(1);
   }, []);
 
   const hasFilters = search || activeCategory || selectedParish;
@@ -185,7 +215,7 @@ function ParishCourtDashboard() {
                 Parish Court
               </h1>
               <p className="text-sm text-white/40">
-                Jamaica's 14 Parishes · {cases.length} cases indexed
+                Jamaica's 14 Parishes · {total} case{total !== 1 ? "s" : ""} indexed
               </p>
             </div>
           </div>
@@ -193,7 +223,7 @@ function ParishCourtDashboard() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 pb-28 md:pb-10">
-        {/* Offence Breakdown Cards — 2×2 on mobile, 4 across on sm+ */}
+        {/* Offence Breakdown Cards */}
         <section>
           <h2 className="text-xs font-semibold text-white/30 uppercase tracking-widest mb-3">
             Offence Breakdown
@@ -219,7 +249,7 @@ function ParishCourtDashboard() {
                     </span>
                   </div>
                   <p className={`text-3xl font-bold ${active ? cfg.color : "text-white"}`}>
-                    {loading ? "—" : categoryCounts[cat]}
+                    {loading && categoryCounts[cat] === 0 ? "—" : categoryCounts[cat]}
                   </p>
                 </button>
               );
@@ -294,11 +324,13 @@ function ParishCourtDashboard() {
             )}
           </div>
           <p className="mt-2 text-xs text-white/30">
-            {loading ? "Loading…" : `${filtered.length} case${filtered.length !== 1 ? "s" : ""}`}
+            {loading
+              ? "Loading…"
+              : `${total} case${total !== 1 ? "s" : ""}${hasFilters ? " matching filters" : ""}`}
           </p>
         </section>
 
-        {/* Recent Cases Feed */}
+        {/* Cases Feed */}
         <section>
           <h2 className="text-xs font-semibold text-white/30 uppercase tracking-widest mb-3">
             Cases
@@ -313,13 +345,13 @@ function ParishCourtDashboard() {
                 />
               ))}
             </div>
-          ) : filtered.length === 0 ? (
+          ) : cases.length === 0 ? (
             <div className="rounded-2xl border border-white/[0.05] bg-white/[0.02] py-16 text-center">
               <p className="text-white/30 text-sm">No cases match your filters.</p>
             </div>
           ) : (
             <div className="space-y-2">
-              {filtered.slice(0, 100).map((c) => {
+              {cases.map((c) => {
                 const cat = categorise(c.offence);
                 const cfg = CATEGORY_CONFIG[cat];
                 const statusLabel = c.status ? STATUS_LABELS[c.status] ?? c.status : null;
@@ -329,10 +361,8 @@ function ParishCourtDashboard() {
                     onClick={() => router.push(`/parish-court/${c.id}`)}
                     className="w-full flex items-center gap-4 rounded-xl border border-white/[0.05] bg-white/[0.03] px-4 py-3 text-left hover:bg-white/[0.07] hover:border-white/[0.10] active:scale-[0.99] transition-all duration-150 min-h-[56px]"
                   >
-                    {/* Category dot */}
                     <div className={`h-2 w-2 rounded-full shrink-0 ${cfg.color.replace("text-", "bg-")}`} />
 
-                    {/* Name + offence */}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-white/90 truncate">
                         {c.accused_name ?? "Unknown"}
@@ -342,7 +372,6 @@ function ParishCourtDashboard() {
                       </p>
                     </div>
 
-                    {/* Badges */}
                     <div className="flex items-center gap-2 shrink-0">
                       <Badge
                         variant="outline"
@@ -368,11 +397,33 @@ function ParishCourtDashboard() {
                   </button>
                 );
               })}
-              {filtered.length > 100 && (
-                <p className="text-center text-xs text-white/25 pt-2">
-                  Showing 100 of {filtered.length} — refine your search to narrow results
-                </p>
-              )}
+            </div>
+          )}
+
+          {/* Pagination controls */}
+          {!loading && total > LIMIT && (
+            <div className="mt-6 flex items-center justify-between gap-4">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="inline-flex items-center gap-2 rounded-xl border border-[#CD7F32]/25 bg-[#CD7F32]/10 px-4 py-2.5 text-[13px] font-semibold text-[#CD7F32] hover:bg-[#CD7F32]/20 hover:border-[#CD7F32]/40 active:scale-[0.97] transition-all duration-150 min-h-[44px] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-[#CD7F32]/10 disabled:active:scale-100"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                <span className="hidden sm:inline">Previous</span>
+              </button>
+
+              <span className="text-sm text-white/50 tabular-nums">
+                Page {page} of {totalPages}
+              </span>
+
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className="inline-flex items-center gap-2 rounded-xl border border-[#CD7F32]/25 bg-[#CD7F32]/10 px-4 py-2.5 text-[13px] font-semibold text-[#CD7F32] hover:bg-[#CD7F32]/20 hover:border-[#CD7F32]/40 active:scale-[0.97] transition-all duration-150 min-h-[44px] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-[#CD7F32]/10 disabled:active:scale-100"
+              >
+                <span className="hidden sm:inline">Next</span>
+                <ChevronRight className="h-4 w-4" />
+              </button>
             </div>
           )}
         </section>
