@@ -9,7 +9,17 @@ import DocketSection from "@/components/DocketSection";
 import LegalPulse from "@/components/LegalPulse";
 import { apiClient } from "@/lib/api";
 import { Judgment, UserCase, CourtSitting } from "@/lib/types";
-import { FileText, Bookmark, TrendingUp, Scale, Calendar, Clock, Building2, User, ArrowUpRight } from "lucide-react";
+import {
+  FileText,
+  Bookmark,
+  TrendingUp,
+  Scale,
+  Calendar,
+  Clock,
+  Building2,
+  User,
+  ArrowUpRight,
+} from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 /* ── Stat card — always dark regardless of theme ── */
@@ -71,8 +81,10 @@ function TodaySittings({ sittings, loading }: TodaySittingsProps) {
   const upcoming = sittings
     .filter((s) => s.event_date && s.event_date > today)
     .sort((a, b) => (a.event_date ?? "").localeCompare(b.event_date ?? ""));
-  const display = todaySittings.length > 0 ? todaySittings.slice(0, 5) : upcoming.slice(0, 5);
-  const label = todaySittings.length > 0 ? "Today's Sittings" : "Upcoming Sittings";
+  const display =
+    todaySittings.length > 0 ? todaySittings.slice(0, 5) : upcoming.slice(0, 5);
+  const label =
+    todaySittings.length > 0 ? "Today's Sittings" : "Upcoming Sittings";
 
   return (
     <section>
@@ -117,7 +129,9 @@ function TodaySittings({ sittings, loading }: TodaySittingsProps) {
                 )}
                 {sitting.event_date && sitting.event_date !== today && (
                   <p className="text-[9px] text-white/30 mt-0.5">
-                    {new Date(`${sitting.event_date}T00:00:00`).toLocaleDateString("en-JM", {
+                    {new Date(
+                      `${sitting.event_date}T00:00:00`,
+                    ).toLocaleDateString("en-JM", {
                       month: "short",
                       day: "numeric",
                     })}
@@ -137,13 +151,17 @@ function TodaySittings({ sittings, loading }: TodaySittingsProps) {
                   {sitting.judge_name && (
                     <div className="flex items-center gap-1 text-[10px] text-white/35">
                       <User className="h-2.5 w-2.5" />
-                      <span className="truncate max-w-[100px]">{sitting.judge_name}</span>
+                      <span className="truncate max-w-[100px]">
+                        {sitting.judge_name}
+                      </span>
                     </div>
                   )}
                   {sitting.court_division && (
                     <div className="flex items-center gap-1 text-[10px] text-white/35">
                       <Building2 className="h-2.5 w-2.5" />
-                      <span className="truncate max-w-[100px]">{sitting.court_division}</span>
+                      <span className="truncate max-w-[100px]">
+                        {sitting.court_division}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -157,8 +175,12 @@ function TodaySittings({ sittings, loading }: TodaySittingsProps) {
           <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-[#FED100]/[0.07] ring-1 ring-[#FED100]/15">
             <Calendar className="h-5 w-5 text-[#FED100]/50" />
           </div>
-          <p className="text-sm font-medium text-white/40">No sittings scheduled</p>
-          <p className="mt-1 text-xs text-white/20">Court lists are updated daily.</p>
+          <p className="text-sm font-medium text-white/40">
+            No sittings scheduled
+          </p>
+          <p className="mt-1 text-xs text-white/20">
+            Court lists are updated daily.
+          </p>
         </div>
       )}
     </section>
@@ -216,7 +238,6 @@ export default function Dashboard() {
         <Navbar />
 
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-32 md:pb-16">
-
           {/* ── Header ── */}
           <div className="mb-7">
             <div className="mb-2.5 flex items-center gap-2">
