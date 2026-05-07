@@ -30,6 +30,7 @@ pub struct SittingEntry {
     pub event_date: Option<NaiveDate>,
     pub event_time: Option<NaiveTime>,
     pub lawyers: Option<String>,
+    pub division: Option<String>,
 }
 
 pub fn parse_court_list_text(text: &str, pdf_date: Option<NaiveDate>) -> Vec<SittingEntry> {
@@ -87,11 +88,21 @@ pub fn parse_court_list_text(text: &str, pdf_date: Option<NaiveDate>) -> Vec<Sit
     let mut current_judge: Option<String> = None;
     let mut current_time: Option<NaiveTime> = None;
     let mut current_section: Option<String> = None;
+    let mut current_division: Option<String> = None;
     let mut skip_next_case = false; // true after "AND" — consolidated secondary case
 
     for raw in text.lines() {
         let line = raw.trim();
         if line.is_empty() {
+            continue;
+        }
+
+        // ── Division header — must come BEFORE noise filter because some
+        //    division strings (e.g. "CIVIL DIVISION") were previously silenced
+        //    as noise, preventing division tracking.
+        if let Some(div) = detect_division_header(line) {
+            flush(&mut current, &mut entries, &current_judge);
+            current_division = Some(div.to_string());
             continue;
         }
 
@@ -145,7 +156,7 @@ pub fn parse_court_list_text(text: &str, pdf_date: Option<NaiveDate>) -> Vec<Sit
                 continue;
             }
             flush(&mut current, &mut entries, &current_judge);
-            current = new_entry(case_num, current_date, current_time, &current_judge, &current_section);
+            current = new_entry(case_num, current_date, current_time, &current_judge, &current_section, &current_division);
             skip_next_case = false;
             continue;
         }
@@ -157,7 +168,7 @@ pub fn parse_court_list_text(text: &str, pdf_date: Option<NaiveDate>) -> Vec<Sit
                 continue;
             }
             flush(&mut current, &mut entries, &current_judge);
-            current = new_entry(case_num, current_date, current_time, &current_judge, &current_section);
+            current = new_entry(case_num, current_date, current_time, &current_judge, &current_section, &current_division);
             skip_next_case = false;
             continue;
         }
@@ -212,6 +223,7 @@ fn new_entry(
     time: Option<NaiveTime>,
     judge: &Option<String>,
     section: &Option<String>,
+    division: &Option<String>,
 ) -> SittingEntry {
     SittingEntry {
         case_number: Some(case_num),
@@ -219,6 +231,7 @@ fn new_entry(
         event_time: time,
         judge_name: judge.clone(),
         event_type: section.clone(),
+        division: division.clone(),
         ..Default::default()
     }
 }
@@ -307,8 +320,6 @@ fn is_noise(line: &str) -> bool {
     if upper.contains("COURT OF APPEAL") && upper.contains("JAMAICA") { return true; }
     if upper.starts_with("LIST OF SITTINGS") { return true; }
     if upper.starts_with("CAUSE LIST") || upper.starts_with("COURT LIST") { return true; }
-    if upper == "COMMERCIAL DIVISION" || upper == "CIVIL DIVISION" { return true; }
-    if upper.starts_with("CRIMINAL DIVISION") { return true; }
     if upper == "IN OPEN COURT" || upper == "IN CHAMBERS" { return true; }
     // Courtroom line (we don't use it; judge comes from COR:)
     if upper.starts_with("COURTROOM NO") { return true; }
@@ -330,6 +341,31 @@ fn is_noise(line: &str) -> bool {
     // Very short lines (single characters, stray punctuation)
     if line.len() <= 2 { return true; }
     false
+}
+
+// Detects a division-level heading that scopes all subsequent case entries.
+// Called BEFORE is_noise so these headers are captured rather than discarded.
+fn detect_division_header(line: &str) -> Option<&'static str> {
+    let upper = line.trim().to_uppercase();
+    if upper == "CIVIL DIVISION" { return Some("Civil"); }
+    if upper.starts_with("CRIMINAL DIVISION") { return Some("Criminal"); }
+    if upper == "COMMERCIAL DIVISION" { return Some("Commercial"); }
+    if upper.contains("PROBATE") && upper.contains("FAMILY") { return Some("Probate and Family"); }
+    if upper == "PROBATE DIVISION" { return Some("Probate"); }
+    if upper == "FAMILY DIVISION" { return Some("Family"); }
+    if upper.contains("GUN COURT") { return Some("Gun Court"); }
+    if upper == "DIVORCE DIVISION" { return Some("Divorce"); }
+    if upper == "ADMIRALTY DIVISION" { return Some("Admiralty"); }
+    if upper.contains("REVENUE COURT") { return Some("Revenue"); }
+    if upper.contains("INTELLECTUAL PROPERTY") && upper.contains("DIVISION") {
+        return Some("Intellectual Property");
+    }
+    if upper.contains("CONSTITUTIONAL") && upper.contains("DIVISION") {
+        return Some("Constitutional");
+    }
+    // "COURT I - GANG MATTER" style courtroom headers appear within the Gun Court
+    if upper.starts_with("COURT ") && upper.contains("GANG") { return Some("Gun Court"); }
+    None
 }
 
 fn contains_versus(line: &str) -> bool {
@@ -394,6 +430,7 @@ fn looks_like_lawyers(line: &str) -> bool {
 
 fn clean_judge_name(raw: &str) -> String {
     // Strip titles in decreasing specificity so we don't leave fragments.
+    // Dot variants cover SC documents; no-dot variants cover CoA documents.
     let upper = raw.to_uppercase();
     let prefixes = [
         "THE HONOURABLE MRS. JUSTICE ",
@@ -407,6 +444,14 @@ fn clean_judge_name(raw: &str) -> String {
         "THE HON. MS. JUSTICE ",
         "THE HON. JUSTICE ",
         "THE HON. ",
+        // No-dot variants used in Court of Appeal documents
+        "THE HON MRS JUSTICE ",
+        "THE HON MR JUSTICE ",
+        "THE HON MISS JUSTICE ",
+        "THE HON MS JUSTICE ",
+        "THE HON DR JUSTICE ",
+        "THE HON JUSTICE ",
+        "THE HON ",
         "MRS. JUSTICE ",
         "MR. JUSTICE ",
         "MISS JUSTICE ",
