@@ -69,6 +69,7 @@ pub struct ScraperState {
     /// PDF URLs from parish case lists we have already parsed into parish_court_cases.
     #[serde(default)]
     pub processed_parish_case_pdf_urls: Vec<String>,
+
 }
 
 impl ScraperState {
