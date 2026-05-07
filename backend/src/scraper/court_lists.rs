@@ -142,7 +142,7 @@ async fn process_one_pdf(
             entry.case_number.as_deref(),
             entry.title.as_deref(),
             entry.judge_name.as_deref(),
-            Some("Civil"),
+            entry.division.as_deref().or(Some("Civil")),
             entry.event_type.as_deref(),
             entry.event_date,
             entry.event_time,
