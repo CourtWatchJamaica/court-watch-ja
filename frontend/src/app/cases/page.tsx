@@ -18,10 +18,12 @@ import {
   SearchX,
   MapPin,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Loader2,
 } from "lucide-react";
 
-const LIMIT = 50;
+const LIMIT = 20;
 
 type Tab = "judgments" | "sittings";
 
@@ -82,7 +84,7 @@ function SkeletonCard() {
   );
 }
 
-// ── Empty states ────────────────────────────────────────────────────────────
+// ── Empty states ─────────────────────────────────────────────────────────────
 
 function EmptyState({
   tab,
@@ -132,7 +134,102 @@ function EmptyState({
   );
 }
 
-// ── Page ────────────────────────────────────────────────────────────────────
+// ── Pagination ───────────────────────────────────────────────────────────────
+
+function buildPageList(current: number, total: number): (number | "…")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: (number | "…")[] = [1];
+  if (current > 4) pages.push("…");
+  for (let p = Math.max(2, current - 2); p <= Math.min(total - 1, current + 2); p++) {
+    pages.push(p);
+  }
+  if (current < total - 3) pages.push("…");
+  pages.push(total);
+  return pages;
+}
+
+function Pagination({
+  page,
+  totalPages,
+  total,
+  itemLabel,
+  disabled,
+  onPageChange,
+}: {
+  page: number;
+  totalPages: number;
+  total: number;
+  itemLabel: string;
+  disabled?: boolean;
+  onPageChange: (p: number) => void;
+}) {
+  if (totalPages <= 1) return null;
+
+  const pageList = buildPageList(page, totalPages);
+
+  return (
+    <div className="flex flex-col items-center gap-3 py-6">
+      <p className="text-[11px] text-white/35">
+        Page {page} of {totalPages} &middot;{" "}
+        {total.toLocaleString()} {itemLabel}
+      </p>
+
+      <div className="flex flex-wrap items-center justify-center gap-1.5">
+        {/* Previous */}
+        <button
+          onClick={() => onPageChange(page - 1)}
+          disabled={page === 1 || disabled}
+          aria-label="Previous page"
+          className="flex min-h-[44px] items-center gap-1 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 text-[13px] text-white/55 transition-all hover:bg-white/[0.07] hover:text-white/80 disabled:cursor-not-allowed disabled:opacity-30"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          <span className="hidden sm:inline">Prev</span>
+        </button>
+
+        {/* Page numbers */}
+        {pageList.map((n, i) =>
+          n === "…" ? (
+            <span
+              key={`ellipsis-${i}`}
+              className="flex min-h-[44px] min-w-[44px] items-center justify-center text-[13px] text-white/25"
+            >
+              …
+            </span>
+          ) : (
+            <button
+              key={n}
+              onClick={() => onPageChange(n as number)}
+              disabled={disabled}
+              aria-label={`Page ${n}`}
+              aria-current={n === page ? "page" : undefined}
+              className={[
+                "flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border text-[13px] font-medium transition-all",
+                n === page
+                  ? "border-[#009B3A]/50 bg-[#009B3A]/15 text-[#009B3A]"
+                  : "border-white/[0.08] bg-white/[0.03] text-white/55 hover:bg-white/[0.07] hover:text-white/80 disabled:cursor-not-allowed disabled:opacity-30",
+              ].join(" ")}
+            >
+              {n}
+            </button>
+          ),
+        )}
+
+        {/* Next */}
+        <button
+          onClick={() => onPageChange(page + 1)}
+          disabled={page === totalPages || disabled}
+          aria-label="Next page"
+          className="flex min-h-[44px] items-center gap-1 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 text-[13px] text-white/55 transition-all hover:bg-white/[0.07] hover:text-white/80 disabled:cursor-not-allowed disabled:opacity-30"
+        >
+          <span className="hidden sm:inline">Next</span>
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function CasesPage() {
   const router = useRouter();
@@ -145,9 +242,10 @@ export default function CasesPage() {
   const [judgementsTotal, setJudgementsTotal] = useState(0);
   const [judgmentsPage, setJudgmentsPage] = useState(1);
 
-  // Sittings — client-side show-more (backend returns full filtered list)
+  // Sittings — server-side pagination (all courts, no court filter)
   const [sittings, setSittings] = useState<CourtSitting[]>([]);
-  const [sittingsShown, setSittingsShown] = useState(LIMIT);
+  const [sittingsTotal, setSittingsTotal] = useState(0);
+  const [sittingsPage, setSittingsPage] = useState(1);
 
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -158,7 +256,7 @@ export default function CasesPage() {
         setLoadingMore(true);
       } else {
         setLoading(true);
-        setJudgmentsPage(1);
+        setJudgmentsPage(page);
       }
       try {
         const res = await apiClient.getJudgments(
@@ -168,7 +266,7 @@ export default function CasesPage() {
           page,
           LIMIT,
         );
-        setJudgementsTotal(res.total);
+        setJudgementsTotal(res.total ?? res.judgments.length);
         setJudgments((prev) =>
           append ? [...prev, ...res.judgments] : res.judgments,
         );
@@ -182,22 +280,37 @@ export default function CasesPage() {
     [],
   );
 
-  const fetchSittings = useCallback(async (q: string) => {
-    setLoading(true);
-    setSittingsShown(LIMIT);
-    try {
-      const today = new Date().toISOString().split("T")[0];
-      const res = await apiClient.getCourtSittings({
-        q: q || undefined,
-        date_from: q ? undefined : today,
-      });
-      setSittings(res.sittings);
-    } catch (err) {
-      console.error("Failed to fetch sittings:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const fetchSittings = useCallback(
+    async (q: string, page: number, append: boolean) => {
+      if (append) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+        setSittingsPage(page);
+      }
+      try {
+        const today = new Date().toISOString().split("T")[0];
+        const res = await apiClient.getCourtSittings({
+          q: q || undefined,
+          // Only apply date_from when not searching, so users can find past cases.
+          // No court filter — all divisions (Supreme, CoA, Parish) are included.
+          date_from: q ? undefined : today,
+          page,
+          limit: LIMIT,
+        });
+        setSittingsTotal(res.total ?? res.sittings.length);
+        setSittings((prev) =>
+          append ? [...prev, ...res.sittings] : res.sittings,
+        );
+      } catch (err) {
+        console.error("Failed to fetch sittings:", err);
+      } finally {
+        if (append) setLoadingMore(false);
+        else setLoading(false);
+      }
+    },
+    [],
+  );
 
   // Read ?q= and ?tab= from URL on mount
   useEffect(() => {
@@ -210,7 +323,7 @@ export default function CasesPage() {
     if (initialTab === "judgments") {
       void fetchJudgments(initialQ, 1, false);
     } else {
-      void fetchSittings(initialQ);
+      void fetchSittings(initialQ, 1, false);
     }
   }, [fetchJudgments, fetchSittings]);
 
@@ -234,7 +347,7 @@ export default function CasesPage() {
       if (activeTab === "judgments") {
         void fetchJudgments(q, 1, false);
       } else {
-        void fetchSittings(q);
+        void fetchSittings(q, 1, false);
       }
     },
     [activeTab, fetchJudgments, fetchSittings, syncUrl],
@@ -246,7 +359,7 @@ export default function CasesPage() {
     if (tab === "judgments") {
       void fetchJudgments(query, 1, false);
     } else {
-      void fetchSittings(query);
+      void fetchSittings(query, 1, false);
     }
   };
 
@@ -256,30 +369,46 @@ export default function CasesPage() {
     if (activeTab === "judgments") {
       void fetchJudgments("", 1, false);
     } else {
-      void fetchSittings("");
+      void fetchSittings("", 1, false);
     }
   };
 
+  // Numeric page navigation — replaces the current list with the selected page.
+  const handlePageChange = useCallback(
+    (newPage: number) => {
+      if (activeTab === "judgments") {
+        setJudgmentsPage(newPage);
+        void fetchJudgments(query, newPage, false);
+      } else {
+        setSittingsPage(newPage);
+        void fetchSittings(query, newPage, false);
+      }
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    },
+    [activeTab, query, fetchJudgments, fetchSittings],
+  );
+
+  // Load More — appends the next page to the existing list.
   const handleLoadMore = useCallback(() => {
     if (activeTab === "judgments") {
       const nextPage = judgmentsPage + 1;
       setJudgmentsPage(nextPage);
       void fetchJudgments(query, nextPage, true);
     } else {
-      setSittingsShown((prev) => prev + LIMIT);
+      const nextPage = sittingsPage + 1;
+      setSittingsPage(nextPage);
+      void fetchSittings(query, nextPage, true);
     }
-  }, [activeTab, judgmentsPage, query, fetchJudgments]);
+  }, [activeTab, judgmentsPage, sittingsPage, query, fetchJudgments, fetchSittings]);
 
   const hasMoreJudgments = judgments.length < judgementsTotal;
-  const visibleSittings = sittings.slice(0, sittingsShown);
-  const hasMoreSittings = sittingsShown < sittings.length;
-  const hasMore =
-    activeTab === "judgments" ? hasMoreJudgments : hasMoreSittings;
+  const hasMoreSittings = sittings.length < sittingsTotal;
+  const hasMore = activeTab === "judgments" ? hasMoreJudgments : hasMoreSittings;
 
-  const shownCount =
-    activeTab === "judgments" ? judgments.length : visibleSittings.length;
-  const totalCount =
-    activeTab === "judgments" ? judgementsTotal : sittings.length;
+  const totalCount = activeTab === "judgments" ? judgementsTotal : sittingsTotal;
+  const shownCount = activeTab === "judgments" ? judgments.length : sittings.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / LIMIT));
+  const currentPage = activeTab === "judgments" ? judgmentsPage : sittingsPage;
 
   return (
     <AuthGuard>
@@ -328,12 +457,12 @@ export default function CasesPage() {
           {/* Result count */}
           {!loading && (
             <p className="mb-4 text-[11px] text-muted-foreground">
-              {shownCount < totalCount
-                ? `Showing ${shownCount} of ${totalCount}`
-                : `${totalCount}`}{" "}
+              {shownCount < (totalCount ?? 0)
+                ? `Showing ${shownCount.toLocaleString()} of ${(totalCount ?? 0).toLocaleString()}`
+                : (totalCount ?? 0).toLocaleString()}{" "}
               {activeTab === "judgments"
-                ? `judgment${totalCount !== 1 ? "s" : ""}`
-                : `sitting${totalCount !== 1 ? "s" : ""}`}
+                ? `judgment${(totalCount ?? 0) !== 1 ? "s" : ""}`
+                : `sitting${(totalCount ?? 0) !== 1 ? "s" : ""}`}
               {query ? ` matching "${query}"` : ""}
             </p>
           )}
@@ -370,8 +499,8 @@ export default function CasesPage() {
                       onClear={handleClearSearch}
                     />
                   )
-                ) : visibleSittings.length > 0 ? (
-                  visibleSittings.map((s) => (
+                ) : sittings.length > 0 ? (
+                  sittings.map((s) => (
                     <SittingCard
                       key={s.id}
                       sitting={s}
@@ -393,9 +522,19 @@ export default function CasesPage() {
                 )}
               </div>
 
-              {/* Load More */}
+              {/* Numeric pagination */}
+              <Pagination
+                page={currentPage}
+                totalPages={totalPages}
+                total={totalCount}
+                itemLabel={activeTab === "judgments" ? "judgments" : "sittings"}
+                disabled={loadingMore}
+                onPageChange={handlePageChange}
+              />
+
+              {/* Load More (secondary) */}
               {hasMore && (
-                <div className="mt-8 flex justify-center">
+                <div className="mt-2 flex justify-center">
                   <button
                     onClick={handleLoadMore}
                     disabled={loadingMore}
