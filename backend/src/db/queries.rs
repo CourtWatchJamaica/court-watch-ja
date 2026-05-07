@@ -370,10 +370,17 @@ pub async fn list_judgments(
     let offset = (page - 1).max(0) * limit;
 
     // Judge-specific path: bypass court constraint, return that judge's judgments.
+    // judge_name can be a comma-separated panel ("Harris JA, Brown JA, Jones JA"), so we
+    // unnest the field and check whether the requested name appears in the list.
+    // ANY(ARRAY(SELECT ...)) in a WHERE clause is safe with sqlx (no type-inference issue).
     if let Some(judge_name) = judge {
         let sql = format!(
             "SELECT {J} FROM judgments
-             WHERE judge_name = $1
+             WHERE judge_name IS NOT NULL
+               AND $1 = ANY(
+                     ARRAY(SELECT TRIM(p)
+                           FROM unnest(string_to_array(judge_name, ',')) p)
+                   )
              ORDER BY date DESC NULLS LAST, created_at DESC
              LIMIT $2 OFFSET $3"
         );
@@ -383,11 +390,17 @@ pub async fn list_judgments(
             .bind(offset)
             .fetch_all(pool)
             .await?;
-        let total: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM judgments WHERE judge_name = $1")
-                .bind(judge_name)
-                .fetch_one(pool)
-                .await?;
+        let total: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM judgments
+             WHERE judge_name IS NOT NULL
+               AND $1 = ANY(
+                     ARRAY(SELECT TRIM(p)
+                           FROM unnest(string_to_array(judge_name, ',')) p)
+                   )",
+        )
+        .bind(judge_name)
+        .fetch_one(pool)
+        .await?;
         return Ok((rows, total));
     }
 
@@ -948,10 +961,15 @@ pub async fn list_court_sittings(
     judge: Option<&str>,
 ) -> sqlx::Result<Vec<CourtSitting>> {
     // Judge-specific path: return all sittings for that judge without court constraint.
+    // Use unnest to handle any future comma-separated judge_name values.
     if let Some(judge_name) = judge {
         let sql = format!(
             "SELECT {S} FROM court_sittings
-             WHERE judge_name = $1
+             WHERE judge_name IS NOT NULL
+               AND $1 = ANY(
+                     ARRAY(SELECT TRIM(p)
+                           FROM unnest(string_to_array(judge_name, ',')) p)
+                   )
              ORDER BY event_date DESC NULLS LAST, event_time NULLS LAST"
         );
         return sqlx::query_as::<_, CourtSitting>(&sql)
