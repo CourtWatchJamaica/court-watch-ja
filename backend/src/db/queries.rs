@@ -1166,6 +1166,91 @@ pub async fn count_sittings_by_source_url(pool: &PgPool, url: &str) -> sqlx::Res
         .await
 }
 
+/// Total rows in court_sittings for the given logical court, using the same
+/// ILIKE filter as the rest of the queries layer.
+pub async fn count_sittings_for_court(pool: &PgPool, court: &str) -> sqlx::Result<i64> {
+    let filter = sitting_court_filter(court);
+    let sql = format!("SELECT COUNT(*) FROM court_sittings WHERE {filter}");
+    sqlx::query_scalar(&sql).fetch_one(pool).await
+}
+
+/// Exact-match count for a specific court_division value (e.g. "Criminal").
+pub async fn count_sittings_by_division(pool: &PgPool, division: &str) -> sqlx::Result<i64> {
+    sqlx::query_scalar("SELECT COUNT(*) FROM court_sittings WHERE court_division = $1")
+        .bind(division)
+        .fetch_one(pool)
+        .await
+}
+
+/// Returns true if there is at least one 'Civil' row for this URL.
+/// Unlike `has_only_civil_sittings_for_url`, this fires even when the URL has a
+/// mix of Civil and non-Civil rows (e.g. a backfill migration fixed some entries
+/// but left others as 'Civil').
+pub async fn has_any_civil_sittings_for_url(pool: &PgPool, url: &str) -> sqlx::Result<bool> {
+    let count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM court_sittings \
+         WHERE pdf_source_url = $1 AND court_division = 'Civil'",
+    )
+    .bind(url)
+    .fetch_one(pool)
+    .await?;
+    Ok(count > 0)
+}
+
+/// Deletes all court_sittings rows that came from `url` and have
+/// `court_division = 'Civil'`.  Called before re-scraping a URL whose
+/// division was wrong on the previous parse run, so that `sitting_exists`
+/// (which checks by case_number/event_date/event_type, not division) does
+/// not treat the old wrong-division rows as already-processed duplicates.
+pub async fn delete_civil_sittings_for_url(pool: &PgPool, url: &str) -> sqlx::Result<u64> {
+    sqlx::query(
+        "DELETE FROM court_sittings WHERE pdf_source_url = $1 AND court_division = 'Civil'",
+    )
+    .bind(url)
+    .execute(pool)
+    .await
+    .map(|r| r.rows_affected())
+}
+
+/// Deletes ALL court_sittings rows that came from `url`, regardless of division.
+/// Use before re-scraping a URL so that `sitting_exists` (which checks
+/// case_number/event_date/event_type without a division filter) does not treat
+/// previously-inserted rows as duplicates and silently skip re-insertion.
+pub async fn delete_sittings_for_url(pool: &PgPool, url: &str) -> sqlx::Result<u64> {
+    sqlx::query("DELETE FROM court_sittings WHERE pdf_source_url = $1")
+        .bind(url)
+        .execute(pool)
+        .await
+        .map(|r| r.rows_affected())
+}
+
+/// Deletes Civil sittings for every URL whose `pdf_source_url` contains `domain`.
+/// Used as a domain-wide sweep when the processed-URL list is empty and we cannot
+/// enumerate individual URLs (e.g. CoA nuclear eviction with an already-clear list).
+pub async fn delete_civil_sittings_for_domain(pool: &PgPool, domain: &str) -> sqlx::Result<u64> {
+    sqlx::query(
+        "DELETE FROM court_sittings WHERE pdf_source_url ILIKE $1 AND court_division = 'Civil'",
+    )
+    .bind(format!("%{domain}%"))
+    .execute(pool)
+    .await
+    .map(|r| r.rows_affected())
+}
+
+/// Returns true iff there is at least one court_sitting for this URL AND every
+/// sitting has court_division = 'Civil' — indicating a PDF parsed before
+/// detect_division_header() was implemented.
+pub async fn has_only_civil_sittings_for_url(pool: &PgPool, url: &str) -> sqlx::Result<bool> {
+    let (total, non_civil): (i64, i64) = sqlx::query_as(
+        "SELECT COUNT(*), COUNT(*) FILTER (WHERE court_division <> 'Civil') \
+         FROM court_sittings WHERE pdf_source_url = $1",
+    )
+    .bind(url)
+    .fetch_one(pool)
+    .await?;
+    Ok(total > 0 && non_civil == 0)
+}
+
 /// Full-text search across court_sittings; returns ranked results with snippets.
 pub async fn search_court_sittings(
     pool: &PgPool,
