@@ -7,6 +7,7 @@
 // On any HTTP or network error the run() function logs a warning and returns Ok(0) —
 // the CoA court-lists page may not always be available.
 use chrono::NaiveDate;
+use regex::Regex;
 use sqlx::PgPool;
 use std::path::Path;
 use tracing::{info, warn};
@@ -21,10 +22,11 @@ use super::{
 };
 use crate::{db::queries, utils::pdf as pdf_utils};
 
-const COURT_LISTS_URL: &str =
-    "https://www.courtofappeal.gov.jm/content/cause-and-hearing-lists";
 /// PDFs are served from the no-www origin; relative links must use this base.
 const BASE_URL: &str = "https://courtofappeal.gov.jm";
+/// Drupal Quick Tabs base — appending &page=N gives subsequent pages.
+const COURT_LISTS_URL: &str =
+    "https://courtofappeal.gov.jm/content/cause-and-hearing-lists?qt-cause_and_hearing_lists=1";
 const COURT_DIVISION: &str = "Court of Appeal";
 
 pub async fn run(
@@ -35,30 +37,21 @@ pub async fn run(
 ) -> anyhow::Result<usize> {
     info!("[CoA Hearings] Fetching court lists index: {COURT_LISTS_URL}");
 
-    let html = match client.get(COURT_LISTS_URL).send().await {
-        Ok(r) if r.status().is_success() => match r.text().await {
-            Ok(t) => t,
-            Err(e) => {
-                warn!("[CoA Hearings] Failed to read court-lists response body: {e} — skipping");
-                return Ok(0);
-            }
-        },
-        Ok(r) => {
-            warn!(
-                "[CoA Hearings] Court-lists page returned status {} — skipping",
-                r.status()
-            );
-            return Ok(0);
-        }
-        Err(e) => {
-            warn!("[CoA Hearings] Network error fetching court-lists page: {e} — skipping");
-            return Ok(0);
-        }
-    };
+    let pdf_links = fetch_paginated_pdf_links(client).await;
 
-    let pdf_links = extract_pdf_links(&html);
+    // Log breakdown by filename keyword for observability.
+    let hearing_count = pdf_links
+        .iter()
+        .filter(|u| u.to_lowercase().contains("hearing"))
+        .count();
+    let cause_count = pdf_links
+        .iter()
+        .filter(|u| u.to_lowercase().contains("cause"))
+        .count();
+    info!("[CoA Hearings] Hearing List: found {hearing_count} PDF(s)");
+    info!("[CoA Hearings] Cause List: found {cause_count} PDF(s)");
+
     let link_count = pdf_links.len();
-
     if link_count == 0 {
         warn!(
             "[CoA Hearings] No PDF links found on court-lists page ({COURT_LISTS_URL}). \
@@ -66,7 +59,7 @@ pub async fn run(
         );
         return Ok(0);
     }
-    info!("[CoA Hearings] Found {link_count} PDF links on court-lists page");
+    info!("[CoA Hearings] Found {link_count} unique PDF link(s) across both list types");
 
     let mut total_new_sittings: usize = 0;
     let mut processed_count: usize = 0;
@@ -109,6 +102,79 @@ pub async fn run(
          New sittings this run: {total_new_sittings}"
     );
     Ok(total_new_sittings)
+}
+
+/// Fetches all PDF links from the CoA cause-and-hearing-lists Quick Tab,
+/// following `&page=N` pagination until no further pages exist.
+/// Returns a deduplicated list of absolute PDF URLs.
+async fn fetch_paginated_pdf_links(client: &reqwest::Client) -> Vec<String> {
+    let re_page = Regex::new(r"[?&]page=(\d+)").unwrap();
+    let mut all_links: Vec<String> = Vec::new();
+
+    let page0_url = format!("{COURT_LISTS_URL}&page=0");
+    let html0 = match fetch_listing_page(client, &page0_url).await {
+        Some(h) => h,
+        None => {
+            warn!("[CoA Hearings] could not fetch listing page — skipping");
+            return all_links;
+        }
+    };
+
+    for link in extract_pdf_links(&html0) {
+        let abs = absolutize(link);
+        if !all_links.contains(&abs) {
+            all_links.push(abs);
+        }
+    }
+
+    let max_page: u32 = re_page
+        .captures_iter(&html0)
+        .filter_map(|c| c[1].parse::<u32>().ok())
+        .max()
+        .unwrap_or(0);
+
+    for page in 1..=max_page {
+        let url = format!("{COURT_LISTS_URL}&page={page}");
+        let html = match fetch_listing_page(client, &url).await {
+            Some(h) => h,
+            None => {
+                warn!("[CoA Hearings] could not fetch page {page} — stopping pagination");
+                break;
+            }
+        };
+        for link in extract_pdf_links(&html) {
+            let abs = absolutize(link);
+            if !all_links.contains(&abs) {
+                all_links.push(abs);
+            }
+        }
+    }
+
+    all_links
+}
+
+/// Fetches a listing page HTML body, returning `None` on any HTTP or network error.
+async fn fetch_listing_page(client: &reqwest::Client, url: &str) -> Option<String> {
+    match client.get(url).send().await {
+        Ok(r) if r.status().is_success() => r.text().await.ok(),
+        Ok(r) => {
+            warn!("[CoA Hearings] HTTP {} for {url}", r.status());
+            None
+        }
+        Err(e) => {
+            warn!("[CoA Hearings] Network error for {url}: {e}");
+            None
+        }
+    }
+}
+
+/// Converts a relative PDF href to an absolute URL using the CoA base origin.
+fn absolutize(link: String) -> String {
+    if link.starts_with("http") {
+        link
+    } else {
+        format!("{BASE_URL}{link}")
+    }
 }
 
 async fn process_one_pdf(
