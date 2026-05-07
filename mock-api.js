@@ -405,6 +405,21 @@ let fakeCourtSittings = [
   },
 ];
 
+// ── Parish Court Case categorisation (mirrors frontend logic) ─────────────────
+
+const PC_VIOLENT = ["murder","manslaughter","assault","wounding","robbery","rape","sexual","grievous","gun","firearm","shooting","stabbing","arson"];
+const PC_PROPERTY = ["larceny","theft","burglary","housebreaking","fraud","forgery","obtaining","malicious","damage","possession of sto"];
+const PC_DRUGS = ["ganja","cannabis","cocaine","drug","possession of prohib","traffick","dangerous drug"];
+
+function categoriseOffence(offence) {
+  if (!offence) return "Other";
+  const o = offence.toLowerCase();
+  if (PC_VIOLENT.some((k) => o.includes(k))) return "Violent";
+  if (PC_DRUGS.some((k) => o.includes(k))) return "Drugs";
+  if (PC_PROPERTY.some((k) => o.includes(k))) return "Property";
+  return "Other";
+}
+
 // ── Parish Court Cases ────────────────────────────────────────────────────────
 
 const fakeParishCases = [
@@ -585,8 +600,9 @@ const server = http.createServer((req, res) => {
   if (req.method === "GET" && path === "/api/parish-cases") {
     const parish = url.searchParams.get("parish");
     const q = url.searchParams.get("q")?.toLowerCase();
+    const category = url.searchParams.get("category");
     const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10));
-    const limit = Math.min(200, Math.max(1, parseInt(url.searchParams.get("limit") || "50", 10)));
+    const limit = Math.min(1000, Math.max(1, parseInt(url.searchParams.get("limit") || "50", 10)));
 
     let results = [...fakeParishCases];
     if (parish) results = results.filter((c) => c.parish === parish);
@@ -596,6 +612,8 @@ const server = http.createServer((req, res) => {
         c.offence?.toLowerCase().includes(q) ||
         c.parish.toLowerCase().includes(q),
     );
+    if (category) results = results.filter((c) => categoriseOffence(c.offence) === category);
+    results.sort((a, b) => (b.week_of ?? "").localeCompare(a.week_of ?? "") || a.id - b.id);
     const total = results.length;
     const offset = (page - 1) * limit;
     return json(res, { cases: results.slice(offset, offset + limit), total });
@@ -667,7 +685,11 @@ const server = http.createServer((req, res) => {
       if (!b.date) return -1;
       return b.date.localeCompare(a.date);
     });
-    return json(res, { judgments: results, total: results.length });
+    const total = results.length;
+    const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10));
+    const limit = Math.min(200, Math.max(1, parseInt(url.searchParams.get("limit") || "50", 10)));
+    const offset = (page - 1) * limit;
+    return json(res, { judgments: results.slice(offset, offset + limit), total });
   }
 
   if (req.method === "GET" && /^\/api\/judgments\/\d+$/.test(path)) {
@@ -739,7 +761,7 @@ const server = http.createServer((req, res) => {
           s.judge_name?.toLowerCase().includes(ql),
       );
     }
-    if (!dateFrom && !dateTo) {
+    if (!dateFrom && !dateTo && !q) {
       const today = new Date().toISOString().split("T")[0];
       results = results.filter((s) => !s.event_date || s.event_date >= today);
     }
@@ -749,7 +771,11 @@ const server = http.createServer((req, res) => {
       if (!b.event_date) return -1;
       return a.event_date.localeCompare(b.event_date);
     });
-    return json(res, { sittings: results });
+    const total = results.length;
+    const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10));
+    const limit = Math.min(200, Math.max(1, parseInt(url.searchParams.get("limit") || "50", 10)));
+    const offset = (page - 1) * limit;
+    return json(res, { sittings: results.slice(offset, offset + limit), total });
   }
 
   if (req.method === "GET" && path === "/api/court-sittings/today") {
