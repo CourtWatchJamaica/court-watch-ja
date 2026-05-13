@@ -32,6 +32,7 @@ export function TrackingProvider({ children }: { children: React.ReactNode }) {
       const jIds = new Set<number>();
       const sIds = new Set<number>();
       for (const c of cases) {
+        if (c.case_id == null) continue; // case_number-only entries have no ID yet
         if (c.case_type === "sitting") sIds.add(c.case_id);
         else jIds.add(c.case_id);
       }

@@ -133,8 +133,8 @@ export default function Navbar() {
             {/* Logo + Court Pills */}
             <div className="flex items-center gap-3 shrink-0">
               <Link href="/" className="flex items-center gap-2.5 shrink-0">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#009B3A]/15 ring-1 ring-[#009B3A]/30">
-                  <HigherCourtIcon className="h-4 w-4 text-[#009B3A]" />
+                <div className="flex items-center justify-center rounded-lg bg-[#009B3A]/15 ring-1 ring-[#009B3A]/30 p-1.5">
+                  <HigherCourtIcon className="h-5 w-5 text-[#009B3A]" />
                 </div>
                 <span className="font-bold text-[17px] tracking-tight text-white">
                   Court<span className="text-[#009B3A]">Watch</span>

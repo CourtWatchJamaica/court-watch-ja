@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { apiClient } from "@/lib/api";
-import { Megaphone, Loader2, CheckCircle2, Users } from "lucide-react";
+import { Megaphone, Loader2, CheckCircle2, Users, Mail } from "lucide-react";
 
 export default function AdminAnnouncePage() {
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
+  const [promo, setPromo] = useState(false);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{
     sent: boolean;
@@ -22,7 +23,7 @@ export default function AdminAnnouncePage() {
     setResult(null);
 
     try {
-      const res = await apiClient.adminAnnounce(title.trim(), message.trim());
+      const res = await apiClient.adminAnnounce(title.trim(), message.trim(), promo);
       setResult(res);
       setTitle("");
       setMessage("");
@@ -90,6 +91,28 @@ export default function AdminAnnouncePage() {
             {message.length}/2000
           </p>
         </div>
+
+        {/* Promo email toggle */}
+        <label className="flex items-center gap-3 cursor-pointer group">
+          <div
+            onClick={() => setPromo((p) => !p)}
+            className={`relative flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+              promo ? "bg-[#FED100]" : "bg-white/[0.12]"
+            }`}
+          >
+            <span
+              className={`absolute h-3.5 w-3.5 rounded-full bg-white shadow transition-transform duration-200 ${
+                promo ? "translate-x-4" : "translate-x-0.5"
+              }`}
+            />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Mail className="h-3.5 w-3.5 text-[#FED100]/60 shrink-0" />
+            <span className="text-xs text-white/50 group-hover:text-white/70 transition-colors">
+              Send as promotional email to all users
+            </span>
+          </div>
+        </label>
 
         {error && (
           <div className="rounded-xl bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-400">

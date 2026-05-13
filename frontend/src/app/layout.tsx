@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import Providers from "@/components/Providers";
 import ScrollToTop from "@/components/ScrollToTop";
 import ChambersPanel from "@/components/ChambersPanel";
+import MaintenanceGate from "@/components/MaintenanceGate";
 
 const geistSans = Geist({
   subsets: ["latin"],
@@ -20,6 +21,11 @@ export const metadata: Metadata = {
   title: "CourtWatch JA — Jamaican Legal Case Tracker",
   description:
     "Track Jamaican court judgments, monitor cases, and stay informed on the latest legal decisions.",
+  icons: {
+    icon: [{ url: "/icons/higher-court.svg", type: "image/svg+xml" }],
+    shortcut: ["/icons/higher-court.svg"],
+    apple: [{ url: "/icons/higher-court.svg" }],
+  },
   openGraph: {
     title: "CourtWatch JA — Jamaican Legal Case Tracker",
     description:
@@ -27,12 +33,21 @@ export const metadata: Metadata = {
     siteName: "CourtWatch JA",
     locale: "en_JM",
     type: "website",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "CourtWatch JA — Jamaican Legal Case Tracker",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "CourtWatch JA — Jamaican Legal Case Tracker",
     description:
       "Track Jamaican court judgments, monitor cases, and stay informed on the latest legal decisions.",
+    images: ["/og-image.png"],
   },
 };
 
@@ -49,9 +64,11 @@ export default function RootLayout({
     >
       <body className="min-h-screen bg-background font-sans antialiased">
         <Providers>
-          {children}
-          <ScrollToTop />
-          <ChambersPanel />
+          <MaintenanceGate>
+            {children}
+            <ScrollToTop />
+            <ChambersPanel />
+          </MaintenanceGate>
         </Providers>
       </body>
     </html>

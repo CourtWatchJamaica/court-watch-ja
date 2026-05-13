@@ -485,6 +485,7 @@ pub async fn create_sitting(
 pub struct AnnounceBody {
     pub title: String,
     pub message: String,
+    pub promo: Option<bool>,
 }
 
 pub async fn announce(
@@ -498,7 +499,32 @@ pub async fn announce(
         return Err(AppError::BadRequest("Message is required".into()));
     }
     let user_count = queries::admin_announce(&state.db, &body.title, &body.message).await?;
+    if body.promo.unwrap_or(false) {
+        tracing::info!(
+            "[Email stub] Promo broadcast '{}' → {} recipient(s). Body: {}",
+            body.title,
+            user_count,
+            body.message
+        );
+    }
     Ok(Json(json!({ "sent": true, "user_count": user_count })))
+}
+
+// ── Maintenance mode ───────────────────────────────────────────────────────
+
+#[derive(Deserialize)]
+pub struct MaintenanceBody {
+    pub enabled: bool,
+}
+
+pub async fn toggle_maintenance(
+    State(state): State<AppState>,
+    Json(body): Json<MaintenanceBody>,
+) -> Result<Json<Value>, AppError> {
+    use std::sync::atomic::Ordering;
+    state.maintenance_mode.store(body.enabled, Ordering::SeqCst);
+    tracing::info!("[Admin] Maintenance mode → {}", body.enabled);
+    Ok(Json(json!({ "maintenance_mode": body.enabled })))
 }
 
 // ── Upload PDF (stub — OCR hookup pending) ─────────────────────────────────

@@ -58,6 +58,8 @@ pub fn router(state: AppState) -> Router {
         .route("/api/user/cases", get(tracking::get_user_cases))
         .route("/api/user/cases", post(tracking::add_user_case))
         .route("/api/user/cases/:case_id", delete(tracking::remove_user_case))
+        .route("/api/user/cases/row/:row_id", delete(tracking::remove_user_case_by_row))
+        .route("/api/user/cases/:row_id/settings", put(tracking::update_case_settings))
         .route("/api/notifications", get(notifications::get_notifications))
         .route("/api/notifications/unread-count", get(notifications::get_unread_count))
         .route("/api/notifications/mark-read", post(notifications::mark_all_read))
@@ -91,6 +93,7 @@ pub fn router(state: AppState) -> Router {
         .route("/api/admin/data/sittings/:id", delete(admin::delete_sitting))
         .route("/api/admin/logs", get(admin::get_activity_log))
         .route("/api/admin/announce", post(admin::announce))
+        .route("/api/admin/maintenance", post(admin::toggle_maintenance))
         .route("/api/admin/upload-pdf", post(admin::upload_pdf))
         .layer(middleware::from_fn(require_admin))
         .layer(middleware::from_fn_with_state(state.clone(), require_auth));

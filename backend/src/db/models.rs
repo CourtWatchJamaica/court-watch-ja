@@ -63,11 +63,28 @@ pub struct Judgment {
 pub struct UserCase {
     pub id: i32,
     pub user_id: i32,
-    pub case_id: i32,
+    pub case_id: Option<i32>,
     pub case_type: String,
+    pub case_number: Option<String>,
     pub last_event_date: Option<NaiveDate>,
     pub last_event_time: Option<NaiveTime>,
     pub created_at: NaiveDateTime,
+    /// Joined from user_case_settings — null when no preference row exists yet.
+    #[sqlx(default)]
+    pub notify_immediately: Option<bool>,
+    #[sqlx(default)]
+    pub notify_day_before: Option<bool>,
+    #[sqlx(default)]
+    pub notify_morning_of: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct UserCaseSettings {
+    pub id: i32,
+    pub user_case_id: i32,
+    pub notify_immediately: bool,
+    pub notify_day_before: bool,
+    pub notify_morning_of: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]

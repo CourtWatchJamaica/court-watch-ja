@@ -14,13 +14,48 @@ import {
   TrendingUp,
   Scale,
   Calendar,
-  Clock,
   Building2,
   User,
   ArrowUpRight,
+  Megaphone,
+  X,
 } from "lucide-react";
 import { VerdictIcon } from "@/components/icons";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Notification } from "@/lib/types";
+
+/* ── Announcement banner ── */
+function AnnouncementBanner({
+  notif,
+  onDismiss,
+}: {
+  notif: Notification;
+  onDismiss: () => void;
+}) {
+  return (
+    <div className="mb-5 flex items-start gap-3 rounded-2xl border border-[#FED100]/25 bg-[#FED100]/[0.05] px-4 py-3.5">
+      <Megaphone className="h-4 w-4 text-[#FED100] shrink-0 mt-0.5" />
+      <div className="flex-1 min-w-0">
+        {notif.title && (
+          <p className="text-sm font-semibold text-[#FED100] leading-snug">
+            {notif.title}
+          </p>
+        )}
+        {notif.message && (
+          <p className="mt-0.5 text-xs text-white/55 leading-relaxed">
+            {notif.message}
+          </p>
+        )}
+      </div>
+      <button
+        onClick={onDismiss}
+        className="shrink-0 rounded-lg p-1 text-white/25 hover:text-white/60 transition-colors"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
 
 /* ── Stat card — always dark regardless of theme ── */
 function StatCard({
@@ -195,21 +230,29 @@ export default function Dashboard() {
   const [sittings, setSittings] = useState<CourtSitting[]>([]);
   const [allJudgments, setAllJudgments] = useState<Judgment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [announcements, setAnnouncements] = useState<Notification[]>([]);
+  const [dismissedIds, setDismissedIds] = useState<Set<number>>(new Set());
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [judgmentsRes, casesRes, sittingsRes, userRes] = await Promise.all([
+      const [judgmentsRes, casesRes, sittingsRes, userRes, notifsRes] = await Promise.all([
         apiClient.getJudgments(),
         apiClient.getUserCases(),
         apiClient.getCourtSittings(),
         apiClient.getMe(),
+        apiClient.getNotifications(),
       ]);
       setUser(userRes);
       setAllJudgments(judgmentsRes.judgments);
       setLatestJudgments(judgmentsRes.judgments.slice(0, 6));
       setTrackedCases(casesRes.cases);
       setSittings(sittingsRes.sittings);
+      setAnnouncements(
+        notifsRes.notifications.filter(
+          (n) => n.type === "announcement" && n.read_at === null,
+        ),
+      );
     } catch (error) {
       console.error("Failed to fetch dashboard data:", error);
     } finally {
@@ -221,11 +264,20 @@ export default function Dashboard() {
     fetchData();
   }, [fetchData]);
 
+  const handleDismissAnnouncement = useCallback(async (id: number) => {
+    setDismissedIds((prev) => new Set([...prev, id]));
+    try {
+      await apiClient.markNotificationRead(id);
+    } catch {
+      /* swallow */
+    }
+  }, []);
+
   const handleUntrack = useCallback(
-    async (caseId: number, caseType: "judgment" | "sitting") => {
+    async (rowId: number) => {
       try {
-        await apiClient.removeUserCase(caseId, caseType);
-        setTrackedCases((prev) => prev.filter((c) => c.case_id !== caseId));
+        await apiClient.removeUserCaseByRow(rowId);
+        setTrackedCases((prev) => prev.filter((c) => c.id !== rowId));
       } catch (err) {
         console.error("Failed to untrack case:", err);
       }
@@ -239,6 +291,17 @@ export default function Dashboard() {
         <Navbar />
 
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-32 md:pb-16">
+          {/* ── Announcement banners ── */}
+          {announcements
+            .filter((n) => !dismissedIds.has(n.id))
+            .map((n) => (
+              <AnnouncementBanner
+                key={n.id}
+                notif={n}
+                onDismiss={() => handleDismissAnnouncement(n.id)}
+              />
+            ))}
+
           {/* ── Header ── */}
           <div className="mb-7">
             <div className="mb-2.5 flex items-center gap-2">
@@ -329,6 +392,7 @@ export default function Dashboard() {
               sittings={sittings}
               loading={loading}
               onUntrack={handleUntrack}
+              onRefresh={fetchData}
             />
             <TodaySittings sittings={sittings} loading={loading} />
           </div>

@@ -14,6 +14,7 @@ import {
   SkipForward,
   RotateCcw,
   Database,
+  Wrench,
 } from "lucide-react";
 
 function StatBox({
@@ -61,6 +62,8 @@ export default function AdminScraperPage() {
   const [actionUrl, setActionUrl] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
+  const [maintenanceLoading, setMaintenanceLoading] = useState(false);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -81,7 +84,25 @@ export default function AdminScraperPage() {
 
   useEffect(() => {
     fetchStatus();
+    apiClient
+      .getMaintenanceStatus()
+      .then(({ maintenance_mode }) => setMaintenanceMode(maintenance_mode))
+      .catch(() => {});
   }, [fetchStatus]);
+
+  const toggleMaintenance = async () => {
+    setMaintenanceLoading(true);
+    setError(null);
+    try {
+      const { maintenance_mode } = await apiClient.adminSetMaintenance(!maintenanceMode);
+      setMaintenanceMode(maintenance_mode);
+      showToast(maintenance_mode ? "Maintenance mode enabled" : "Maintenance mode disabled");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to toggle maintenance mode");
+    } finally {
+      setMaintenanceLoading(false);
+    }
+  };
 
   const handleTrigger = async () => {
     setTriggering(true);
@@ -275,6 +296,40 @@ export default function AdminScraperPage() {
             />
           </div>
         ) : null}
+      </div>
+
+      {/* Maintenance Mode */}
+      <div className="mb-6 rounded-2xl border border-white/[0.07] bg-[#0d0d1a] p-5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#FED100]/10 ring-1 ring-[#FED100]/20">
+              <Wrench className="h-4 w-4 text-[#FED100]" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-white">Maintenance Mode</p>
+              <p className="mt-0.5 text-[11px] text-white/35 leading-relaxed">
+                When enabled, non-admin users see a maintenance page instead of the app.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={toggleMaintenance}
+            disabled={maintenanceLoading}
+            className={`relative flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${
+              maintenanceMode ? "bg-[#FED100]" : "bg-white/[0.12]"
+            }`}
+          >
+            {maintenanceLoading ? (
+              <Loader2 className="absolute inset-0 m-auto h-3.5 w-3.5 animate-spin text-black/60" />
+            ) : (
+              <span
+                className={`absolute h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${
+                  maintenanceMode ? "translate-x-6" : "translate-x-1"
+                }`}
+              />
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Deep Scrape */}

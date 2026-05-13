@@ -5,7 +5,10 @@ mod middleware;
 mod scraper;
 mod utils;
 
-use std::sync::{atomic::AtomicBool, Arc};
+use std::collections::HashMap;
+use std::net::SocketAddr;
+use std::sync::{atomic::AtomicBool, Arc, Mutex};
+use std::time::Instant;
 
 use axum::http::{HeaderValue, Method};
 use sqlx::PgPool;
@@ -22,6 +25,10 @@ pub struct AppState {
     pub config: Arc<Config>,
     /// Set to true while a manual (admin-triggered) scraper run is in progress.
     pub scraper_running: Arc<AtomicBool>,
+    /// When true, non-admin users see the maintenance page.
+    pub maintenance_mode: Arc<AtomicBool>,
+    /// Per-IP request timestamps for auth endpoint rate limiting (5 req / 60 s).
+    pub rate_limiter: Arc<Mutex<HashMap<String, Vec<Instant>>>>,
 }
 
 #[tokio::main]
@@ -79,10 +86,34 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // ── App state ─────────────────────────────────────────────────────────
+    let rate_limiter: Arc<Mutex<HashMap<String, Vec<Instant>>>> =
+        Arc::new(Mutex::new(HashMap::new()));
+
+    // Clean up stale rate-limit entries every 5 minutes.
+    {
+        let rl = rate_limiter.clone();
+        tokio::spawn(async move {
+            let mut ticker =
+                tokio::time::interval(std::time::Duration::from_secs(300));
+            loop {
+                ticker.tick().await;
+                let mut map = rl.lock().unwrap();
+                let now = Instant::now();
+                let window = std::time::Duration::from_secs(60);
+                map.retain(|_, v| {
+                    v.retain(|&t| now.duration_since(t) < window);
+                    !v.is_empty()
+                });
+            }
+        });
+    }
+
     let state = AppState {
         db: pool.clone(),
         config: config.clone(),
         scraper_running: Arc::new(AtomicBool::new(false)),
+        maintenance_mode: Arc::new(AtomicBool::new(false)),
+        rate_limiter,
     };
 
     // ── CORS ──────────────────────────────────────────────────────────────
@@ -127,7 +158,11 @@ async fn main() -> anyhow::Result<()> {
     let addr = format!("0.0.0.0:{}", config.port);
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     info!("Listening on {addr}");
-    axum::serve(listener, app).await?;
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await?;
 
     Ok(())
 }

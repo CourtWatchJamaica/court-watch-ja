@@ -6,11 +6,16 @@ import AuthGuard from "@/components/AuthGuard";
 import Navbar from "@/components/Navbar";
 import { apiClient } from "@/lib/api";
 import { Notification } from "@/lib/types";
-import { Bell, FileText, Calendar, CheckCheck } from "lucide-react";
+import { Bell, FileText, Calendar, CheckCheck, Megaphone } from "lucide-react";
 
 const TYPE_META: Record<string, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
-  new_judgment: { label: "New Judgment", color: "bg-[#009B3A]/15 text-[#009B3A]", icon: FileText },
-  sitting_changed: { label: "Sitting Updated", color: "bg-[#FED100]/15 text-[#FED100]", icon: Calendar },
+  new_judgment:             { label: "New Judgment",      color: "bg-[#009B3A]/15 text-[#009B3A]",   icon: FileText  },
+  sitting_changed:          { label: "Sitting Updated",   color: "bg-[#FED100]/15 text-[#FED100]",   icon: Calendar  },
+  case_listed:              { label: "Case Listed",       color: "bg-blue-500/15 text-blue-400",      icon: Calendar  },
+  case_available:           { label: "Case Available",    color: "bg-[#009B3A]/15 text-[#009B3A]",   icon: FileText  },
+  sitting_reminder_1d:      { label: "Hearing Tomorrow",  color: "bg-amber-400/15 text-amber-400",   icon: Calendar  },
+  sitting_reminder_morning: { label: "Hearing Today",     color: "bg-red-500/15 text-red-400",        icon: Calendar  },
+  announcement:             { label: "Announcement",      color: "bg-[#FED100]/15 text-[#FED100]",   icon: Megaphone },
 };
 
 function NotifMeta(type: string) {
@@ -43,9 +48,12 @@ function NotifRow({
 
   const handleClick = () => {
     if (isUnread) onRead(notif.id);
-    router.push(notif.type === "sitting_changed"
-      ? `/cases/sittings/${notif.case_id}`
-      : `/cases/${notif.case_id}`);
+    if (!notif.case_id) return;
+    router.push(
+      notif.type === "sitting_changed" || notif.type === "case_listed"
+        ? `/cases/sittings/${notif.case_id}`
+        : `/cases/${notif.case_id}`,
+    );
   };
 
   return (
@@ -74,10 +82,22 @@ function NotifRow({
           <span className="text-[10px] text-white/25">{formatRelative(notif.sent_at)}</span>
         </div>
         <p className={`text-sm leading-snug ${isUnread ? "text-white/80 font-medium" : "text-white/50"}`}>
-          {notif.type === "new_judgment"
-            ? `New judgment filed — Case #${notif.case_id}`
-            : `Sitting schedule changed — Case #${notif.case_id}`}
+          {notif.title
+            ? notif.title
+            : notif.type === "new_judgment"
+              ? `New judgment filed — Case #${notif.case_id}`
+              : notif.type === "case_available"
+                ? `Your tracked case is now available — Case #${notif.case_id}`
+                : notif.type === "case_listed"
+                  ? `Your case has been listed for a sitting — #${notif.case_id}`
+                  : `Sitting schedule changed — Case #${notif.case_id}`}
         </p>
+        {notif.message && !notif.title && (
+          <p className="mt-0.5 text-xs text-white/30 line-clamp-2">{notif.message}</p>
+        )}
+        {notif.message && notif.title && (
+          <p className="mt-0.5 text-xs text-white/35 line-clamp-2">{notif.message}</p>
+        )}
       </div>
     </button>
   );

@@ -849,15 +849,21 @@ pub async fn list_judge_connections(pool: &PgPool) -> sqlx::Result<Vec<JudgeConn
 
 pub async fn get_user_cases(pool: &PgPool, user_id: i32) -> sqlx::Result<Vec<UserCase>> {
     sqlx::query_as::<_, UserCase>(
-        "SELECT * FROM user_cases WHERE user_id = $1 ORDER BY created_at DESC",
+        "SELECT uc.id, uc.user_id, uc.case_id, uc.case_type, uc.case_number,
+                uc.last_event_date, uc.last_event_time, uc.created_at,
+                ucs.notify_immediately, ucs.notify_day_before, ucs.notify_morning_of
+         FROM user_cases uc
+         LEFT JOIN user_case_settings ucs ON ucs.user_case_id = uc.id
+         WHERE uc.user_id = $1
+         ORDER BY uc.created_at DESC",
     )
     .bind(user_id)
     .fetch_all(pool)
     .await
 }
 
-/// Insert a tracking entry.  Returns the new row, or `RowNotFound` when
-/// `ON CONFLICT DO NOTHING` fires (already tracked — treat as success).
+/// Insert a tracking entry by case ID.  Returns the new row, or `RowNotFound`
+/// when the conflict index fires (already tracked — treat as success).
 pub async fn add_user_case(
     pool: &PgPool,
     user_id: i32,
@@ -867,8 +873,12 @@ pub async fn add_user_case(
     sqlx::query_as::<_, UserCase>(
         "INSERT INTO user_cases (user_id, case_id, case_type)
          VALUES ($1, $2, $3)
-         ON CONFLICT (user_id, case_id, case_type) DO NOTHING
-         RETURNING *",
+         ON CONFLICT DO NOTHING
+         RETURNING id, user_id, case_id, case_type, case_number,
+                   last_event_date, last_event_time, created_at,
+                   NULL::boolean AS notify_immediately,
+                   NULL::boolean AS notify_day_before,
+                   NULL::boolean AS notify_morning_of",
     )
     .bind(user_id)
     .bind(case_id)
@@ -877,6 +887,31 @@ pub async fn add_user_case(
     .await
 }
 
+/// Insert a tracking entry by case number (no known case_id yet).
+pub async fn add_user_case_by_number(
+    pool: &PgPool,
+    user_id: i32,
+    case_number: &str,
+    case_type: &str,
+) -> sqlx::Result<UserCase> {
+    sqlx::query_as::<_, UserCase>(
+        "INSERT INTO user_cases (user_id, case_number, case_type)
+         VALUES ($1, $2, $3)
+         ON CONFLICT DO NOTHING
+         RETURNING id, user_id, case_id, case_type, case_number,
+                   last_event_date, last_event_time, created_at,
+                   NULL::boolean AS notify_immediately,
+                   NULL::boolean AS notify_day_before,
+                   NULL::boolean AS notify_morning_of",
+    )
+    .bind(user_id)
+    .bind(case_number)
+    .bind(case_type)
+    .fetch_one(pool)
+    .await
+}
+
+/// Delete by the tracked-case's ID (used by the tracking context for ID-based entries).
 pub async fn remove_user_case(
     pool: &PgPool,
     user_id: i32,
@@ -892,6 +927,50 @@ pub async fn remove_user_case(
     .execute(pool)
     .await?;
     Ok(result.rows_affected())
+}
+
+/// Delete by the user_cases row ID (safe for both ID-based and case_number-based entries).
+pub async fn remove_user_case_by_row(
+    pool: &PgPool,
+    user_id: i32,
+    row_id: i32,
+) -> sqlx::Result<u64> {
+    let result = sqlx::query(
+        "DELETE FROM user_cases WHERE id = $1 AND user_id = $2",
+    )
+    .bind(row_id)
+    .bind(user_id)
+    .execute(pool)
+    .await?;
+    Ok(result.rows_affected())
+}
+
+// ── User Case Settings ──────────────────────────────────────────────────────
+
+pub async fn upsert_user_case_settings(
+    pool: &PgPool,
+    user_case_id: i32,
+    notify_immediately: bool,
+    notify_day_before: bool,
+    notify_morning_of: bool,
+) -> sqlx::Result<UserCaseSettings> {
+    sqlx::query_as::<_, UserCaseSettings>(
+        "INSERT INTO user_case_settings
+           (user_case_id, notify_immediately, notify_day_before, notify_morning_of, updated_at)
+         VALUES ($1, $2, $3, $4, NOW())
+         ON CONFLICT (user_case_id) DO UPDATE SET
+           notify_immediately = EXCLUDED.notify_immediately,
+           notify_day_before  = EXCLUDED.notify_day_before,
+           notify_morning_of  = EXCLUDED.notify_morning_of,
+           updated_at         = NOW()
+         RETURNING id, user_case_id, notify_immediately, notify_day_before, notify_morning_of",
+    )
+    .bind(user_case_id)
+    .bind(notify_immediately)
+    .bind(notify_day_before)
+    .bind(notify_morning_of)
+    .fetch_one(pool)
+    .await
 }
 
 // ── Notifications ──────────────────────────────────────────────────────────
@@ -1480,6 +1559,254 @@ pub async fn check_notifications(pool: &PgPool) {
         tracing::info!(
             "[Notifications] {} sitting_changed notification(s) inserted",
             changed.len()
+        );
+    }
+
+    // ── Sitting reminders — 1 day before ─────────────────────────────────
+    #[derive(sqlx::FromRow)]
+    struct ReminderPair {
+        user_id: i32,
+        case_id: i32,
+    }
+
+    let day_before: Vec<ReminderPair> = match sqlx::query_as(
+        "SELECT uc.user_id, uc.case_id
+         FROM user_cases uc
+         JOIN court_sittings cs ON cs.id = uc.case_id
+         WHERE uc.case_type = 'sitting'
+           AND uc.case_id IS NOT NULL
+           AND cs.event_date = CURRENT_DATE + 1
+           AND NOT EXISTS (
+               SELECT 1 FROM notifications n
+               WHERE n.user_id = uc.user_id
+                 AND n.case_id = uc.case_id
+                 AND n.type = 'sitting_reminder_1d'
+                 AND n.sent_at::date = CURRENT_DATE
+           )",
+    )
+    .fetch_all(pool)
+    .await
+    {
+        Ok(rows) => rows,
+        Err(e) => {
+            tracing::warn!("[Notifications] sitting_reminder_1d query failed: {e}");
+            return;
+        }
+    };
+
+    for row in &day_before {
+        if let Err(e) = sqlx::query(
+            "INSERT INTO notifications (user_id, case_id, type) VALUES ($1, $2, 'sitting_reminder_1d')",
+        )
+        .bind(row.user_id)
+        .bind(row.case_id)
+        .execute(pool)
+        .await
+        {
+            tracing::warn!(
+                "[Notifications] failed to insert sitting_reminder_1d for user {}: {e}",
+                row.user_id
+            );
+        }
+    }
+    if !day_before.is_empty() {
+        tracing::info!(
+            "[Notifications] {} sitting_reminder_1d notification(s) inserted",
+            day_before.len()
+        );
+    }
+
+    // ── Sitting reminders — morning of ───────────────────────────────────
+    let morning_of: Vec<ReminderPair> = match sqlx::query_as(
+        "SELECT uc.user_id, uc.case_id
+         FROM user_cases uc
+         JOIN court_sittings cs ON cs.id = uc.case_id
+         WHERE uc.case_type = 'sitting'
+           AND uc.case_id IS NOT NULL
+           AND cs.event_date = CURRENT_DATE
+           AND NOT EXISTS (
+               SELECT 1 FROM notifications n
+               WHERE n.user_id = uc.user_id
+                 AND n.case_id = uc.case_id
+                 AND n.type = 'sitting_reminder_morning'
+                 AND n.sent_at::date = CURRENT_DATE
+           )",
+    )
+    .fetch_all(pool)
+    .await
+    {
+        Ok(rows) => rows,
+        Err(e) => {
+            tracing::warn!("[Notifications] sitting_reminder_morning query failed: {e}");
+            return;
+        }
+    };
+
+    for row in &morning_of {
+        if let Err(e) = sqlx::query(
+            "INSERT INTO notifications (user_id, case_id, type) VALUES ($1, $2, 'sitting_reminder_morning')",
+        )
+        .bind(row.user_id)
+        .bind(row.case_id)
+        .execute(pool)
+        .await
+        {
+            tracing::warn!(
+                "[Notifications] failed to insert sitting_reminder_morning for user {}: {e}",
+                row.user_id
+            );
+        }
+    }
+    if !morning_of.is_empty() {
+        tracing::info!(
+            "[Notifications] {} sitting_reminder_morning notification(s) inserted",
+            morning_of.len()
+        );
+    }
+
+    // ── Case listed — case_number-only tracked entries now have a sitting ─
+    #[derive(sqlx::FromRow)]
+    struct CaseListed {
+        user_id: i32,
+        uc_id: i32,
+        sitting_id: i32,
+    }
+
+    let listed: Vec<CaseListed> = match sqlx::query_as(
+        "SELECT uc.user_id, uc.id AS uc_id, cs.id AS sitting_id
+         FROM user_cases uc
+         JOIN court_sittings cs ON cs.case_number = uc.case_number
+         WHERE uc.case_id IS NULL
+           AND uc.case_number IS NOT NULL
+           AND NOT EXISTS (
+               SELECT 1 FROM notifications n
+               WHERE n.user_id = uc.user_id
+                 AND n.case_id = cs.id
+                 AND n.type = 'case_listed'
+           )",
+    )
+    .fetch_all(pool)
+    .await
+    {
+        Ok(rows) => rows,
+        Err(e) => {
+            tracing::warn!("[Notifications] case_listed query failed: {e}");
+            return;
+        }
+    };
+
+    for row in &listed {
+        if let Err(e) = sqlx::query(
+            "INSERT INTO notifications (user_id, case_id, type) VALUES ($1, $2, 'case_listed')",
+        )
+        .bind(row.user_id)
+        .bind(row.sitting_id)
+        .execute(pool)
+        .await
+        {
+            tracing::warn!(
+                "[Notifications] failed to insert case_listed for user {}: {e}",
+                row.user_id
+            );
+            continue;
+        }
+        // Upgrade the case_number-only entry to a real case_id so it stops matching.
+        let _ = sqlx::query(
+            "UPDATE user_cases SET case_id = $1 WHERE id = $2",
+        )
+        .bind(row.sitting_id)
+        .bind(row.uc_id)
+        .execute(pool)
+        .await;
+    }
+    if !listed.is_empty() {
+        tracing::info!(
+            "[Notifications] {} case_listed notification(s) inserted",
+            listed.len()
+        );
+    }
+
+    // ── Case available — pending entries matched to a judgment ────────────
+    #[derive(sqlx::FromRow)]
+    struct CaseAvailable {
+        user_id: i32,
+        uc_id: i32,
+        judgment_id: i32,
+        email: String,
+        j_title: Option<String>,
+        case_number: Option<String>,
+    }
+
+    let available: Vec<CaseAvailable> = match sqlx::query_as(
+        "SELECT uc.user_id,
+                uc.id          AS uc_id,
+                j.id           AS judgment_id,
+                u.email,
+                j.title        AS j_title,
+                uc.case_number
+         FROM user_cases uc
+         JOIN judgments j ON j.case_number = uc.case_number
+         JOIN users u ON u.id = uc.user_id
+         WHERE uc.case_id IS NULL
+           AND uc.case_number IS NOT NULL
+           AND NOT EXISTS (
+               SELECT 1 FROM notifications n
+               WHERE n.user_id = uc.user_id
+                 AND n.case_id = j.id
+                 AND n.type = 'case_available'
+           )",
+    )
+    .fetch_all(pool)
+    .await
+    {
+        Ok(rows) => rows,
+        Err(e) => {
+            tracing::warn!("[Notifications] case_available query failed: {e}");
+            return;
+        }
+    };
+
+    for row in &available {
+        let notif_title = row
+            .j_title
+            .as_deref()
+            .unwrap_or("Case Available");
+        if let Err(e) = sqlx::query(
+            "INSERT INTO notifications (user_id, case_id, type, title, message)
+             VALUES ($1, $2, 'case_available', $3, 'Your tracked case has been published as a judgment.')",
+        )
+        .bind(row.user_id)
+        .bind(row.judgment_id)
+        .bind(notif_title)
+        .execute(pool)
+        .await
+        {
+            tracing::warn!(
+                "[Notifications] failed to insert case_available for user {}: {e}",
+                row.user_id
+            );
+            continue;
+        }
+        let _ = sqlx::query(
+            "UPDATE user_cases SET case_id = $1, case_type = 'judgment' WHERE id = $2",
+        )
+        .bind(row.judgment_id)
+        .bind(row.uc_id)
+        .execute(pool)
+        .await;
+
+        tracing::info!(
+            "[Email stub] case_available → user_id={} email={} case_number={} judgment_id={}",
+            row.user_id,
+            row.email,
+            row.case_number.as_deref().unwrap_or(""),
+            row.judgment_id
+        );
+    }
+    if !available.is_empty() {
+        tracing::info!(
+            "[Notifications] {} case_available notification(s) inserted",
+            available.len()
         );
     }
 }

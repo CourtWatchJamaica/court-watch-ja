@@ -486,6 +486,9 @@ function sittingMatchesCourt(sitting, court) {
 let userCasesStore = [];
 let nextUserCaseId = 1;
 
+let caseSettingsStore = [];
+let nextSettingsId = 1;
+
 let notificationsStore = [];
 let nextNotifId = 1;
 
@@ -540,6 +543,7 @@ function json(res, data, status = 200) {
 let nextSittingId = Math.max(...fakeCourtSittings.map((s) => s.id)) + 1;
 let nextJudgmentId = Math.max(...fakeJudgments.map((j) => j.id)) + 1;
 let judgmentsMutable = [...fakeJudgments];
+let maintenanceMode = false;
 let mockUser = {
   id: 1,
   email: "admin@courtwatchja.com",
@@ -567,7 +571,16 @@ const server = http.createServer((req, res) => {
   // ── Maintenance / Health ──────────────────────────────────────────────────────
 
   if (req.method === "GET" && path === "/api/maintenance/status") {
-    return json(res, { maintenance_mode: false });
+    return json(res, { maintenance_mode: maintenanceMode });
+  }
+
+  if (req.method === "POST" && path === "/api/admin/maintenance") {
+    parseBody(req, ({ enabled }) => {
+      maintenanceMode = !!enabled;
+      console.log(`  Maintenance mode → ${maintenanceMode}`);
+      return json(res, { maintenance_mode: maintenanceMode });
+    });
+    return;
   }
 
   // ── Parish Court Cases ────────────────────────────────────────────────────────
@@ -638,6 +651,15 @@ const server = http.createServer((req, res) => {
   }
 
   // ── Auth ──────────────────────────────────────────────────────────────────────
+
+  // OAuth provider exchange — returns the same mock JWT as email/password login
+  if (req.method === "POST" && path === "/api/auth/oauth") {
+    parseBody(req, ({ provider, email }) => {
+      if (!provider || !email) return json(res, { error: "provider and email required" }, 400);
+      return json(res, { token: MOCK_JWT });
+    });
+    return;
+  }
 
   if (req.method === "POST" && path === "/api/auth/login") {
     parseBody(req, ({ email, password }) => {
@@ -827,29 +849,66 @@ const server = http.createServer((req, res) => {
   // ── User Cases ────────────────────────────────────────────────────────────────
 
   if (req.method === "GET" && path === "/api/user/cases") {
-    return json(res, { cases: userCasesStore });
+    // Merge in settings from caseSettingsStore
+    const cases = userCasesStore.map((c) => {
+      const s = caseSettingsStore.find((x) => x.user_case_id === c.id);
+      return {
+        ...c,
+        notify_immediately: s?.notify_immediately ?? null,
+        notify_day_before: s?.notify_day_before ?? null,
+        notify_morning_of: s?.notify_morning_of ?? null,
+      };
+    });
+    return json(res, { cases });
   }
 
   if (req.method === "POST" && path === "/api/user/cases") {
-    parseBody(req, ({ case_id, case_type = "judgment" }) => {
-      if (case_id == null) return json(res, { error: "case_id required" }, 400);
-      const existing = userCasesStore.find(
-        (c) => c.case_id === case_id && c.case_type === case_type,
-      );
-      if (!existing) {
-        userCasesStore.push({
-          id: nextUserCaseId++,
-          user_id: 1,
-          case_id,
-          case_type,
-          created_at: new Date().toISOString(),
-        });
+    parseBody(req, ({ case_id, case_number, case_type = "judgment" }) => {
+      if (case_id != null) {
+        const existing = userCasesStore.find(
+          (c) => c.case_id === case_id && c.case_type === case_type,
+        );
+        if (!existing) {
+          userCasesStore.push({
+            id: nextUserCaseId++,
+            user_id: 1,
+            case_id,
+            case_number: null,
+            case_type,
+            created_at: new Date().toISOString(),
+          });
+        }
+      } else if (case_number) {
+        const existing = userCasesStore.find(
+          (c) => c.case_number === case_number && c.case_type === case_type && c.case_id == null,
+        );
+        if (!existing) {
+          userCasesStore.push({
+            id: nextUserCaseId++,
+            user_id: 1,
+            case_id: null,
+            case_number,
+            case_type,
+            created_at: new Date().toISOString(),
+          });
+        }
+      } else {
+        return json(res, { error: "case_id or case_number required" }, 400);
       }
       return json(res, { success: true });
     });
     return;
   }
 
+  // Delete by user_cases row id
+  if (req.method === "DELETE" && /^\/api\/user\/cases\/row\/\d+$/.test(path)) {
+    const row_id = parseInt(path.split("/").pop());
+    userCasesStore = userCasesStore.filter((c) => c.id !== row_id);
+    caseSettingsStore = caseSettingsStore.filter((s) => s.user_case_id !== row_id);
+    return json(res, { success: true });
+  }
+
+  // Delete by tracked case_id (legacy — used by tracking context)
   if (req.method === "DELETE" && /^\/api\/user\/cases\/\d+$/.test(path)) {
     const case_id = parseInt(path.split("/").pop());
     const case_type = url.searchParams.get("case_type") || "judgment";
@@ -857,6 +916,29 @@ const server = http.createServer((req, res) => {
       (c) => !(c.case_id === case_id && c.case_type === case_type),
     );
     return json(res, { success: true });
+  }
+
+  // Upsert notification settings for a tracked case row
+  if (req.method === "PUT" && /^\/api\/user\/cases\/\d+\/settings$/.test(path)) {
+    const row_id = parseInt(path.split("/")[path.split("/").length - 2]);
+    parseBody(req, ({ notify_immediately, notify_day_before, notify_morning_of }) => {
+      const existing = caseSettingsStore.find((s) => s.user_case_id === row_id);
+      if (existing) {
+        existing.notify_immediately = notify_immediately;
+        existing.notify_day_before = notify_day_before;
+        existing.notify_morning_of = notify_morning_of;
+      } else {
+        caseSettingsStore.push({
+          id: nextSettingsId++,
+          user_case_id: row_id,
+          notify_immediately,
+          notify_day_before,
+          notify_morning_of,
+        });
+      }
+      return json(res, { success: true });
+    });
+    return;
   }
 
   // ── Notifications ─────────────────────────────────────────────────────────────
@@ -1106,7 +1188,7 @@ const server = http.createServer((req, res) => {
   // ── Admin: Announce ───────────────────────────────────────────────────────────
 
   if (req.method === "POST" && path === "/api/admin/announce") {
-    parseBody(req, ({ title, message }) => {
+    parseBody(req, ({ title, message, promo }) => {
       if (!title || !message) return json(res, { error: "title and message required" }, 400);
       const user_count = mockUsers.length;
       mockUsers.forEach((u) => {
@@ -1121,6 +1203,9 @@ const server = http.createServer((req, res) => {
           read_at: null,
         });
       });
+      if (promo) {
+        console.log(`  [Email stub] Promo broadcast '${title}' → ${user_count} recipient(s). Body: ${message}`);
+      }
       return json(res, { sent: true, user_count });
     });
     return;

@@ -177,12 +177,40 @@ export const apiClient = {
     });
   },
 
+  async addUserCaseByNumber(
+    case_number: string,
+    case_type: "judgment" | "sitting" = "judgment",
+  ): Promise<{ success: boolean }> {
+    return request("/user/cases", {
+      method: "POST",
+      body: JSON.stringify({ case_number, case_type }),
+    });
+  },
+
   async removeUserCase(
     case_id: number,
     case_type: "judgment" | "sitting" = "judgment",
   ): Promise<{ success: boolean }> {
     return request(`/user/cases/${case_id}?case_type=${case_type}`, {
       method: "DELETE",
+    });
+  },
+
+  async removeUserCaseByRow(rowId: number): Promise<{ success: boolean }> {
+    return request(`/user/cases/row/${rowId}`, { method: "DELETE" });
+  },
+
+  async updateCaseSettings(
+    rowId: number,
+    settings: {
+      notify_immediately: boolean;
+      notify_day_before: boolean;
+      notify_morning_of: boolean;
+    },
+  ): Promise<unknown> {
+    return request(`/user/cases/${rowId}/settings`, {
+      method: "PUT",
+      body: JSON.stringify(settings),
     });
   },
 
@@ -282,7 +310,7 @@ export const apiClient = {
 
   async adminSetMaintenance(enabled: boolean): Promise<{ maintenance_mode: boolean }> {
     return request("/admin/maintenance", {
-      method: "PUT",
+      method: "POST",
       body: JSON.stringify({ enabled }),
     });
   },
@@ -405,10 +433,10 @@ export const apiClient = {
   },
 
   // ── Admin: Announce ───────────────────────────────────────────────────────
-  async adminAnnounce(title: string, message: string): Promise<{ sent: boolean; user_count: number }> {
+  async adminAnnounce(title: string, message: string, promo = false): Promise<{ sent: boolean; user_count: number }> {
     return request("/admin/announce", {
       method: "POST",
-      body: JSON.stringify({ title, message }),
+      body: JSON.stringify({ title, message, promo }),
     });
   },
 

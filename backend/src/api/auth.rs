@@ -1,4 +1,7 @@
-use axum::{extract::State, Extension, Json};
+use std::net::SocketAddr;
+use std::time::Instant;
+
+use axum::{extract::{ConnectInfo, State}, http::HeaderMap, Extension, Json};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -7,6 +10,30 @@ use crate::{
     utils::jwt,
     AppState,
 };
+
+fn check_rate_limit(state: &AppState, ip: &str) -> Result<(), AppError> {
+    const LIMIT: usize = 5;
+    const WINDOW: std::time::Duration = std::time::Duration::from_secs(60);
+    let mut map = state.rate_limiter.lock().unwrap();
+    let now = Instant::now();
+    let timestamps = map.entry(ip.to_string()).or_default();
+    timestamps.retain(|&t| now.duration_since(t) < WINDOW);
+    if timestamps.len() >= LIMIT {
+        return Err(AppError::TooManyRequests);
+    }
+    timestamps.push(now);
+    Ok(())
+}
+
+fn client_ip(headers: &HeaderMap, addr: &SocketAddr) -> String {
+    headers
+        .get("x-forwarded-for")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.split(',').next())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| addr.ip().to_string())
+}
 
 #[derive(Deserialize)]
 pub struct AuthRequest {
@@ -30,8 +57,11 @@ pub struct MeResponse {
 
 pub async fn signup(
     State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
     Json(body): Json<AuthRequest>,
 ) -> Result<Json<AuthResponse>, AppError> {
+    check_rate_limit(&state, &client_ip(&headers, &addr))?;
     if body.email.is_empty() || body.password.is_empty() {
         return Err(AppError::BadRequest("Email and password are required".into()));
     }
@@ -57,8 +87,11 @@ pub async fn signup(
 
 pub async fn login(
     State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
     Json(body): Json<AuthRequest>,
 ) -> Result<Json<AuthResponse>, AppError> {
+    check_rate_limit(&state, &client_ip(&headers, &addr))?;
     let user = queries::find_user_by_email(&state.db, &body.email)
         .await?
         .ok_or(AppError::Unauthorized)?;

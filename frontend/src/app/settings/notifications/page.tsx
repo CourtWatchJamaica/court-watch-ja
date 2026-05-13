@@ -213,11 +213,12 @@ function ActiveNotifsList({
   settings: NotifSettings;
 }) {
   const items = trackedCases.flatMap((uc) => {
+    if (uc.case_id == null) return [];
     const cs = settings.cases[uc.case_id];
     if (!cs?.enabled || cs.timings.length === 0) return [];
     const j = judgments.find((x) => x.id === uc.case_id);
     const title = j?.title || `Case #${uc.case_id}`;
-    return cs.timings.map((t) => ({
+    return cs.timings.map((t: string) => ({
       key: `${uc.case_id}-${t}`,
       title,
       timing: TIMINGS.find((x) => x.id === t)?.label ?? t,
@@ -457,15 +458,16 @@ export default function NotificationSettingsPage() {
                   </p>
                 </div>
                 <div className="divide-y divide-white/[0.05]">
-                  {trackedCases.map((uc) => {
-                    const j = judgments.find((x) => x.id === uc.case_id);
-                    const cs = getCaseSettings(uc.case_id);
-                    const selected = selectedCaseId === uc.case_id;
+                  {trackedCases.filter((uc) => uc.case_id != null).map((uc) => {
+                    const caseId = uc.case_id!;
+                    const j = judgments.find((x) => x.id === caseId);
+                    const cs = getCaseSettings(caseId);
+                    const selected = selectedCaseId === caseId;
                     return (
                       <button
                         key={uc.id}
                         onClick={() => {
-                          setSelectedCaseId(uc.case_id);
+                          setSelectedCaseId(caseId);
                           setMobileSheetOpen(true);
                         }}
                         className={cn(

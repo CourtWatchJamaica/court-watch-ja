@@ -86,8 +86,14 @@ export interface CourtSitting {
 export interface UserCase {
   id: number;
   user_id: number;
-  case_id: number;
+  /** Null when the entry was tracked by case_number before a real case was matched. */
+  case_id: number | null;
   case_type: "judgment" | "sitting";
+  case_number?: string | null;
+  /** Notification preferences (null = use defaults). */
+  notify_immediately?: boolean | null;
+  notify_day_before?: boolean | null;
+  notify_morning_of?: boolean | null;
   /** Last known sitting date — used by the notification engine to detect changes. */
   last_event_date?: string | null;
   last_event_time?: string | null;
