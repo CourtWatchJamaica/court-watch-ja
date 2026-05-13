@@ -1,0 +1,138 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import AuthGuard from "@/components/AuthGuard";
+import Navbar from "@/components/Navbar";
+import CaseCard from "@/components/CaseCard";
+import { apiClient } from "@/lib/api";
+import { Judgment, UserCase } from "@/lib/types";
+import { Button } from "@/components/ui/button";
+import { FileText, Bookmark } from "lucide-react";
+
+export default function Dashboard() {
+  const router = useRouter();
+  const [latestJudgments, setLatestJudgments] = useState<Judgment[]>([]);
+  const [trackedCases, setTrackedCases] = useState<UserCase[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [judgmentsRes, casesRes] = await Promise.all([
+          apiClient.getJudgments(),
+          apiClient.getUserCases(),
+        ]);
+        setLatestJudgments(judgmentsRes.judgments.slice(0, 5));
+        setTrackedCases(casesRes.cases);
+      } catch (error) {
+        console.error("Failed to fetch dashboard data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  if (loading) {
+    return (
+      <AuthGuard>
+        <Navbar />
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900" />
+        </div>
+      </AuthGuard>
+    );
+  }
+
+  return (
+    <AuthGuard>
+      <Navbar />
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
+          <p className="text-gray-600">
+            Overview of recent judgments and your tracked cases
+          </p>
+        </div>
+
+        <div className="grid gap-8 md:grid-cols-2">
+          {/* Latest Judgments */}
+          <section>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold flex items-center">
+                <FileText className="h-5 w-5 mr-2" />
+                Latest Judgments
+              </h2>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push("/cases")}
+              >
+                View All
+              </Button>
+            </div>
+            <div className="space-y-4">
+              {latestJudgments.length > 0 ? (
+                latestJudgments.map((judgment) => (
+                  <CaseCard
+                    key={judgment.id}
+                    judgment={judgment}
+                    onClick={() => router.push(`/cases/${judgment.id}`)}
+                  />
+                ))
+              ) : (
+                <p className="text-gray-500 text-center py-8">
+                  No judgments found
+                </p>
+              )}
+            </div>
+          </section>
+
+          {/* Tracked Cases */}
+          <section>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold flex items-center">
+                <Bookmark className="h-5 w-5 mr-2" />
+                Your Tracked Cases ({trackedCases.length})
+              </h2>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push("/cases")}
+              >
+                Track More
+              </Button>
+            </div>
+            <div className="space-y-4">
+              {trackedCases.length > 0 ? (
+                <div className="text-gray-600 text-sm">
+                  {trackedCases.map((userCase) => (
+                    <div
+                      key={userCase.id}
+                      className="p-3 bg-gray-50 rounded-md mb-2"
+                    >
+                      Case ID: {userCase.case_id} - Tracked on{" "}
+                      {new Date(userCase.created_at).toLocaleDateString()}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <p>No tracked cases yet</p>
+                  <Button
+                    className="mt-4"
+                    onClick={() => router.push("/cases")}
+                  >
+                    Browse Cases
+                  </Button>
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+      </main>
+    </AuthGuard>
+  );
+}
