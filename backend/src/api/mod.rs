@@ -7,8 +7,10 @@ pub mod judge_connections;
 pub mod judgments;
 pub mod judges;
 pub mod maintenance;
+pub mod news;
 pub mod notifications;
 pub mod parish_cases;
+pub mod pdf;
 pub mod tracking;
 
 pub fn court_slug_to_name(slug: &str) -> &'static str {
@@ -44,7 +46,9 @@ pub fn router(state: AppState) -> Router {
         .route("/api/maintenance/status", get(maintenance::status))
         .route("/api/parish-cases", get(parish_cases::list_parish_cases))
         .route("/api/parish-cases/:id", get(parish_cases::get_parish_case_by_id))
-        .route("/api/parish-summary", get(parish_cases::parish_summary));
+        .route("/api/parish-summary", get(parish_cases::parish_summary))
+        .route("/api/pdf/judgment/:id", get(pdf::judgment_pdf))
+        .route("/api/pdf/sitting/:id", get(pdf::sitting_pdf));
 
     // ── Protected (any authenticated user) ───────────────────────────────
     let protected = Router::new()
@@ -60,6 +64,8 @@ pub fn router(state: AppState) -> Router {
         .route("/api/user/cases/:case_id", delete(tracking::remove_user_case))
         .route("/api/user/cases/row/:row_id", delete(tracking::remove_user_case_by_row))
         .route("/api/user/cases/:row_id/settings", put(tracking::update_case_settings))
+        .route("/api/legal-news", get(news::list_news))
+        .route("/api/case-lookup", get(judgments::case_lookup))
         .route("/api/notifications", get(notifications::get_notifications))
         .route("/api/notifications/unread-count", get(notifications::get_unread_count))
         .route("/api/notifications/mark-read", post(notifications::mark_all_read))

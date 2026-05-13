@@ -14,6 +14,39 @@ const MOCK_PAYLOAD = Buffer.from(
 
 const MOCK_JWT = `eyJhbGciOiJIUzI1NiJ9.${MOCK_PAYLOAD}.mock_signature`;
 
+// ── Minimal valid PDF builder (for mock PDF endpoints) ────────────────────────
+
+function buildMockPdf(bodyText) {
+  const lines = bodyText.split("\n");
+  const escaped = lines.map((l) => `(${l.replace(/[()\\]/g, "\\$&")})`);
+  const streamLines = escaped.map((l, i) => `BT /F1 11 Tf 40 ${720 - i * 18} Td ${l} Tj ET`).join("\n");
+  const stream = streamLines;
+  const streamLen = Buffer.byteLength(stream, "utf8");
+
+  const objects = [
+    `1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj`,
+    `2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj`,
+    `3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj`,
+    `4 0 obj\n<< /Length ${streamLen} >>\nstream\n${stream}\nendstream\nendobj`,
+    `5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj`,
+  ];
+
+  const header = "%PDF-1.4\n";
+  let body = header;
+  const offsets = [];
+  for (const obj of objects) {
+    offsets.push(Buffer.byteLength(body, "utf8"));
+    body += obj + "\n";
+  }
+  const xrefOffset = Buffer.byteLength(body, "utf8");
+  body += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  for (const off of offsets) {
+    body += String(off).padStart(10, "0") + " 00000 n \n";
+  }
+  body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+  return Buffer.from(body, "utf8");
+}
+
 // ── Fake data ───────────────────────────────────────────────────────────────────
 
 const fakeJudgments = [
@@ -520,6 +553,89 @@ let mockScraperState = {
   pdf_skipped: ["https://supremecourt.gov.jm/not-a-court-list.pdf"],
   pdf_skipped_count: 1,
 };
+
+const fakeLegalNews = [
+  {
+    id: 1,
+    title: "Supreme Court Rules Against Police in Landmark Search and Seizure Case",
+    description: "The Supreme Court found that officers violated constitutional rights during a warrantless search in Kingston.",
+    source: "Jamaica Gleaner",
+    url: "https://jamaica-gleaner.com/article/news/20260510/supreme-court-rules-against-police-landmark-search-seizure-case",
+    published_at: "2026-05-10T09:00:00Z",
+    category: "judgment",
+    created_at: "2026-05-10T09:30:00Z",
+  },
+  {
+    id: 2,
+    title: "Two Men Charged in St. Catherine Drive-By Shooting",
+    description: "Police arrested suspects in connection with a drive-by shooting that injured three people in Spanish Town.",
+    source: "Jamaica Observer",
+    url: "https://jamaicaobserver.com/news/two-men-charged-st-catherine-drive-by-shooting",
+    published_at: "2026-05-11T07:15:00Z",
+    category: "crime",
+    created_at: "2026-05-11T07:45:00Z",
+  },
+  {
+    id: 3,
+    title: "Court of Appeal Overturns Murder Conviction on Evidence Grounds",
+    description: "A three-judge panel set aside a 2022 conviction after finding key forensic evidence was improperly admitted.",
+    source: "RJR News",
+    url: "https://radiojamaicanewsonline.com/local/court-of-appeal-overturns-murder-conviction-evidence-grounds",
+    published_at: "2026-05-09T14:00:00Z",
+    category: "judgment",
+    created_at: "2026-05-09T14:30:00Z",
+  },
+  {
+    id: 4,
+    title: "Lottery Scammer Sentenced to 15 Years in Montego Bay",
+    description: "A Manchester native convicted of defrauding elderly American victims of over USD 2 million was sentenced Monday.",
+    source: "Loop Jamaica",
+    url: "https://loopjamaica.com/content/lottery-scammer-sentenced-15-years-montego-bay",
+    published_at: "2026-05-12T10:30:00Z",
+    category: "crime",
+    created_at: "2026-05-12T11:00:00Z",
+  },
+  {
+    id: 5,
+    title: "Chief Justice Announces New Case Management Protocols for 2026",
+    description: "Reforms include mandatory pre-trial conferences, electronic filing, and strict 90-day case resolution targets.",
+    source: "Jamaica Star",
+    url: "https://jamaica-star.com/article/news/20260508/chief-justice-announces-new-case-management-protocols-2026",
+    published_at: "2026-05-08T08:00:00Z",
+    category: "judgment",
+    created_at: "2026-05-08T08:30:00Z",
+  },
+  {
+    id: 6,
+    title: "Westmoreland Gang Leader Arrested After Month-Long Operation",
+    description: "The joint police-military operation led to the arrest of a wanted man linked to 11 murders in the parish.",
+    source: "Jamaica Gleaner",
+    url: "https://jamaica-gleaner.com/article/news/20260511/westmoreland-gang-leader-arrested-month-long-operation",
+    published_at: "2026-05-11T16:00:00Z",
+    category: "crime",
+    created_at: "2026-05-11T16:30:00Z",
+  },
+  {
+    id: 7,
+    title: "NHT Ordered to Pay $8M After Unlawful Repossession Ruling",
+    description: "The Supreme Court awarded damages to a family wrongfully evicted from a housing scheme property in Portmore.",
+    source: "Jamaica Observer",
+    url: "https://jamaicaobserver.com/news/nht-ordered-pay-8m-unlawful-repossession-ruling",
+    published_at: "2026-05-07T11:00:00Z",
+    category: "judgment",
+    created_at: "2026-05-07T11:30:00Z",
+  },
+  {
+    id: 8,
+    title: "Police Seize Illegal Firearms Cache in Clarendon During Raid",
+    description: "Officers recovered 14 illegal firearms and over 400 rounds of ammunition during a pre-dawn operation.",
+    source: "RJR News",
+    url: "https://radiojamaicanewsonline.com/local/police-seize-illegal-firearms-cache-clarendon-raid",
+    published_at: "2026-05-12T06:45:00Z",
+    category: "crime",
+    created_at: "2026-05-12T07:00:00Z",
+  },
+];
 
 // ── Helpers ──────────────────────────────────────────────────────────────────────
 
@@ -1222,6 +1338,75 @@ const server = http.createServer((req, res) => {
       });
     });
     return;
+  }
+
+  // ── Case Lookup ──────────────────────────────────────────────────────────
+
+  if (req.method === "GET" && path === "/api/case-lookup") {
+    const caseNumber = url.searchParams.get("case_number") || "";
+    const upper = caseNumber.toUpperCase();
+
+    const today = new Date().toISOString().split("T")[0];
+
+    const judgments = judgmentsMutable
+      .filter((j) => j.case_number.toUpperCase().includes(upper))
+      .slice(0, 5)
+      .map((j) => ({ id: j.id, case_number: j.case_number, title: j.title, date: j.date, court: j.court }));
+
+    const sittings = fakeCourtSittings
+      .filter((s) => s.case_number?.toUpperCase().includes(upper))
+      .slice(0, 5)
+      .map((s) => ({ id: s.id, case_number: s.case_number, title: s.title, event_date: s.event_date, court: s.court_division }));
+
+    return json(res, {
+      found: judgments.length > 0 || sittings.length > 0,
+      judgments,
+      sittings,
+      has_upcoming: sittings.some((s) => s.event_date && s.event_date >= today),
+      has_past: sittings.some((s) => s.event_date && s.event_date < today),
+    });
+  }
+
+  // ── Legal News ───────────────────────────────────────────────────────────────
+
+  if (req.method === "GET" && path === "/api/legal-news") {
+    const category = url.searchParams.get("category") || null;
+    const limit = Math.min(parseInt(url.searchParams.get("limit") || "8", 10), 100);
+    let news = category ? fakeLegalNews.filter((n) => n.category === category) : fakeLegalNews;
+    news = news.slice(0, limit);
+    return json(res, { news });
+  }
+
+  // ── Branded PDF downloads ─────────────────────────────────────────────────────
+
+  const judgmentPdfMatch = path.match(/^\/api\/pdf\/judgment\/(\d+)$/);
+  if (req.method === "GET" && judgmentPdfMatch) {
+    const id = parseInt(judgmentPdfMatch[1], 10);
+    const item = judgmentsMutable.find((j) => j.id === id);
+    if (!item) return json(res, { error: "Not found" }, 404);
+    const pdfBytes = buildMockPdf(`COURTWATCH JA — Judgment Summary\n\nCase: ${item.case_number}\nTitle: ${item.title || "(untitled)"}\nCourt: ${item.court || "N/A"}\nJudge: ${item.judge_name || "N/A"}\nDate: ${item.date || "N/A"}\n\n${item.summary_text || "No summary available."}`);
+    const safe = (item.case_number || "judgment").replace(/[^\w-]/g, "_").slice(0, 80);
+    res.writeHead(200, {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="CourtWatch-JA-${safe}.pdf"`,
+      "Cache-Control": "public, max-age=3600",
+    });
+    return res.end(pdfBytes);
+  }
+
+  const sittingPdfMatch = path.match(/^\/api\/pdf\/sitting\/(\d+)$/);
+  if (req.method === "GET" && sittingPdfMatch) {
+    const id = parseInt(sittingPdfMatch[1], 10);
+    const item = fakeCourtSittings.find((s) => s.id === id);
+    if (!item) return json(res, { error: "Not found" }, 404);
+    const pdfBytes = buildMockPdf(`COURTWATCH JA — Court Sitting Summary\n\nTitle: ${item.title || item.case_number || "N/A"}\nDivision: ${item.court_division || "N/A"}\nEvent Type: ${item.event_type || "N/A"}\nJudge: ${item.judge_name || "N/A"}\nDate: ${item.event_date || "N/A"}\nTime: ${item.event_time || "N/A"}\n\nCounsel: ${item.lawyers || "N/A"}`);
+    const safe = (item.case_number || "sitting").replace(/[^\w-]/g, "_").slice(0, 80);
+    res.writeHead(200, {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="CourtWatch-JA-${safe}.pdf"`,
+      "Cache-Control": "public, max-age=3600",
+    });
+    return res.end(pdfBytes);
   }
 
   // ── 404 ───────────────────────────────────────────────────────────────────────

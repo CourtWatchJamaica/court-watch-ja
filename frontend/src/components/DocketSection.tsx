@@ -1,11 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { Bell, X, ArrowRight, Scale, Building2, Plus, Loader2 } from "lucide-react";
+import { Bell, X, ArrowRight, Scale, Building2, Plus, Loader2, Calendar, FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Judgment, UserCase, CourtSitting } from "@/lib/types";
+import { CaseLookupResult, Judgment, UserCase, CourtSitting } from "@/lib/types";
 import { apiClient } from "@/lib/api";
 
 /* ── Types ── */
@@ -61,7 +62,7 @@ function getCountdownColor(date: string | null): string {
   return "bg-[#009B3A]/12 text-[#009B3A]";
 }
 
-/* ── Notification Settings Popover ── */
+/* ── Notification Settings Modal ── */
 
 interface NotifSettings {
   notify_immediately: boolean;
@@ -69,71 +70,157 @@ interface NotifSettings {
   notify_morning_of: boolean;
 }
 
-function NotifPopover({
+const NOTIF_ITEMS: { key: keyof NotifSettings; label: string; sub: string }[] = [
+  { key: "notify_immediately", label: "When listed or updated",  sub: "Any change to this case" },
+  { key: "notify_day_before",  label: "Day before the hearing",  sub: "Evening reminder" },
+  { key: "notify_morning_of",  label: "Morning of the hearing",  sub: "Same-day alert at 7 AM" },
+];
+
+function NotifModal({
   rowId,
   initial,
+  caseLabel,
+  onClose,
 }: {
   rowId: number;
   initial: NotifSettings;
+  caseLabel?: string;
+  onClose: () => void;
 }) {
   const [settings, setSettings] = useState<NotifSettings>(initial);
   const [saving, setSaving] = useState(false);
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  // Escape key
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  // Focus trap + initial focus
+  useEffect(() => {
+    const modal = modalRef.current;
+    if (!modal) return;
+    const sel = 'button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])';
+    const getFocusables = () => Array.from(modal.querySelectorAll<HTMLElement>(sel));
+    getFocusables()[0]?.focus();
+    const onTab = (e: KeyboardEvent) => {
+      if (e.key !== "Tab") return;
+      const els = getFocusables();
+      const first = els[0], last = els[els.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last?.focus(); }
+      } else {
+        if (document.activeElement === last) { e.preventDefault(); first?.focus(); }
+      }
+    };
+    document.addEventListener("keydown", onTab);
+    return () => document.removeEventListener("keydown", onTab);
+  }, []);
 
   const toggle = (key: keyof NotifSettings) => {
     const next = { ...settings, [key]: !settings[key] };
     setSettings(next);
     setSaving(true);
-    apiClient
-      .updateCaseSettings(rowId, next)
-      .finally(() => setSaving(false));
+    apiClient.updateCaseSettings(rowId, next).finally(() => setSaving(false));
   };
 
-  return (
+  return createPortal(
     <div
-      className="absolute right-0 top-8 z-50 w-52 rounded-xl border border-white/[0.1] bg-[#0d0d1a] p-3 shadow-2xl"
-      onClick={(e) => e.stopPropagation()}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Notification settings"
     >
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-[#FED100]">
-          Notify me
-        </span>
-        {saving && <Loader2 className="h-3 w-3 animate-spin text-white/30" />}
-      </div>
-      {(
-        [
-          { key: "notify_immediately" as const, label: "When listed / updated" },
-          { key: "notify_day_before" as const, label: "Day before hearing" },
-          { key: "notify_morning_of" as const, label: "Morning of hearing" },
-        ] as const
-      ).map(({ key, label }) => (
-        <label
-          key={key}
-          className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-2 hover:bg-white/[0.04]"
-        >
-          <div
-            className={`h-3.5 w-3.5 shrink-0 rounded-sm border transition-colors ${
-              settings[key]
-                ? "border-[#FED100] bg-[#FED100]"
-                : "border-white/20 bg-transparent"
-            }`}
-            onClick={() => toggle(key)}
-          >
-            {settings[key] && (
-              <svg viewBox="0 0 10 8" className="h-full w-full p-0.5">
-                <polyline
-                  points="1,4 3.5,6.5 9,1"
-                  fill="none"
-                  stroke="#0d0d1a"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-              </svg>
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+
+      {/* Card */}
+      <div
+        ref={modalRef}
+        className="relative z-10 w-[90vw] max-w-[380px] rounded-2xl border border-white/[0.1] bg-[#0d0d1a]/95 shadow-2xl backdrop-blur-xl ring-1 ring-inset ring-white/[0.04]"
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between border-b border-white/[0.06] px-5 py-4">
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#FED100]">
+              Notifications
+            </p>
+            {caseLabel && (
+              <p className="mt-0.5 max-w-[260px] truncate font-mono text-[11px] text-white/35">
+                {caseLabel}
+              </p>
             )}
           </div>
-          <span className="text-[11px] text-white/60">{label}</span>
-        </label>
-      ))}
-    </div>
+          <button
+            onClick={onClose}
+            className="ml-3 shrink-0 rounded-lg p-1.5 text-white/30 transition-colors hover:bg-white/[0.06] hover:text-white/70"
+            aria-label="Close"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Toggle rows */}
+        <div className="space-y-0.5 px-3 py-3">
+          {NOTIF_ITEMS.map(({ key, label, sub }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => toggle(key)}
+              className="flex w-full items-center gap-3.5 rounded-xl px-3 py-3 text-left transition-colors hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#FED100]/40"
+            >
+              {/* Pill toggle */}
+              <div
+                aria-checked={settings[key]}
+                role="switch"
+                className={`relative h-5 w-9 shrink-0 rounded-full transition-colors duration-200 ${
+                  settings[key] ? "bg-[#FED100]" : "bg-white/[0.12]"
+                }`}
+              >
+                <div
+                  className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                    settings[key] ? "translate-x-4" : "translate-x-0.5"
+                  }`}
+                />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className={`text-[13px] font-medium leading-snug transition-colors ${
+                  settings[key] ? "text-white/90" : "text-white/40"
+                }`}>
+                  {label}
+                </p>
+                <p className="mt-0.5 text-[11px] text-white/25">{sub}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between border-t border-white/[0.06] px-5 py-3">
+          <div className="flex h-4 items-center gap-1.5">
+            {saving && (
+              <>
+                <Loader2 className="h-3 w-3 animate-spin text-white/30" />
+                <span className="text-[10px] text-white/30">Saving…</span>
+              </>
+            )}
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-lg bg-white/[0.06] px-3 py-1.5 text-[11px] font-medium text-white/50 transition-colors hover:bg-white/[0.1] hover:text-white/80"
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -250,28 +337,28 @@ function DocketCard({
             </div>
 
             {/* Notification settings bell */}
-            <div className="relative" onClick={(e) => e.stopPropagation()}>
-              <button
-                onClick={() => setNotifOpen((p) => !p)}
-                className="flex items-center gap-0.5 rounded px-0.5 transition-colors hover:bg-white/[0.06]"
-                aria-label="Notification settings"
-              >
-                <Bell
-                  className={`h-3 w-3 ${activeAlerts > 0 ? "text-[#FED100]" : "text-white/20"}`}
-                />
-                {activeAlerts > 0 && (
-                  <span className="text-[9px] font-bold text-[#FED100]">
-                    {activeAlerts}
-                  </span>
-                )}
-              </button>
-              {notifOpen && (
-                <NotifPopover
-                  rowId={userCase.id}
-                  initial={defaultSettings}
-                />
+            <button
+              onClick={(e) => { e.stopPropagation(); setNotifOpen((p) => !p); }}
+              className="flex items-center gap-0.5 rounded px-0.5 transition-colors hover:bg-white/[0.06]"
+              aria-label="Notification settings"
+            >
+              <Bell
+                className={`h-3 w-3 ${activeAlerts > 0 ? "text-[#FED100]" : "text-white/20"}`}
+              />
+              {activeAlerts > 0 && (
+                <span className="text-[9px] font-bold text-[#FED100]">
+                  {activeAlerts}
+                </span>
               )}
-            </div>
+            </button>
+            {notifOpen && (
+              <NotifModal
+                rowId={userCase.id}
+                initial={defaultSettings}
+                caseLabel={citation ?? title}
+                onClose={() => setNotifOpen(false)}
+              />
+            )}
 
             {isSitting && (
               <span className="rounded-full bg-[#FED100]/10 border border-[#FED100]/20 px-1.5 py-0.5 text-[8px] font-semibold text-[#FED100]">
@@ -344,31 +431,91 @@ function DocketCard({
 
 /* ── Add by Case Number input ── */
 
-function AddByNumberForm({ onRefresh }: { onRefresh: () => void }) {
+interface TrackedRow {
+  rowId: number;
+  caseNumber: string;
+  settings: NotifSettings;
+}
+
+export function AddByNumberForm({ onRefresh }: { onRefresh: () => void }) {
   const [value, setValue] = useState("");
   const [loading, setLoading] = useState(false);
-  const [feedback, setFeedback] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [tracked, setTracked] = useState<TrackedRow | null>(null);
+  const [notifOpen, setNotifOpen] = useState(false);
+
+  // ── Case-lookup preview ──
+  const [preview, setPreview] = useState<CaseLookupResult | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    const trimmed = value.trim();
+    if (trimmed.length < 3) {
+      setPreview(null);
+      setShowPreview(false);
+      return;
+    }
+    setShowPreview(true);
+    let cancelled = false;
+    debounceRef.current = setTimeout(async () => {
+      setPreviewLoading(true);
+      try {
+        const result = await apiClient.caseLookup(trimmed);
+        if (!cancelled) setPreview(result);
+      } catch {
+        if (!cancelled) setPreview(null);
+      } finally {
+        if (!cancelled) setPreviewLoading(false);
+      }
+    }, 300);
+    return () => { cancelled = true; };
+  }, [value]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = value.trim();
     if (!trimmed) return;
     setLoading(true);
-    setFeedback(null);
+    setError(null);
+    setShowPreview(false);
+    setNotifOpen(false);
     try {
       await apiClient.addUserCaseByNumber(trimmed, "judgment");
+      const { cases } = await apiClient.getUserCases();
+      const newCase = cases.find((c) => c.case_number === trimmed);
+      setTracked({
+        rowId: newCase?.id ?? 0,
+        caseNumber: trimmed,
+        settings: {
+          notify_immediately: newCase?.notify_immediately ?? true,
+          notify_day_before: newCase?.notify_day_before ?? true,
+          notify_morning_of: newCase?.notify_morning_of ?? true,
+        },
+      });
       setValue("");
-      setFeedback("Tracking — we'll alert you when it's listed.");
+      setPreview(null);
       onRefresh();
     } catch {
-      setFeedback("Could not add that case number. Try again.");
+      setError("Could not add that case number. Try again.");
     } finally {
       setLoading(false);
     }
   };
 
+  const selectPreviewCase = (caseNumber: string) => {
+    setValue(caseNumber);
+    setShowPreview(false);
+  };
+
+  const activeCount = tracked
+    ? Object.values(tracked.settings).filter(Boolean).length
+    : 0;
+
   return (
-    <div className="mt-3 rounded-xl border border-white/[0.06] bg-[#0d0d1a] px-3 py-2.5">
+    <div className="rounded-xl border border-white/[0.06] bg-[#0d0d1a] px-3 py-2.5">
       <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-white/30">
         Track by Case Number
       </p>
@@ -376,7 +523,9 @@ function AddByNumberForm({ onRefresh }: { onRefresh: () => void }) {
         <input
           type="text"
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={(e) => { setValue(e.target.value); setError(null); }}
+          onBlur={() => setTimeout(() => setShowPreview(false), 150)}
+          onFocus={() => { if (value.trim().length >= 3 && preview) setShowPreview(true); }}
           placeholder="e.g. HCV/01234/2025"
           className="flex-1 min-w-0 rounded-lg border border-white/[0.1] bg-black/30 px-3 py-2 text-[12px] text-white placeholder-white/20 focus:outline-none focus:border-[#FED100]/40 focus:ring-1 focus:ring-[#FED100]/20 transition-colors"
         />
@@ -389,8 +538,132 @@ function AddByNumberForm({ onRefresh }: { onRefresh: () => void }) {
           Track
         </button>
       </form>
-      {feedback && (
-        <p className="mt-1.5 text-[10px] text-white/40">{feedback}</p>
+
+      {/* Live preview dropdown */}
+      {showPreview && value.trim().length >= 3 && (
+        <div
+          className="mt-1.5 rounded-xl border border-white/[0.1] bg-[#0d0d1a] overflow-hidden shadow-xl"
+          onMouseDown={(e) => e.preventDefault()}
+        >
+          {previewLoading ? (
+            <div className="flex items-center gap-2 px-3 py-3">
+              <Loader2 className="h-3 w-3 animate-spin text-white/30" />
+              <span className="text-[11px] text-white/30">Searching…</span>
+            </div>
+          ) : preview?.found ? (
+            <div className="divide-y divide-white/[0.05]">
+              {preview.judgments.map((j) => (
+                <button
+                  key={`j-${j.id}`}
+                  type="button"
+                  onClick={() => selectPreviewCase(j.case_number)}
+                  className="flex w-full items-start gap-2.5 px-3 py-2.5 text-left hover:bg-white/[0.04] transition-colors"
+                >
+                  <FileText className="mt-0.5 h-3 w-3 shrink-0 text-[#009B3A]" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[11px] font-medium text-white/80">
+                      {j.title || j.case_number}
+                    </p>
+                    <div className="mt-0.5 flex items-center gap-2 flex-wrap">
+                      <span className="font-mono text-[10px] text-white/35">{j.case_number}</span>
+                      {j.court && (
+                        <span className="text-[10px] text-white/25">{j.court}</span>
+                      )}
+                      {j.date && (
+                        <span className="flex items-center gap-1 text-[10px] text-white/25">
+                          <Calendar className="h-2.5 w-2.5" />
+                          {new Date(j.date).toLocaleDateString("en-JM", { year: "numeric", month: "short", day: "numeric" })}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-[#009B3A]/12 px-1.5 py-0.5 text-[9px] font-semibold text-[#009B3A]">
+                    Judgment
+                  </span>
+                </button>
+              ))}
+              {preview.sittings.map((s) => (
+                <button
+                  key={`s-${s.id}`}
+                  type="button"
+                  onClick={() => selectPreviewCase(s.case_number ?? value.trim())}
+                  className="flex w-full items-start gap-2.5 px-3 py-2.5 text-left hover:bg-white/[0.04] transition-colors"
+                >
+                  <Calendar className="mt-0.5 h-3 w-3 shrink-0 text-[#FED100]" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[11px] font-medium text-white/80">
+                      {s.title || s.case_number || "Untitled Sitting"}
+                    </p>
+                    <div className="mt-0.5 flex items-center gap-2 flex-wrap">
+                      {s.case_number && (
+                        <span className="font-mono text-[10px] text-white/35">{s.case_number}</span>
+                      )}
+                      {s.court && (
+                        <span className="text-[10px] text-white/25">{s.court}</span>
+                      )}
+                      {s.event_date && (
+                        <span className="flex items-center gap-1 text-[10px] text-white/25">
+                          <Calendar className="h-2.5 w-2.5" />
+                          {new Date(`${s.event_date}T00:00:00`).toLocaleDateString("en-JM", { year: "numeric", month: "short", day: "numeric" })}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-[#FED100]/10 px-1.5 py-0.5 text-[9px] font-semibold text-[#FED100]">
+                    Sitting
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="px-3 py-3">
+              <p className="text-[11px] text-white/35">
+                No existing cases match — you can still track this number.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {error && (
+        <p className="mt-1.5 text-[10px] text-red-400">{error}</p>
+      )}
+
+      {tracked && !error && (
+        <div className="mt-2.5 flex items-center gap-2 rounded-lg border border-[#009B3A]/20 bg-[#009B3A]/[0.06] px-2.5 py-2">
+          <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#009B3A]" />
+          <span className="flex-1 truncate font-mono text-[11px] text-white/70">
+            {tracked.caseNumber}
+          </span>
+          <span className="shrink-0 text-[10px] font-medium text-[#009B3A]">
+            Tracking
+          </span>
+          {tracked.rowId > 0 && (
+            <button
+              type="button"
+              onClick={() => setNotifOpen((p) => !p)}
+              className="flex shrink-0 items-center gap-0.5 rounded px-0.5 transition-colors hover:bg-white/[0.06]"
+              aria-label="Notification settings"
+            >
+              <Bell
+                className={`h-3 w-3 transition-colors ${
+                  activeCount > 0 ? "text-[#FED100]" : "text-white/20"
+                }`}
+              />
+              {activeCount > 0 && (
+                <span className="text-[9px] font-bold text-[#FED100]">{activeCount}</span>
+              )}
+            </button>
+          )}
+          {notifOpen && tracked.rowId > 0 && (
+            <NotifModal
+              rowId={tracked.rowId}
+              initial={tracked.settings}
+              caseLabel={tracked.caseNumber}
+              onClose={() => setNotifOpen(false)}
+            />
+          )}
+        </div>
       )}
     </div>
   );
@@ -427,7 +700,6 @@ function DocketEmpty({ onRefresh }: { onRefresh: () => void }) {
       >
         Browse Cases
       </Button>
-      <AddByNumberForm onRefresh={onRefresh} />
     </div>
   );
 }
@@ -525,7 +797,6 @@ export default function DocketSection({
               <DocketCard key={item.userCase.id} item={item} onUntrack={onUntrack} />
             ))}
           </div>
-          <AddByNumberForm onRefresh={onRefresh} />
         </>
       ) : (
         <DocketEmpty onRefresh={onRefresh} />

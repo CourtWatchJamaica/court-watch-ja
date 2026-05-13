@@ -1811,6 +1811,63 @@ pub async fn check_notifications(pool: &PgPool) {
     }
 }
 
+// ── Legal News ─────────────────────────────────────────────────────────────
+
+pub async fn upsert_legal_news(
+    pool: &PgPool,
+    title: &str,
+    description: Option<&str>,
+    source: &str,
+    url: &str,
+    published_at: Option<chrono::NaiveDateTime>,
+    category: &str,
+) -> sqlx::Result<()> {
+    sqlx::query(
+        "INSERT INTO legal_news (title, description, source, url, published_at, category)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (url) DO NOTHING",
+    )
+    .bind(title)
+    .bind(description)
+    .bind(source)
+    .bind(url)
+    .bind(published_at)
+    .bind(category)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+pub async fn list_legal_news(
+    pool: &PgPool,
+    category: Option<&str>,
+    limit: i64,
+) -> sqlx::Result<Vec<LegalNews>> {
+    if let Some(cat) = category {
+        sqlx::query_as::<_, LegalNews>(
+            "SELECT id, title, description, source, url, published_at, category, created_at
+             FROM legal_news
+             WHERE category = $1
+             ORDER BY COALESCE(published_at, created_at) DESC
+             LIMIT $2",
+        )
+        .bind(cat)
+        .bind(limit)
+        .fetch_all(pool)
+        .await
+    } else {
+        sqlx::query_as::<_, LegalNews>(
+            "SELECT id, title, description, source, url, published_at, category, created_at
+             FROM legal_news
+             ORDER BY COALESCE(published_at, created_at) DESC
+             LIMIT $1",
+        )
+        .bind(limit)
+        .fetch_all(pool)
+        .await
+    }
+}
+
 // ── Parish Court Cases ─────────────────────────────────────────────────────
 
 const PC: &str = "id, parish, accused_name, offence, status, week_of, pdf_source_url, created_at";
@@ -1994,4 +2051,37 @@ pub async fn upsert_parish_case(
     .execute(pool)
     .await?;
     Ok(())
+}
+
+// ── Case lookup ────────────────────────────────────────────────────────────────
+
+pub async fn case_lookup(
+    pool: &PgPool,
+    case_number: &str,
+) -> sqlx::Result<(Vec<CaseLookupJudgmentRow>, Vec<CaseLookupSittingRow>)> {
+    let pattern = format!("%{}%", case_number.to_uppercase());
+
+    let judgments = sqlx::query_as::<_, CaseLookupJudgmentRow>(
+        "SELECT id, case_number, title, date, court
+         FROM judgments
+         WHERE UPPER(case_number) LIKE $1
+         ORDER BY date DESC NULLS LAST
+         LIMIT 5",
+    )
+    .bind(&pattern)
+    .fetch_all(pool)
+    .await?;
+
+    let sittings = sqlx::query_as::<_, CaseLookupSittingRow>(
+        "SELECT id, case_number, title, event_date, court_division
+         FROM court_sittings
+         WHERE UPPER(case_number) LIKE $1
+         ORDER BY event_date DESC NULLS LAST
+         LIMIT 5",
+    )
+    .bind(&pattern)
+    .fetch_all(pool)
+    .await?;
+
+    Ok((judgments, sittings))
 }

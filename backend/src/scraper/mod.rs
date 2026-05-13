@@ -1,4 +1,5 @@
 pub mod appeal_court;
+pub mod news;
 pub mod appeal_court_lists;
 pub mod court_lists;
 pub mod judgment_detail;

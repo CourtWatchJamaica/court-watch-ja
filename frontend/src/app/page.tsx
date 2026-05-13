@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import Navbar from "@/components/Navbar";
 import JudgmentCarousel from "@/components/JudgmentCarousel";
-import DocketSection from "@/components/DocketSection";
+import DocketSection, { AddByNumberForm } from "@/components/DocketSection";
 import LegalPulse from "@/components/LegalPulse";
 import { apiClient } from "@/lib/api";
 import { Judgment, UserCase, CourtSitting, User as UserProfile } from "@/lib/types";
@@ -369,7 +369,19 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* ── b. Latest Judgments Carousel ── */}
+          {/* ── b. Track by Case Number ── */}
+          <div className="mb-8">
+            <div className="mb-3 flex items-center gap-2.5">
+              <div className="h-4 w-[3px] rounded-full bg-[#FED100]" />
+              <Scale className="h-3.5 w-3.5 text-[#FED100]" />
+              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#FED100]">
+                Track a Case
+              </span>
+            </div>
+            <AddByNumberForm onRefresh={fetchData} />
+          </div>
+
+          {/* ── c. Latest Judgments Carousel ── */}
           <div className="mb-8 carousel-container group">
             {loading ? (
               <div>

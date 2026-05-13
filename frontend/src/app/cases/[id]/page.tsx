@@ -191,20 +191,19 @@ export default function CaseDetailPage() {
                 </div>
               )}
 
-              {/* PDF link */}
-              {judgment.pdf_url && (
-                <div className="px-6 pb-6">
-                  <a
-                    href={judgment.pdf_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 rounded-xl border border-[#009B3A]/25 bg-[#009B3A]/10 px-4 py-2.5 text-[12px] font-semibold text-[#009B3A] hover:bg-[#009B3A]/15 transition-colors"
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                    Download PDF
-                  </a>
-                </div>
-              )}
+              {/* PDF download */}
+              <div className="px-6 pb-6">
+                <a
+                  href={`${process.env.NEXT_PUBLIC_API_URL}/pdf/judgment/${judgment.id}`}
+                  className="group inline-flex items-center gap-2.5 rounded-xl border border-[#009B3A]/25 bg-[#009B3A]/10 px-4 py-2.5 text-[12px] font-semibold text-[#009B3A] hover:bg-[#009B3A]/15 transition-colors"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Download Summary (PDF)
+                  <span className="font-mono text-[9px] font-normal text-[#009B3A]/50 group-hover:text-[#009B3A]/70 transition-colors">
+                    CourtWatch JA
+                  </span>
+                </a>
+              </div>
 
               {/* Footer */}
               <div className="px-6 py-4 border-t border-white/[0.05]">

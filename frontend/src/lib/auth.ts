@@ -2,14 +2,16 @@ import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import Apple from "next-auth/providers/apple";
 
+const providers = [
+  ...(process.env.AUTH_GOOGLE_ID ? [Google] : []),
+  ...(process.env.AUTH_APPLE_ID
+    ? [Apple({ clientId: process.env.AUTH_APPLE_ID, clientSecret: process.env.AUTH_APPLE_SECRET! })]
+    : []),
+];
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  providers: [
-    Google,
-    Apple({
-      clientId: process.env.AUTH_APPLE_ID!,
-      clientSecret: process.env.AUTH_APPLE_SECRET!,
-    }),
-  ],
+  secret: process.env.AUTH_SECRET,
+  providers,
   session: { strategy: "jwt" },
   pages: {
     signIn: "/auth/login",

@@ -1,10 +1,12 @@
 import {
   ActivityLogRow,
   AdminUser,
+  CaseLookupResult,
   CourtSitting,
   Judge,
   JudgeConnection,
   Judgment,
+  LegalNewsItem,
   Notification,
   ParishCaseDetail,
   ParishCourtCase,
@@ -430,6 +432,23 @@ export const apiClient = {
 
   async getParishSummary(): Promise<{ summary: ParishSummary[] }> {
     return request("/parish-summary");
+  },
+
+  // ── Case Lookup ───────────────────────────────────────────────────────────
+  async caseLookup(caseNumber: string): Promise<CaseLookupResult> {
+    return request(`/case-lookup?case_number=${encodeURIComponent(caseNumber)}`);
+  },
+
+  // ── Legal News ────────────────────────────────────────────────────────────
+  async getLegalNews(opts?: {
+    category?: string;
+    limit?: number;
+  }): Promise<{ news: LegalNewsItem[] }> {
+    const params = new URLSearchParams();
+    if (opts?.category) params.set("category", opts.category);
+    if (opts?.limit != null) params.set("limit", String(opts.limit));
+    const qs = params.toString();
+    return request(`/legal-news${qs ? `?${qs}` : ""}`);
   },
 
   // ── Admin: Announce ───────────────────────────────────────────────────────

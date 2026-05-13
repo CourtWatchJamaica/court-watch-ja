@@ -18,6 +18,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
   title: "CourtWatch JA — Jamaican Legal Case Tracker",
   description:
     "Track Jamaican court judgments, monitor cases, and stay informed on the latest legal decisions.",

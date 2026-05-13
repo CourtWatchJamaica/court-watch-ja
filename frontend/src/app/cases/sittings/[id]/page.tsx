@@ -12,6 +12,7 @@ import { useTracking } from "@/lib/tracking-context";
 import {
   ArrowLeft,
   Calendar,
+  Download,
   User,
   Building2,
   Clock,
@@ -197,6 +198,20 @@ export default function SittingDetailPage() {
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* Court list PDF download */}
+              <div className="px-6 pb-6">
+                <a
+                  href={`${process.env.NEXT_PUBLIC_API_URL}/pdf/sitting/${sitting.id}`}
+                  className="group inline-flex items-center gap-2.5 rounded-xl border border-[#FED100]/25 bg-[#FED100]/10 px-4 py-2.5 text-[12px] font-semibold text-[#FED100] hover:bg-[#FED100]/15 transition-colors"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Download Summary (PDF)
+                  <span className="font-mono text-[9px] font-normal text-[#FED100]/50 group-hover:text-[#FED100]/70 transition-colors">
+                    CourtWatch JA
+                  </span>
+                </a>
               </div>
 
               {/* Footer */}

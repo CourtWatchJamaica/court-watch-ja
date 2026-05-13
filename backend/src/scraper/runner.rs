@@ -35,8 +35,23 @@ pub async fn start(pool: PgPool, config: Arc<Config>) -> anyhow::Result<()> {
         sched.add(job).await?;
     }
 
+    // ── Daily RSS news feed at 08:00 UTC ─────────────────────────────────
+    {
+        let pool = pool.clone();
+        let job = Job::new_async("0 0 8 * * *", move |_uuid, _lock| {
+            let pool = pool.clone();
+            Box::pin(async move {
+                info!("[News] Daily RSS scrape starting");
+                if let Err(e) = super::news::run(&pool).await {
+                    error!("[News] RSS scrape failed: {e}");
+                }
+            })
+        })?;
+        sched.add(job).await?;
+    }
+
     sched.start().await?;
-    info!("Cron scheduler started — judgments+courts scraped Mon/Wed/Fri 06:00 UTC, judges Mon 06:00 UTC");
+    info!("Cron scheduler started — judgments+courts scraped Mon/Wed/Fri 06:00 UTC, news daily 08:00 UTC");
     Ok(())
 }
 

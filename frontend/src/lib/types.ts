@@ -146,3 +146,34 @@ export interface ParishCaseDetail {
   total_count: number;
   offence_tallies: ParishCaseTallies;
 }
+
+export interface CaseLookupResult {
+  found: boolean;
+  judgments: Array<{
+    id: number;
+    case_number: string;
+    title: string | null;
+    date: string | null;
+    court: string | null;
+  }>;
+  sittings: Array<{
+    id: number;
+    case_number: string | null;
+    title: string | null;
+    event_date: string | null;
+    court: string | null;
+  }>;
+  has_upcoming: boolean;
+  has_past: boolean;
+}
+
+export interface LegalNewsItem {
+  id: number;
+  title: string;
+  description: string | null;
+  source: string;
+  url: string;
+  published_at: string | null;
+  category: string;
+  created_at: string;
+}

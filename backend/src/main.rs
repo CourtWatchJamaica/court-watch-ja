@@ -154,6 +154,18 @@ async fn main() -> anyhow::Result<()> {
         });
     }
 
+    // ── Startup RSS news fetch ─────────────────────────────────────────────
+    // Runs once in the background immediately on boot; daily cron handles
+    // subsequent fetches.  ON CONFLICT DO NOTHING makes this safe to repeat.
+    {
+        let pool_bg = pool.clone();
+        tokio::spawn(async move {
+            if let Err(e) = scraper::news::run(&pool_bg).await {
+                tracing::warn!("Startup RSS news fetch failed: {e}");
+            }
+        });
+    }
+
     // ── Listen ────────────────────────────────────────────────────────────
     let addr = format!("0.0.0.0:{}", config.port);
     let listener = tokio::net::TcpListener::bind(&addr).await?;

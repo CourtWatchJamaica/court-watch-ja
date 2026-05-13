@@ -157,3 +157,35 @@ pub struct ParishSummary {
     pub name: String,
     pub total_cases: i64,
 }
+
+// ── Case-lookup projections (used only by the /case-lookup handler) ──────────
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+pub struct CaseLookupJudgmentRow {
+    pub id: i32,
+    pub case_number: String,
+    pub title: Option<String>,
+    pub date: Option<NaiveDate>,
+    pub court: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+pub struct CaseLookupSittingRow {
+    pub id: i32,
+    pub case_number: Option<String>,
+    pub title: Option<String>,
+    pub event_date: Option<NaiveDate>,
+    pub court_division: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct LegalNews {
+    pub id: i32,
+    pub title: String,
+    pub description: Option<String>,
+    pub source: String,
+    pub url: String,
+    pub published_at: Option<NaiveDateTime>,
+    pub category: String,
+    pub created_at: NaiveDateTime,
+}
