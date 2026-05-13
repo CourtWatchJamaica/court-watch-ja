@@ -1,7 +1,24 @@
+# ── Secrets / local environment ──────────────────────────────────────────────
 .env
-backend/pdfs/
+.env.local
+.env.*.local
+backend/.env
+frontend/.env.local
+
+# ── Rust build artifacts ──────────────────────────────────────────────────────
 backend/target/
+backend/pdfs/
 backend/scraper_state.json
+
+# ── Next.js build artifacts ───────────────────────────────────────────────────
 frontend/.next/
 frontend/node_modules/
-frontend/.env.example
+
+# ── macOS metadata ────────────────────────────────────────────────────────────
+.DS_Store
+**/.DS_Store
+
+# ── Editor / backup clutter ───────────────────────────────────────────────────
+*.backup
+*.backup.*
+*,backup*
