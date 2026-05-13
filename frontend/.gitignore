@@ -1,49 +1,96 @@
-
-# dependencies
-/node_modules
+# ─── Dependencies ──────────────────────────────────────────────────────────────
+node_modules/
 /.pnp
 .pnp.js
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
 
-# testing
-/coverage
-
-# next.js
+# ─── Next.js build output ──────────────────────────────────────────────────────
 /.next/
 /out/
+/build/
 
-# production
-/build
+# ─── TypeScript ────────────────────────────────────────────────────────────────
+*.tsbuildinfo
+next-env.d.ts
 
-# debug
+# ─── Environment files — NEVER commit real credentials ─────────────────────────
+.env
+.env.local
+.env.development
+.env.development.local
+.env.test
+.env.test.local
+.env.production
+.env.production.local
+.env.staging
+.env.*.local
+
+# Keep the sanitised example — it has no secrets
+!.env.example
+
+# ─── Vercel ────────────────────────────────────────────────────────────────────
+.vercel
+
+# ─── Testing / coverage ────────────────────────────────────────────────────────
+/coverage
+/.nyc_output
+/test-results
+/playwright-report
+/playwright/.cache
+
+# ─── Debug logs ────────────────────────────────────────────────────────────────
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+*.log
 
-# env files — NEVER commit real environment files
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-.env.production
-
-# Keep the example file — it has no secrets
-!.env.example
-
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-
-# IDE
+# ─── IDE / editor ──────────────────────────────────────────────────────────────
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-workspace
+*.sublime-project
 
-# OS
+# ─── OS artefacts ──────────────────────────────────────────────────────────────
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+desktop.ini
+
+# ─── Backend / Rust / scraper files (must not live in frontend/) ───────────────
+/backend/
+*.rs
+Cargo.toml
+Cargo.lock
+/target/
+*.rlib
+*.rmeta
+*.pdb
+
+# ─── Mock API / server-side scripts ────────────────────────────────────────────
+mock-api.js
+mock-api.ts
+
+# ─── Miscellaneous ─────────────────────────────────────────────────────────────
+*.pem
+*.key
+*.cert
+*.p12
+*.pfx
+.cache/
+.parcel-cache/
+.turbo/
+storybook-static/
