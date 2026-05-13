@@ -13,6 +13,7 @@ pub struct User {
     #[serde(skip_serializing)]
     pub password_hash: String,
     pub role: String,
+    pub display_name: Option<String>,
     pub created_at: NaiveDateTime,
 }
 

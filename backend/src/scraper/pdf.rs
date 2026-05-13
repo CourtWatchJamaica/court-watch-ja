@@ -57,8 +57,10 @@ pub fn parse_court_list_text(text: &str, pdf_date: Option<NaiveDate>) -> Vec<Sit
     // COR: line (Commercial Division judge)
     let re_cor = Regex::new(r"(?i)^COR\s*:?\s*(.+)").unwrap();
 
-    // Before: line (Civil Division judge)
-    let re_before = Regex::new(r"(?i)^Before\s*:\s*(.+)").unwrap();
+    // Before: line (Civil/CoA Division judge)
+    // Uses (.*) so a bare "BEFORE:" line (no name on same line) also matches —
+    // the empty capture triggers before_pending mode to collect names from subsequent lines.
+    let re_before = Regex::new(r"(?i)^Before\s*:\s*(.*)").unwrap();
 
     // Counsel / Attorney line
     let re_counsel = Regex::new(r"(?i)^(?:Counsel|Attorney)s?\s*:\s*(.+)").unwrap();
@@ -90,6 +92,9 @@ pub fn parse_court_list_text(text: &str, pdf_date: Option<NaiveDate>) -> Vec<Sit
     let mut current_section: Option<String> = None;
     let mut current_division: Option<String> = None;
     let mut skip_next_case = false; // true after "AND" — consolidated secondary case
+    // CoA PDFs often have "BEFORE:" on its own line followed by judge names.
+    // When true, the next "THE HON…" lines are collected as the current judge.
+    let mut before_pending = false;
 
     for raw in text.lines() {
         let line = raw.trim();
@@ -109,6 +114,17 @@ pub fn parse_court_list_text(text: &str, pdf_date: Option<NaiveDate>) -> Vec<Sit
         // ── Structural noise: skip lines that carry no sitting data ───────────
         if is_noise(line) {
             continue;
+        }
+
+        // ── BEFORE: on its own line — collect following judge-name lines ──────
+        // CoA PDFs use "BEFORE:" alone then list "THE HON … JUSTICE …" on the next lines.
+        if before_pending {
+            let upper = line.to_uppercase();
+            if upper.starts_with("THE HON") {
+                current_judge = Some(clean_judge_name(line));
+                continue; // keep before_pending — more judges may follow
+            }
+            before_pending = false; // non-judge line ends the block; fall through
         }
 
         // ── Day-header date: update context for all subsequent entries ────────
@@ -131,9 +147,16 @@ pub fn parse_court_list_text(text: &str, pdf_date: Option<NaiveDate>) -> Vec<Sit
             continue;
         }
 
-        // ── Judge — Before: (Civil) ───────────────────────────────────────────
+        // ── Judge — Before: (Civil/CoA) ──────────────────────────────────────
         if let Some(cap) = re_before.captures(line) {
-            current_judge = Some(clean_judge_name(cap[1].trim()));
+            let captured = cap[1].trim();
+            if captured.is_empty() {
+                // "BEFORE:" alone — judge names appear on the following lines
+                before_pending = true;
+            } else {
+                current_judge = Some(clean_judge_name(captured));
+                before_pending = false;
+            }
             continue;
         }
 

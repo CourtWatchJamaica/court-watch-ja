@@ -85,8 +85,9 @@ export const apiClient = {
 
   // ── Profile ─────────────────────────────────────────────────────────────
   async updateProfile(body: {
+    display_name?: string | null;
     email?: string;
-    current_password: string;
+    current_password?: string;
     new_password?: string;
   }): Promise<User> {
     return request("/user/profile", {

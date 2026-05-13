@@ -8,10 +8,9 @@ import JudgmentCarousel from "@/components/JudgmentCarousel";
 import DocketSection from "@/components/DocketSection";
 import LegalPulse from "@/components/LegalPulse";
 import { apiClient } from "@/lib/api";
-import { Judgment, UserCase, CourtSitting } from "@/lib/types";
+import { Judgment, UserCase, CourtSitting, User as UserProfile } from "@/lib/types";
 import {
   FileText,
-  Bookmark,
   TrendingUp,
   Scale,
   Calendar,
@@ -20,6 +19,7 @@ import {
   User,
   ArrowUpRight,
 } from "lucide-react";
+import { VerdictIcon } from "@/components/icons";
 import { Skeleton } from "@/components/ui/skeleton";
 
 /* ── Stat card — always dark regardless of theme ── */
@@ -37,13 +37,13 @@ function StatCard({
   iconColor: string;
 }) {
   return (
-    <div className="flex items-center gap-3.5 rounded-2xl border border-white/[0.07] bg-[#0d0d1a] px-5 py-4 shrink-0">
+    <div className="flex items-center gap-3.5 rounded-2xl border border-border bg-card px-5 py-4 shrink-0">
       <div className={`rounded-xl p-2.5 ${iconBg}`}>
         <Icon className={`h-5 w-5 ${iconColor}`} />
       </div>
       <div>
-        <p className="text-xl font-bold text-white leading-none">{value}</p>
-        <p className="mt-1 text-[11px] text-white/45 leading-none">{label}</p>
+        <p className="text-xl font-bold text-foreground leading-none">{value}</p>
+        <p className="mt-1 text-[11px] text-muted-foreground leading-none">{label}</p>
       </div>
     </div>
   );
@@ -51,7 +51,7 @@ function StatCard({
 
 function SkeletonStat() {
   return (
-    <div className="flex items-center gap-3.5 rounded-2xl border border-white/[0.06] bg-[#0d0d1a] px-5 py-4 shrink-0 min-w-[140px]">
+    <div className="flex items-center gap-3.5 rounded-2xl border border-border bg-card px-5 py-4 shrink-0 min-w-[140px]">
       <Skeleton className="h-10 w-10 rounded-xl bg-white/[0.06]" />
       <div className="space-y-2">
         <Skeleton className="h-5 w-10 bg-white/[0.06]" />
@@ -95,7 +95,7 @@ function TodaySittings({ sittings, loading }: TodaySittingsProps) {
         </div>
         <button
           onClick={() => router.push("/court-sittings/today")}
-          className="flex items-center gap-1 text-[11px] font-medium text-[#FED100]/55 hover:text-[#FED100] transition-colors"
+          className="flex items-center gap-1 text-[11px] font-medium text-amber-600 hover:text-amber-700 dark:text-[#FED100]/70 dark:hover:text-[#FED100] transition-colors"
         >
           View All
           <ArrowUpRight className="h-3 w-3" />
@@ -105,30 +105,28 @@ function TodaySittings({ sittings, loading }: TodaySittingsProps) {
       {loading ? (
         <div className="space-y-2">
           {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-14 rounded-xl bg-white/[0.06]" />
+            <Skeleton key={i} className="h-14 rounded-xl bg-muted" />
           ))}
         </div>
       ) : display.length > 0 ? (
-        <div className="rounded-2xl border border-white/[0.06] bg-[#0d0d1a] overflow-hidden divide-y divide-white/[0.05]">
+        <div className="rounded-2xl border border-border bg-card overflow-hidden divide-y divide-border">
           {display.map((sitting) => (
             <div
               key={sitting.id}
-              className="group flex items-start gap-3 px-4 py-3 hover:bg-white/[0.025] transition-colors cursor-pointer"
+              className="group flex items-start gap-3 px-4 py-3 hover:bg-accent/40 transition-colors cursor-pointer"
               onClick={() => router.push(`/cases/sittings/${sitting.id}`)}
             >
               {/* Time */}
               <div className="shrink-0 text-center min-w-[44px]">
                 {sitting.event_time ? (
-                  <>
-                    <p className="text-[11px] font-bold text-[#FED100]">
-                      {formatSittingTime(sitting.event_time)}
-                    </p>
-                  </>
+                  <p className="text-[11px] font-bold text-amber-600 dark:text-[#FED100]">
+                    {formatSittingTime(sitting.event_time)}
+                  </p>
                 ) : (
-                  <p className="text-[11px] text-white/30">TBD</p>
+                  <p className="text-[11px] text-muted-foreground/50">TBD</p>
                 )}
                 {sitting.event_date && sitting.event_date !== today && (
-                  <p className="text-[9px] text-white/30 mt-0.5">
+                  <p className="text-[9px] text-muted-foreground/60 mt-0.5">
                     {new Date(
                       `${sitting.event_date}T00:00:00`,
                     ).toLocaleDateString("en-JM", {
@@ -140,16 +138,16 @@ function TodaySittings({ sittings, loading }: TodaySittingsProps) {
               </div>
 
               {/* Divider */}
-              <div className="mt-1 h-full w-px bg-white/[0.08] shrink-0 self-stretch" />
+              <div className="mt-1 h-full w-px bg-border shrink-0 self-stretch" />
 
               {/* Content */}
               <div className="flex-1 min-w-0">
-                <p className="text-[12px] font-medium text-white/80 line-clamp-1 group-hover:text-white transition-colors">
+                <p className="text-[12px] font-medium text-foreground/80 line-clamp-1 group-hover:text-foreground transition-colors">
                   {sitting.title || sitting.case_number || "Untitled Sitting"}
                 </p>
                 <div className="mt-1 flex items-center gap-2 flex-wrap">
                   {sitting.judge_name && (
-                    <div className="flex items-center gap-1 text-[10px] text-white/35">
+                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
                       <User className="h-2.5 w-2.5" />
                       <span className="truncate max-w-[100px]">
                         {sitting.judge_name}
@@ -157,7 +155,7 @@ function TodaySittings({ sittings, loading }: TodaySittingsProps) {
                     </div>
                   )}
                   {sitting.court_division && (
-                    <div className="flex items-center gap-1 text-[10px] text-white/35">
+                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
                       <Building2 className="h-2.5 w-2.5" />
                       <span className="truncate max-w-[100px]">
                         {sitting.court_division}
@@ -166,19 +164,19 @@ function TodaySittings({ sittings, loading }: TodaySittingsProps) {
                   )}
                 </div>
               </div>
-              <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-white/15 group-hover:text-white/50 transition-colors" />
+              <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/30 group-hover:text-muted-foreground transition-colors" />
             </div>
           ))}
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.05] bg-[#0d0d1a] py-10 text-center px-6">
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card py-10 text-center px-6">
           <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-[#FED100]/[0.07] ring-1 ring-[#FED100]/15">
             <Calendar className="h-5 w-5 text-[#FED100]/50" />
           </div>
-          <p className="text-sm font-medium text-white/40">
+          <p className="text-sm font-medium text-muted-foreground">
             No sittings scheduled
           </p>
-          <p className="mt-1 text-xs text-white/20">
+          <p className="mt-1 text-xs text-muted-foreground/60">
             Court lists are updated daily.
           </p>
         </div>
@@ -191,6 +189,7 @@ function TodaySittings({ sittings, loading }: TodaySittingsProps) {
 
 export default function Dashboard() {
   const router = useRouter();
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [latestJudgments, setLatestJudgments] = useState<Judgment[]>([]);
   const [trackedCases, setTrackedCases] = useState<UserCase[]>([]);
   const [sittings, setSittings] = useState<CourtSitting[]>([]);
@@ -200,11 +199,13 @@ export default function Dashboard() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [judgmentsRes, casesRes, sittingsRes] = await Promise.all([
+      const [judgmentsRes, casesRes, sittingsRes, userRes] = await Promise.all([
         apiClient.getJudgments(),
         apiClient.getUserCases(),
         apiClient.getCourtSittings(),
+        apiClient.getMe(),
       ]);
+      setUser(userRes);
       setAllJudgments(judgmentsRes.judgments);
       setLatestJudgments(judgmentsRes.judgments.slice(0, 6));
       setTrackedCases(casesRes.cases);
@@ -247,7 +248,7 @@ export default function Dashboard() {
               </span>
             </div>
             <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
-              Good morning, Counsellor
+              Good morning, {user?.display_name || "Counsellor"}
             </h1>
             <p className="mt-1.5 text-sm text-muted-foreground">
               {new Date().toLocaleDateString("en-JM", {
@@ -276,7 +277,7 @@ export default function Dashboard() {
                   <StatCard
                     label="Tracked Cases"
                     value={trackedCases.length}
-                    icon={Bookmark}
+                    icon={VerdictIcon}
                     iconBg="bg-[#FED100]/12"
                     iconColor="text-[#FED100]"
                   />

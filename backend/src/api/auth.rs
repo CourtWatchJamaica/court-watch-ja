@@ -24,6 +24,7 @@ pub struct MeResponse {
     pub id: i32,
     pub email: String,
     pub role: String,
+    pub display_name: Option<String>,
     pub created_at: String,
 }
 
@@ -85,14 +86,16 @@ pub async fn me(
         id: user.id,
         email: user.email,
         role: user.role,
+        display_name: user.display_name,
         created_at: user.created_at.to_string(),
     }))
 }
 
 #[derive(Deserialize)]
 pub struct UpdateProfileRequest {
+    pub display_name: Option<String>,  // no password required; None = absent, Some("") = clear
     pub email: Option<String>,
-    pub current_password: String,
+    pub current_password: Option<String>, // required only when email / new_password is set
     pub new_password: Option<String>,
 }
 
@@ -101,7 +104,7 @@ pub async fn update_profile(
     Extension(user_id): Extension<i32>,
     Json(body): Json<UpdateProfileRequest>,
 ) -> Result<Json<MeResponse>, AppError> {
-    if body.email.is_none() && body.new_password.is_none() {
+    if body.display_name.is_none() && body.email.is_none() && body.new_password.is_none() {
         return Err(AppError::BadRequest("No changes provided".into()));
     }
 
@@ -109,30 +112,49 @@ pub async fn update_profile(
         .await?
         .ok_or(AppError::NotFound)?;
 
-    let valid = bcrypt::verify(&body.current_password, &user.password_hash)
-        .map_err(|e| AppError::Internal(e.to_string()))?;
-
-    if !valid {
-        return Err(AppError::BadRequest("Current password is incorrect".into()));
-    }
-
-    let new_hash = if let Some(ref pw) = body.new_password {
-        if pw.len() < 8 {
-            return Err(AppError::BadRequest(
-                "New password must be at least 8 characters".into(),
-            ));
+    // Password verification is required only for credential changes.
+    let new_hash = if body.email.is_some() || body.new_password.is_some() {
+        let cp = body.current_password.as_deref().unwrap_or("");
+        if cp.is_empty() {
+            return Err(AppError::BadRequest("Current password is required".into()));
         }
-        Some(
-            bcrypt::hash(pw, bcrypt::DEFAULT_COST)
-                .map_err(|e| AppError::Internal(e.to_string()))?,
-        )
+        let valid = bcrypt::verify(cp, &user.password_hash)
+            .map_err(|e| AppError::Internal(e.to_string()))?;
+        if !valid {
+            return Err(AppError::BadRequest("Current password is incorrect".into()));
+        }
+        if let Some(ref pw) = body.new_password {
+            if pw.len() < 8 {
+                return Err(AppError::BadRequest(
+                    "New password must be at least 8 characters".into(),
+                ));
+            }
+            Some(
+                bcrypt::hash(pw, bcrypt::DEFAULT_COST)
+                    .map_err(|e| AppError::Internal(e.to_string()))?,
+            )
+        } else {
+            None
+        }
     } else {
         None
+    };
+
+    // Resolve the final display_name:
+    //   - body contains Some(s)  → trim it; empty string becomes NULL
+    //   - body contains None     → keep whatever is currently stored
+    let final_display_name: Option<String> = match body.display_name {
+        Some(ref s) => {
+            let t = s.trim();
+            if t.is_empty() { None } else { Some(t.to_string()) }
+        }
+        None => user.display_name.clone(),
     };
 
     let updated = queries::update_user_profile(
         &state.db,
         user_id,
+        final_display_name.as_deref(),
         body.email.as_deref(),
         new_hash.as_deref(),
     )
@@ -143,6 +165,7 @@ pub async fn update_profile(
         id: updated.id,
         email: updated.email,
         role: updated.role,
+        display_name: updated.display_name,
         created_at: updated.created_at.to_string(),
     }))
 }

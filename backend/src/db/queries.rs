@@ -36,7 +36,7 @@ pub async fn set_system_config(pool: &PgPool, key: &str, value: &str) -> sqlx::R
 pub async fn create_user(pool: &PgPool, email: &str, password_hash: &str) -> sqlx::Result<User> {
     sqlx::query_as::<_, User>(
         "INSERT INTO users (email, password_hash) VALUES ($1, $2)
-         RETURNING id, email, password_hash, role, created_at",
+         RETURNING id, email, password_hash, role, display_name, created_at",
     )
     .bind(email)
     .bind(password_hash)
@@ -46,7 +46,7 @@ pub async fn create_user(pool: &PgPool, email: &str, password_hash: &str) -> sql
 
 pub async fn find_user_by_email(pool: &PgPool, email: &str) -> sqlx::Result<Option<User>> {
     sqlx::query_as::<_, User>(
-        "SELECT id, email, password_hash, role, created_at FROM users WHERE email = $1",
+        "SELECT id, email, password_hash, role, display_name, created_at FROM users WHERE email = $1",
     )
     .bind(email)
     .fetch_optional(pool)
@@ -55,7 +55,7 @@ pub async fn find_user_by_email(pool: &PgPool, email: &str) -> sqlx::Result<Opti
 
 pub async fn get_user_by_id(pool: &PgPool, id: i32) -> sqlx::Result<Option<User>> {
     sqlx::query_as::<_, User>(
-        "SELECT id, email, password_hash, role, created_at FROM users WHERE id = $1",
+        "SELECT id, email, password_hash, role, display_name, created_at FROM users WHERE id = $1",
     )
     .bind(id)
     .fetch_optional(pool)
@@ -66,7 +66,7 @@ pub async fn get_user_by_id(pool: &PgPool, id: i32) -> sqlx::Result<Option<User>
 
 pub async fn admin_list_users(pool: &PgPool) -> sqlx::Result<Vec<User>> {
     sqlx::query_as::<_, User>(
-        "SELECT id, email, password_hash, role, created_at FROM users ORDER BY created_at DESC",
+        "SELECT id, email, password_hash, role, display_name, created_at FROM users ORDER BY created_at DESC",
     )
     .fetch_all(pool)
     .await
@@ -79,7 +79,7 @@ pub async fn admin_set_user_role(
 ) -> sqlx::Result<Option<User>> {
     sqlx::query_as::<_, User>(
         "UPDATE users SET role = $1 WHERE id = $2
-         RETURNING id, email, password_hash, role, created_at",
+         RETURNING id, email, password_hash, role, display_name, created_at",
     )
     .bind(role)
     .bind(user_id)
@@ -98,17 +98,20 @@ pub async fn admin_delete_user(pool: &PgPool, user_id: i32) -> sqlx::Result<bool
 pub async fn update_user_profile(
     pool: &PgPool,
     user_id: i32,
+    display_name: Option<&str>,       // SET directly — None clears the field
     new_email: Option<&str>,
     new_password_hash: Option<&str>,
 ) -> sqlx::Result<Option<User>> {
     sqlx::query_as::<_, User>(
         "UPDATE users
-         SET email         = COALESCE($2, email),
-             password_hash = COALESCE($3, password_hash)
+         SET display_name  = $2,
+             email         = COALESCE($3, email),
+             password_hash = COALESCE($4, password_hash)
          WHERE id = $1
-         RETURNING id, email, password_hash, role, created_at",
+         RETURNING id, email, password_hash, role, display_name, created_at",
     )
     .bind(user_id)
+    .bind(display_name)
     .bind(new_email)
     .bind(new_password_hash)
     .fetch_optional(pool)

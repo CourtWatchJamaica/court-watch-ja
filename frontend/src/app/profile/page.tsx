@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Loader2,
+  Pencil,
 } from "lucide-react";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -68,12 +69,12 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a] overflow-hidden">
-      <div className="flex items-center gap-3 px-6 py-4 border-b border-white/[0.05]">
+    <div className="rounded-2xl border border-border bg-card overflow-hidden">
+      <div className="flex items-center gap-3 px-6 py-4 border-b border-border">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#009B3A]/10">
           <Icon className="h-4 w-4 text-[#009B3A]" />
         </div>
-        <h2 className="text-sm font-semibold text-white/80">{title}</h2>
+        <h2 className="text-sm font-semibold text-foreground/80">{title}</h2>
       </div>
       <div className="px-6 py-5 space-y-4">{children}</div>
     </div>
@@ -103,7 +104,7 @@ function Field({
 }) {
   return (
     <div className="space-y-1.5">
-      <label htmlFor={id} className="block text-[11px] font-semibold uppercase tracking-wider text-white/35">
+      <label htmlFor={id} className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
         {label}
       </label>
       <input
@@ -114,7 +115,7 @@ function Field({
         placeholder={placeholder}
         autoComplete={autoComplete}
         disabled={disabled}
-        className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none focus:border-[#009B3A]/50 focus:ring-1 focus:ring-[#009B3A]/25 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        className="w-full rounded-xl border border-border bg-background/50 px-4 py-3 text-sm text-foreground placeholder-muted-foreground/40 focus:outline-none focus:border-[#009B3A]/50 focus:ring-1 focus:ring-[#009B3A]/25 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
       />
     </div>
   );
@@ -147,6 +148,11 @@ function ProfilePage() {
   const [user, setUser] = useState<User | null>(null);
   const [userLoading, setUserLoading] = useState(true);
 
+  // Display name form state
+  const [displayName, setDisplayName] = useState("");
+  const [displayNameLoading, setDisplayNameLoading] = useState(false);
+  const [displayNameFeedback, setDisplayNameFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
   // Email form state
   const [newEmail, setNewEmail] = useState("");
   const [emailPassword, setEmailPassword] = useState("");
@@ -164,6 +170,7 @@ function ProfilePage() {
     try {
       const u = await apiClient.getMe();
       setUser(u);
+      setDisplayName(u.display_name ?? "");
       setNewEmail(u.email);
     } catch {
       // AuthGuard handles 401
@@ -175,6 +182,25 @@ function ProfilePage() {
   useEffect(() => {
     void loadUser();
   }, [loadUser]);
+
+  const handleDisplayNameSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setDisplayNameFeedback(null);
+    setDisplayNameLoading(true);
+    try {
+      const updated = await apiClient.updateProfile({ display_name: displayName.trim() || null });
+      setUser(updated);
+      setDisplayName(updated.display_name ?? "");
+      setDisplayNameFeedback({ type: "success", message: "Display name updated." });
+    } catch (err) {
+      setDisplayNameFeedback({
+        type: "error",
+        message: err instanceof Error ? err.message : "Failed to update display name.",
+      });
+    } finally {
+      setDisplayNameLoading(false);
+    }
+  };
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -265,20 +291,20 @@ function ProfilePage() {
         <SectionCard title="Account" icon={UserCircle2}>
           {userLoading ? (
             <div className="space-y-3 animate-pulse">
-              <div className="h-4 w-48 rounded bg-white/[0.06]" />
-              <div className="h-3 w-32 rounded bg-white/[0.04]" />
+              <div className="h-4 w-48 rounded bg-muted" />
+              <div className="h-3 w-32 rounded bg-muted/60" />
             </div>
           ) : user ? (
             <div className="space-y-3">
               <div className="flex items-center gap-3">
-                <Mail className="h-4 w-4 text-white/30 shrink-0" />
-                <span className="text-sm text-white/80">{user.email}</span>
+                <Mail className="h-4 w-4 text-muted-foreground/60 shrink-0" />
+                <span className="text-sm text-foreground/80">{user.email}</span>
               </div>
               <div className="flex items-center gap-3">
-                <ShieldCheck className="h-4 w-4 text-white/30 shrink-0" />
+                <ShieldCheck className="h-4 w-4 text-muted-foreground/60 shrink-0" />
                 <RoleBadge role={user.role} />
               </div>
-              <div className="text-[11px] text-white/25 pt-1">
+              <div className="text-[11px] text-muted-foreground/60 pt-1">
                 Member since{" "}
                 {new Date(user.created_at).toLocaleDateString("en-JM", {
                   year: "numeric",
@@ -288,8 +314,30 @@ function ProfilePage() {
               </div>
             </div>
           ) : (
-            <p className="text-sm text-white/30">Unable to load account info.</p>
+            <p className="text-sm text-muted-foreground">Unable to load account info.</p>
           )}
+        </SectionCard>
+
+        {/* ── Display name ── */}
+        <SectionCard title="Display Name" icon={Pencil}>
+          <form onSubmit={handleDisplayNameSubmit} className="space-y-4">
+            <Field
+              label="Display Name"
+              id="display-name"
+              value={displayName}
+              onChange={setDisplayName}
+              placeholder="e.g. Counsellor Smith (leave blank to reset)"
+              autoComplete="nickname"
+              disabled={userLoading}
+            />
+            <p className="text-[11px] text-muted-foreground/60">
+              Shown in the dashboard greeting. Leave blank to use the default "Counsellor".
+            </p>
+            {displayNameFeedback && (
+              <Banner type={displayNameFeedback.type} message={displayNameFeedback.message} />
+            )}
+            <SubmitButton loading={displayNameLoading} label="Save Name" />
+          </form>
         </SectionCard>
 
         {/* ── Change email ── */}

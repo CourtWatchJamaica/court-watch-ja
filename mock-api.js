@@ -540,6 +540,13 @@ function json(res, data, status = 200) {
 let nextSittingId = Math.max(...fakeCourtSittings.map((s) => s.id)) + 1;
 let nextJudgmentId = Math.max(...fakeJudgments.map((j) => j.id)) + 1;
 let judgmentsMutable = [...fakeJudgments];
+let mockUser = {
+  id: 1,
+  email: "admin@courtwatchja.com",
+  role: "super_admin",
+  display_name: null,
+  created_at: "2024-01-01T00:00:00Z",
+};
 
 // ── Server ────────────────────────────────────────────────────────────────────────
 
@@ -602,7 +609,7 @@ const server = http.createServer((req, res) => {
     const q = url.searchParams.get("q")?.toLowerCase();
     const category = url.searchParams.get("category");
     const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10));
-    const limit = Math.min(1000, Math.max(1, parseInt(url.searchParams.get("limit") || "50", 10)));
+    const limit = Math.min(5000, Math.max(1, parseInt(url.searchParams.get("limit") || "5000", 10)));
 
     let results = [...fakeParishCases];
     if (parish) results = results.filter((c) => c.parish === parish);
@@ -653,12 +660,19 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.method === "GET" && path === "/api/auth/me") {
-    return json(res, {
-      id: 1,
-      email: "admin@courtwatchja.com",
-      role: "super_admin",
-      created_at: "2024-01-01T00:00:00Z",
+    return json(res, { ...mockUser });
+  }
+
+  if (req.method === "PUT" && path === "/api/user/profile") {
+    parseBody(req, (body) => {
+      if ("display_name" in body) {
+        const dn = typeof body.display_name === "string" ? body.display_name.trim() : null;
+        mockUser.display_name = dn || null;
+      }
+      if (body.email) mockUser.email = body.email;
+      return json(res, { ...mockUser });
     });
+    return;
   }
 
   // ── Judgments ─────────────────────────────────────────────────────────────────

@@ -20,7 +20,7 @@ pub async fn list_parish_cases(
     Query(params): Query<CasesQuery>,
 ) -> Json<Value> {
     let page = params.page.unwrap_or(1).max(1);
-    let limit = params.limit.unwrap_or(50).clamp(1, 200);
+    let limit = params.limit.unwrap_or(5000).clamp(1, 5000);
 
     match queries::list_parish_cases(
         &state.db,

@@ -71,11 +71,11 @@ function StatItem({
   value: string | number;
 }) {
   return (
-    <div className="flex flex-1 items-center gap-3 rounded-xl border border-white/[0.07] bg-[#0d0d1a] px-4 py-3">
+    <div className="flex flex-1 items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
       <Icon className="h-4 w-4 shrink-0 text-[#009B3A]/70" />
       <div className="min-w-0">
-        <p className="text-[11px] text-white/35 leading-none mb-1">{label}</p>
-        <p className="text-[13px] font-semibold text-white leading-none truncate">{value}</p>
+        <p className="text-[11px] text-muted-foreground leading-none mb-1">{label}</p>
+        <p className="text-[13px] font-semibold text-foreground leading-none truncate">{value}</p>
       </div>
     </div>
   );
@@ -222,16 +222,16 @@ export default function JudgeDetailPage() {
                     {upcomingSittings.map((s) => (
                       <div
                         key={s.id}
-                        className="flex items-start gap-3 rounded-xl border border-white/[0.07] bg-[#0d0d1a] px-4 py-3"
+                        className="flex items-start gap-3 rounded-xl border border-border bg-card px-4 py-3"
                       >
                         <div className="shrink-0 pt-0.5">
                           <Clock className="h-3.5 w-3.5 text-[#FED100]/60" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-[12px] font-medium text-white/80 line-clamp-1">
+                          <p className="text-[12px] font-medium text-foreground/80 line-clamp-1">
                             {s.title || s.case_number || "Sitting"}
                           </p>
-                          <div className="mt-1 flex items-center gap-3 text-[10px] text-white/35">
+                          <div className="mt-1 flex items-center gap-3 text-[10px] text-muted-foreground">
                             {s.event_date && (
                               <span>
                                 {new Date(`${s.event_date}T00:00:00`).toLocaleDateString("en-JM", {

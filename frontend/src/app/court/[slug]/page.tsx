@@ -11,7 +11,8 @@ import { apiClient, CourtStats } from "@/lib/api";
 import { Judgment, CourtSitting } from "@/lib/types";
 import { SLUG_TO_COURT, useCourt, type Court } from "@/lib/court-context";
 import { useTracking } from "@/lib/tracking-context";
-import { Scale, Calendar, FileText, ArrowRight } from "lucide-react";
+import { Calendar, FileText, ArrowRight, ArrowLeft } from "lucide-react";
+import { CourtIcon } from "@/components/icons";
 
 const COURT_DESCRIPTIONS: Record<string, string> = {
   "Supreme Court":
@@ -32,9 +33,9 @@ function StatPill({
   color: string;
 }) {
   return (
-    <div className="flex flex-col items-center rounded-2xl border border-white/[0.07] bg-[#0d0d1a] px-4 py-4">
+    <div className="flex flex-col items-center rounded-2xl border border-border bg-card px-4 py-4">
       <span className={`text-2xl font-bold ${color}`}>{value}</span>
-      <span className="mt-1 text-center text-[11px] text-white/40 leading-snug">{label}</span>
+      <span className="mt-1 text-center text-[11px] text-muted-foreground leading-snug">{label}</span>
     </div>
   );
 }
@@ -103,10 +104,19 @@ export default function CourtPage() {
       <div className="min-h-screen bg-background">
         <Navbar />
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-32 md:pb-12">
+          {/* Back link */}
+          <Link
+            href="/cases"
+            className="mb-6 inline-flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Back to Cases
+          </Link>
+
           {/* Header */}
           <div className="mb-8">
             <div className="mb-2.5 flex items-center gap-2">
-              <Scale className="h-4 w-4 text-[#009B3A]" />
+              <CourtIcon className="h-4 w-4 text-[#009B3A]" />
               <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#009B3A]">
                 Jamaica Court System
               </span>
@@ -125,10 +135,10 @@ export default function CourtPage() {
               [1, 2, 3].map((i) => (
                 <div
                   key={i}
-                  className="animate-pulse rounded-2xl border border-white/[0.06] bg-[#0d0d1a] px-4 py-4 flex flex-col items-center gap-2"
+                  className="animate-pulse rounded-2xl border border-border bg-card px-4 py-4 flex flex-col items-center gap-2"
                 >
-                  <div className="h-6 w-10 rounded bg-white/[0.06]" />
-                  <div className="h-2.5 w-20 rounded bg-white/[0.04]" />
+                  <div className="h-6 w-10 rounded bg-muted" />
+                  <div className="h-2.5 w-20 rounded bg-muted/60" />
                 </div>
               ))
             ) : (
@@ -156,11 +166,11 @@ export default function CourtPage() {
           <div className="mb-8 carousel-container group">
             <div className="mb-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Scale className="h-4 w-4 text-[#009B3A]" />
+                <CourtIcon className="h-4 w-4 text-[#009B3A]" />
                 <h2 className="text-sm font-semibold text-foreground">Latest Judgments</h2>
               </div>
               <Link
-                href="/cases"
+                href={`/cases?court=${slug}`}
                 className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
               >
                 See all
@@ -168,13 +178,13 @@ export default function CourtPage() {
               </Link>
             </div>
             {loading ? (
-              <div className="h-[168px] sm:h-[200px] rounded-2xl border border-white/[0.06] bg-[#0d0d1a] animate-pulse" />
+              <div className="h-[168px] sm:h-[200px] rounded-2xl border border-border bg-card animate-pulse" />
             ) : judgments.length > 0 ? (
               <JudgmentCarousel judgments={judgments} />
             ) : (
-              <div className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.07] bg-[#0d0d1a] py-12">
-                <FileText className="h-8 w-8 text-white/10 mb-2" />
-                <p className="text-sm text-white/30">No judgments for this court</p>
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card py-12">
+                <FileText className="h-8 w-8 text-muted-foreground/30 mb-2" />
+                <p className="text-sm text-muted-foreground">No judgments for this court</p>
               </div>
             )}
           </div>
@@ -187,7 +197,7 @@ export default function CourtPage() {
                 <h2 className="text-sm font-semibold text-foreground">This Week&apos;s Sittings</h2>
               </div>
               <Link
-                href="/cases"
+                href={`/cases?court=${slug}`}
                 className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
               >
                 Browse all cases
@@ -199,7 +209,7 @@ export default function CourtPage() {
                 {[1, 2, 3].map((i) => (
                   <div
                     key={i}
-                    className="h-24 animate-pulse rounded-xl border border-white/[0.06] bg-[#0d0d1a]"
+                    className="h-24 animate-pulse rounded-xl border border-border bg-card"
                   />
                 ))}
               </div>
@@ -216,9 +226,9 @@ export default function CourtPage() {
                 ))}
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.07] bg-[#0d0d1a] py-12">
-                <Calendar className="h-8 w-8 text-white/10 mb-2" />
-                <p className="text-sm text-white/30">No sittings scheduled this week</p>
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card py-12">
+                <Calendar className="h-8 w-8 text-muted-foreground/30 mb-2" />
+                <p className="text-sm text-muted-foreground">No sittings scheduled this week</p>
               </div>
             )}
           </div>
@@ -226,10 +236,10 @@ export default function CourtPage() {
           {/* Browse all CTA */}
           <div className="flex justify-center pt-2">
             <Link
-              href="/cases"
+              href={`/cases?court=${slug}`}
               className="flex items-center gap-2 rounded-xl border border-[#009B3A]/25 bg-[#009B3A]/10 px-6 py-3 text-sm font-semibold text-[#009B3A] hover:bg-[#009B3A]/15 transition-colors"
             >
-              Browse all cases
+              View All Judgments
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>

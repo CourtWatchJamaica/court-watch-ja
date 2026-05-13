@@ -35,6 +35,27 @@ pub async fn run(
     client: &reqwest::Client,
     pdf_dir: &str,
 ) -> anyhow::Result<usize> {
+    // Remove stale processed_appeal_pdf_urls — entries where 0 court_sittings reference
+    // the URL (previous import failed silently, e.g. due to the old parse bug).
+    let stale: Vec<String> = {
+        let mut s = Vec::new();
+        for url in &state.processed_appeal_pdf_urls {
+            match queries::count_sittings_by_source_url(pool, url).await {
+                Ok(0) => s.push(url.clone()),
+                Ok(_) => {}
+                Err(e) => warn!("[CoA Hearings] DB count failed for {url}: {e}"),
+            }
+        }
+        s
+    };
+    if !stale.is_empty() {
+        info!(
+            "[CoA Hearings] Removing {} stale processed-URL entries (0 sittings in DB)",
+            stale.len()
+        );
+        state.processed_appeal_pdf_urls.retain(|u| !stale.contains(u));
+    }
+
     info!("[CoA Hearings] Fetching court lists index: {COURT_LISTS_URL}");
 
     let pdf_links = fetch_paginated_pdf_links(client).await;

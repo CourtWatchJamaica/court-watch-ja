@@ -256,19 +256,41 @@ pub fn date_from_url(url: &str) -> Option<NaiveDate> {
 }
 
 pub fn date_from_text(text: &str) -> Option<NaiveDate> {
-    let re = Regex::new(
-        r"(?i)(?:week\s+commencing|for\s+the\s+week|dated?|sitting)\s+:?\s*(\d{1,2}\s+\w+\s+\d{4}|\w+\s+\d{1,2},?\s+\d{4})",
-    )
-    .unwrap();
     // Use char-safe take — never byte-index.
     let head: String = text.chars().take(1500).collect();
+
+    // Regex to strip ordinal suffixes ("4TH" → "4", "1ST" → "1") before chrono parsing.
+    let re_strip = Regex::new(r"(?i)(\d)(st|nd|rd|th)\b").unwrap();
+
+    // Pass 1: keyword-prefixed date — allow ordinal suffix attached to the day digit
+    // ("SITTING 4TH MAY 2026", "WEEK COMMENCING 1ST JUNE 2026").
+    let re = Regex::new(
+        r"(?i)(?:week\s+commencing|for\s+the\s+week|dated?|sitting)\s+:?\s*(\d{1,2}(?:st|nd|rd|th)?\s+\w+\s+\d{4}|\w+\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4})",
+    )
+    .unwrap();
     if let Some(cap) = re.captures(&head) {
-        let s = &cap[1];
+        let clean = re_strip.replace_all(&cap[1], "$1");
         for fmt in &["%d %B %Y", "%d %b %Y", "%B %d, %Y", "%B %d %Y"] {
-            if let Ok(d) = NaiveDate::parse_from_str(s, fmt) {
+            if let Ok(d) = NaiveDate::parse_from_str(clean.trim(), fmt) {
                 return Some(d);
             }
         }
     }
+
+    // Pass 2: bare ordinal date anywhere in the header — CoA PDFs use this format
+    // without a keyword prefix ("4TH MAY 2026", "MONDAY 4TH MAY 2026").
+    let re_ord = Regex::new(
+        r"(?i)\b(\d{1,2})(?:st|nd|rd|th)\s+([A-Za-z]+)\s+(\d{4})\b",
+    )
+    .unwrap();
+    if let Some(cap) = re_ord.captures(&head) {
+        let plain = format!("{} {} {}", &cap[1], &cap[2], &cap[3]);
+        for fmt in &["%d %B %Y", "%d %b %Y"] {
+            if let Ok(d) = NaiveDate::parse_from_str(&plain, fmt) {
+                return Some(d);
+            }
+        }
+    }
+
     None
 }

@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   UserCircle2,
 } from "lucide-react";
+import { HigherCourtIcon, CourtroomIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import ThemeToggle from "@/components/ThemeToggle";
 import { apiClient } from "@/lib/api";
@@ -35,25 +36,6 @@ const DESKTOP_LINKS = [
   { href: "/judges", label: "Judges" },
 ];
 
-function GavelIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="m14 13-7.5 7.5c-.83.83-2.17.83-3 0 0 0 0 0 0 0a2.12 2.12 0 0 1 0-3L11 10" />
-      <path d="m16 16 6-6" />
-      <path d="m8 8 6-6" />
-      <path d="m9 7 8 8" />
-      <path d="m21 11-8-8" />
-    </svg>
-  );
-}
 
 function getRoleFromToken(): string | null {
   try {
@@ -152,7 +134,7 @@ export default function Navbar() {
             <div className="flex items-center gap-3 shrink-0">
               <Link href="/" className="flex items-center gap-2.5 shrink-0">
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#009B3A]/15 ring-1 ring-[#009B3A]/30">
-                  <Scale className="h-4 w-4 text-[#009B3A]" />
+                  <HigherCourtIcon className="h-4 w-4 text-[#009B3A]" />
                 </div>
                 <span className="font-bold text-[17px] tracking-tight text-white">
                   Court<span className="text-[#009B3A]">Watch</span>
@@ -334,7 +316,7 @@ export default function Navbar() {
             onClick={openChambers}
             className="relative flex flex-col items-center gap-[3px] rounded-[14px] px-[13px] py-2 transition-all duration-200 text-white/35 hover:text-white/70 hover:bg-white/[0.07]"
           >
-            <GavelIcon className="h-[19px] w-[19px]" />
+            <CourtroomIcon className="h-[19px] w-[19px]" />
             <span className="text-[9.5px] font-semibold tracking-wide leading-none">
               Chambers
             </span>
