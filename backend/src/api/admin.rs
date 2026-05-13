@@ -171,8 +171,7 @@ pub async fn deep_scrape(State(state): State<AppState>) -> Result<Json<Value>, A
     tokio::spawn(async move {
         // Lower the cutoff so scrapers go back to 2020
         if let Err(e) =
-            crate::db::queries::set_system_config(&pool, "judgment_cutoff_date", "2020-01-01")
-                .await
+            crate::db::queries::set_system_config(&pool, "judgment_cutoff_date", "2020-01-01").await
         {
             tracing::error!("[DeepScrape] Failed to lower cutoff: {e}");
         }
@@ -189,8 +188,7 @@ pub async fn deep_scrape(State(state): State<AppState>) -> Result<Json<Value>, A
 
         // Restore the cutoff
         if let Err(e) =
-            crate::db::queries::set_system_config(&pool, "judgment_cutoff_date", "2026-01-01")
-                .await
+            crate::db::queries::set_system_config(&pool, "judgment_cutoff_date", "2026-01-01").await
         {
             tracing::error!("[DeepScrape] Failed to restore cutoff: {e}");
         }
