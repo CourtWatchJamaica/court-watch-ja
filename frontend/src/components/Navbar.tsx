@@ -17,6 +17,7 @@ import {
   X,
   ShieldCheck,
   UserCircle2,
+  MoreHorizontal,
 } from "lucide-react";
 import { HigherCourtIcon, CourtroomIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
@@ -59,13 +60,27 @@ export default function Navbar() {
   const [courtSheetOpen, setCourtSheetOpen] = useState(false);
   const [role, setRole] = useState<string | null>(null);
   const [notifToast, setNotifToast] = useState<string | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
   const prevCountRef = useRef<number | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const moreRef = useRef<HTMLDivElement>(null);
 
   // Read role from JWT once on mount (no API call needed — payload is public)
   useEffect(() => {
     setRole(getRoleFromToken());
   }, []);
+
+  // Close "more" dropdown on outside click
+  useEffect(() => {
+    if (!moreOpen) return;
+    function handleOutside(e: MouseEvent) {
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) {
+        setMoreOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, [moreOpen]);
 
   // Poll unread count; show toast when new notifications arrive
   useEffect(() => {
@@ -129,14 +144,14 @@ export default function Navbar() {
 
       <nav className="sticky top-[3px] z-50 border-b border-white/[0.07] bg-[#07070f]/92 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between gap-2">
+          <div className="flex h-16 items-center justify-between gap-1 sm:gap-2">
             {/* Logo + Court Pills */}
-            <div className="flex items-center gap-3 shrink-0">
+            <div className="flex items-center gap-3 shrink-0 min-w-0">
               <Link href="/" className="flex items-center gap-2.5 shrink-0">
                 <div className="flex items-center justify-center rounded-lg bg-[#009B3A]/15 ring-1 ring-[#009B3A]/30 p-1.5">
                   <HigherCourtIcon className="h-5 w-5 text-[#009B3A]" />
                 </div>
-                <span className="font-bold text-[17px] tracking-tight text-white">
+                <span className="font-bold text-[17px] tracking-tight text-white whitespace-nowrap">
                   Court<span className="text-[#009B3A]">Watch</span>
                   <span className="text-[#FED100]"> JA</span>
                 </span>
@@ -203,7 +218,8 @@ export default function Navbar() {
             </div>
 
             {/* Right: Actions */}
-            <div className="flex items-center gap-1.5 shrink-0">
+            <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+              {/* Court selector pill — visible on < lg, opens bottom sheet */}
               <button
                 onClick={() => setCourtSheetOpen(true)}
                 className="lg:hidden flex items-center gap-1.5 rounded-full border border-[#009B3A]/40 bg-[#009B3A]/10 px-2.5 py-1.5 text-[11px] font-semibold text-[#009B3A] transition-colors hover:bg-[#009B3A]/20"
@@ -215,12 +231,17 @@ export default function Navbar() {
                 <ChevronDown className="h-3 w-3 shrink-0" />
               </button>
 
-              <ThemeToggle />
+              {/* ThemeToggle — sm+ only; on mobile it lives in the More dropdown */}
+              <div className="hidden sm:block">
+                <ThemeToggle />
+              </div>
+
+              {/* Bell — always visible */}
               <Link href="/notifications">
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="relative h-9 w-9 rounded-lg text-white/40 hover:text-white hover:bg-white/[0.07]"
+                  className="relative h-8 w-8 sm:h-9 sm:w-9 rounded-lg text-white/40 hover:text-white hover:bg-white/[0.07]"
                 >
                   <Bell className="h-4 w-4" />
                   {unreadCount > 0 && (
@@ -230,11 +251,13 @@ export default function Navbar() {
                   )}
                 </Button>
               </Link>
+
+              {/* Profile — always visible */}
               <Link href="/profile">
                 <Button
                   variant="ghost"
                   size="icon"
-                  className={`h-9 w-9 rounded-lg transition-colors ${
+                  className={`h-8 w-8 sm:h-9 sm:w-9 rounded-lg transition-colors ${
                     pathname.startsWith("/profile")
                       ? "text-[#009B3A] bg-[#009B3A]/10"
                       : "text-white/40 hover:text-white hover:bg-white/[0.07]"
@@ -243,7 +266,9 @@ export default function Navbar() {
                   <UserCircle2 className="h-4 w-4" />
                 </Button>
               </Link>
-              <Link href="/settings">
+
+              {/* Settings — sm+ only */}
+              <Link href="/settings" className="hidden sm:block">
                 <Button
                   variant="ghost"
                   size="icon"
@@ -252,21 +277,66 @@ export default function Navbar() {
                   <Settings className="h-4 w-4" />
                 </Button>
               </Link>
-              <div className="mx-1 h-4 w-px bg-white/[0.08]" />
+
+              {/* Separator — sm+ only */}
+              <div className="hidden sm:block mx-1 h-4 w-px bg-white/[0.08]" />
+
+              {/* Logout — sm+ only */}
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={handleLogout}
-                className="h-9 w-9 rounded-lg text-white/40 hover:text-red-400 hover:bg-red-500/10"
+                className="hidden sm:flex h-9 w-9 rounded-lg text-white/40 hover:text-red-400 hover:bg-red-500/10"
               >
                 <LogOut className="h-4 w-4" />
               </Button>
+
+              {/* More — mobile only: ThemeToggle, Settings, Logout */}
+              <div ref={moreRef} className="relative sm:hidden">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setMoreOpen((v) => !v)}
+                  className="h-8 w-8 rounded-lg text-white/40 hover:text-white hover:bg-white/[0.07]"
+                  aria-label="More options"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+
+                {moreOpen && (
+                  <div className="absolute right-0 top-full mt-1.5 w-44 rounded-xl border border-white/[0.1] bg-[#0d0d1a] shadow-2xl overflow-hidden z-[100]">
+                    {/* Theme */}
+                    <div className="flex items-center justify-between px-3 py-1.5 border-b border-white/[0.07]">
+                      <span className="text-xs text-white/50">Theme</span>
+                      <ThemeToggle />
+                    </div>
+                    {/* Settings */}
+                    <Link
+                      href="/settings"
+                      onClick={() => setMoreOpen(false)}
+                      className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-white/60 hover:text-white hover:bg-white/[0.05] transition-colors"
+                    >
+                      <Settings className="h-4 w-4" />
+                      Settings
+                    </Link>
+                    <div className="h-px bg-white/[0.07]" />
+                    {/* Logout */}
+                    <button
+                      onClick={() => { setMoreOpen(false); handleLogout(); }}
+                      className="flex w-full items-center gap-2.5 px-3 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Log out
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
       </nav>
 
-      {/* Mobile bottom nav */}
+      {/* Mobile bottom nav — untouched */}
       <div className="md:hidden fixed bottom-0 inset-x-0 z-50 flex justify-center pointer-events-none">
         <nav
           className="pointer-events-auto flex items-center gap-0 rounded-[22px] border border-white/[0.08] bg-[#0d0d1a]/96 px-1 py-2 shadow-[0_8px_48px_rgba(0,0,0,0.5)] backdrop-blur-2xl"
@@ -324,7 +394,7 @@ export default function Navbar() {
         </nav>
       </div>
 
-      {/* Court selector sheet */}
+      {/* Court selector bottom sheet */}
       {courtSheetOpen && (
         <>
           <div
