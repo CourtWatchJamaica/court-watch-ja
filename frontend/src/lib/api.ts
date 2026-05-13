@@ -25,6 +25,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers: HeadersInit = {
     "Content-Type": "application/json",
     ...(token && { Authorization: `Bearer ${token}` }),
+    ...(BASE_URL.includes("ngrok-free.app") && { "ngrok-skip-browser-warning": "true" }),
     ...options.headers,
   };
 
