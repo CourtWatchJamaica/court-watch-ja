@@ -18,6 +18,10 @@ frontend/node_modules/
 .DS_Store
 **/.DS_Store
 
+# ── Claude / AI instructions ─────────────────────────────────────────────────
+CLAUDE.md
+**/CLAUDE.md
+
 # ── Editor / backup clutter ───────────────────────────────────────────────────
 *.backup
 *.backup.*
@@ -28,3 +32,5 @@ backend/src/.DS_Store
 frontend/src/app/page.tsx.backup
 frontend/src/components/Navbar,backup.tsx
 frontend/src/components/ScrollToTop.backup.tsx
+CLAUDE.md
+frontend/CLAUDE.md
