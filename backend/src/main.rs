@@ -93,8 +93,7 @@ async fn main() -> anyhow::Result<()> {
     {
         let rl = rate_limiter.clone();
         tokio::spawn(async move {
-            let mut ticker =
-                tokio::time::interval(std::time::Duration::from_secs(300));
+            let mut ticker = tokio::time::interval(std::time::Duration::from_secs(300));
             loop {
                 ticker.tick().await;
                 let mut map = rl.lock().unwrap();
