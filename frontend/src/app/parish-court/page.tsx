@@ -202,6 +202,10 @@ function ParishCourtDashboard() {
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const analyticsLoadedRef                      = useRef(false);
 
+  // Auto-scroll to cases feed when the user taps a filter (mobile only)
+  const casesFeedRef    = useRef<HTMLElement>(null);
+  const isFirstRender   = useRef(true);
+
   // ── Debounce search ─────────────────────────────────────────────────────────
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 300);
@@ -287,6 +291,14 @@ function ParishCourtDashboard() {
   }, []);
 
   const hasFilters = search || activeCategory || selectedParish;
+
+  // Scroll to the cases feed on filter tap — skip first render and desktop
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    if (typeof window !== "undefined" && window.innerWidth < 1024) {
+      casesFeedRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [activeCategory, selectedParish]);
 
   // When map click → switch to cases tab with parish pre-selected
   const handleMapParishClick = useCallback((parish: string) => {
@@ -446,7 +458,7 @@ function ParishCourtDashboard() {
             </section>
 
             {/* Cases Feed */}
-            <section>
+            <section ref={casesFeedRef}>
               <h2 className="text-xs font-semibold text-white/30 uppercase tracking-widest mb-3">
                 Cases
               </h2>

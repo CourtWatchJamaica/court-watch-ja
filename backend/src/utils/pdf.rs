@@ -186,3 +186,46 @@ pub fn extract_text_ocr(pdf_bytes: &[u8]) -> Option<String> {
         Some(full_text)
     }
 }
+
+/// Returns true when `text` appears to contain `case_number`.
+///
+/// Three passes, from most to least strict:
+///   1. Exact case-insensitive substring (works for searchable PDFs).
+///   2. Normalised match (strip non-alphanumeric, lowercase) — catches OCR
+///      spacing artefacts, e.g. "SU 2020 CV 04215" matching "SU2020CV04215".
+///   3. Prefix-stripped match — SC PDFs sometimes write "2020 CV 04215"
+///      without the "SU" court prefix that the DB stores; strip leading
+///      alphabetic chars from the normalised case number and check again.
+pub fn pdf_contains_case_number(text: &str, case_number: &str) -> bool {
+    if case_number.is_empty() {
+        return false;
+    }
+    let lower_text = text.to_lowercase();
+    let lower_case = case_number.to_lowercase();
+
+    // Pass 1: exact case-insensitive
+    if lower_text.contains(&lower_case) {
+        return true;
+    }
+
+    let norm_text: String = lower_text.chars().filter(|c| c.is_alphanumeric()).collect();
+    let norm_case: String = lower_case.chars().filter(|c| c.is_alphanumeric()).collect();
+
+    if norm_case.is_empty() {
+        return false;
+    }
+
+    // Pass 2: full normalised match (handles OCR spaces)
+    if norm_text.contains(&norm_case) {
+        return true;
+    }
+
+    // Pass 3: strip leading court-prefix letters from the case number
+    // (e.g. "SU2020CV04215" → also check "2020CV04215").
+    // Require at least 6 chars to avoid short-number false positives.
+    let stripped = norm_case.trim_start_matches(|c: char| c.is_alphabetic());
+    !stripped.is_empty()
+        && stripped != norm_case.as_str()
+        && stripped.len() >= 6
+        && norm_text.contains(stripped)
+}

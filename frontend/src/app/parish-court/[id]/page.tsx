@@ -247,8 +247,14 @@ function ParishCaseDetail() {
         {loading ? (
           <DetailSkeleton />
         ) : notFound || !courtCase ? (
-          <div className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.07] bg-black/30 py-16 text-center">
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.07] bg-black/30 py-16 text-center gap-4 px-6">
             <p className="text-sm text-white/40">Case not found.</p>
+            <button
+              onClick={() => router.push("/parish-court")}
+              className="rounded-xl border border-[#CD7F32]/25 bg-[#CD7F32]/10 px-4 py-2.5 text-[13px] font-semibold text-[#CD7F32] hover:bg-[#CD7F32]/20 transition-colors"
+            >
+              Back to Parish Court
+            </button>
           </div>
         ) : (
           <>

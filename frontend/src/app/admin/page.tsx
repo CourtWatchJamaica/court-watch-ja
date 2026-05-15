@@ -15,6 +15,7 @@ import {
   Clock,
   Wrench,
   Loader2,
+  AlertTriangle,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -158,6 +159,21 @@ export default function AdminOverviewPage() {
     return d.toLocaleDateString("en-JM", { month: "short", day: "numeric" });
   };
 
+  const backupEntry = config.find((e) => e.key === "backup_last_date");
+  const backupDate = backupEntry?.value ?? null;
+  const backupStale = (() => {
+    if (!backupDate) return true;
+    const d = new Date(backupDate);
+    return (Date.now() - d.getTime()) / 86400000 > 7;
+  })();
+  const formatBackupAge = (iso: string) => {
+    const d = new Date(iso);
+    const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+    if (days === 0) return "today";
+    if (days === 1) return "1 day ago";
+    return `${days} days ago`;
+  };
+
   return (
     <div className="p-6 md:p-8 max-w-5xl">
       <div className="mb-8">
@@ -170,6 +186,26 @@ export default function AdminOverviewPage() {
         <h1 className="text-2xl font-bold text-white">Admin Overview</h1>
         <p className="mt-1 text-sm text-white/40">System status at a glance.</p>
       </div>
+
+      {/* Database backup reminder */}
+      {!loading && isSuperAdmin && backupStale && (
+        <div className="mb-6 flex items-center gap-3 rounded-2xl border border-amber-400/20 bg-amber-400/[0.06] p-4">
+          <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" />
+          <p className="flex-1 text-sm text-amber-400/90">
+            {backupDate
+              ? `Last DB backup: ${formatBackupAge(backupDate)} — consider exporting a fresh backup.`
+              : "No database backup on record — export a backup and set backup_last_date in system config."}
+          </p>
+          <a
+            href="https://dashboard.render.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="shrink-0 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-1.5 text-xs font-semibold text-amber-400 hover:bg-amber-400/20 transition-colors"
+          >
+            Render →
+          </a>
+        </div>
+      )}
 
       {/* Stats row */}
       {loading ? (

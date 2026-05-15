@@ -26,7 +26,7 @@ use std::time::Duration;
 use tokio::time::sleep;
 use tracing::{info, warn};
 
-use super::{judges, judgment_detail, judgments::JudgmentRow, ScraperState};
+use super::{judges, judgment_detail, judgments::JudgmentRow, tags, ScraperState};
 use crate::db::queries;
 
 /// Base URL for page navigation (www, with /index.php routing).
@@ -204,14 +204,13 @@ async fn scrape_one_url(
             }
         }
 
-        let (pdf_url, summary, detail_judge) = if let Some(ref detail_url) = row.detail_url {
-            let full_url = if detail_url.starts_with("http") {
-                detail_url.clone()
-            } else {
-                format!("{BASE_URL}{detail_url}")
-            };
+        let source_url = row.detail_url.as_ref().map(|d| {
+            if d.starts_with("http") { d.clone() } else { format!("{BASE_URL}{d}") }
+        });
+
+        let (pdf_url, summary, detail_judge) = if let Some(ref full_url) = source_url {
             sleep(Duration::from_secs(3)).await;
-            match judgment_detail::fetch(client, &full_url).await {
+            match judgment_detail::fetch(client, full_url, &row.case_number).await {
                 Ok(d) => (d.pdf_url, d.summary_text, d.judge_name),
                 Err(e) => {
                     warn!(
@@ -225,8 +224,11 @@ async fn scrape_one_url(
             (None, None, None)
         };
 
+        // judgment_detail::fetch normalises CoA URLs internally; apply once more
+        // as a safety net for any edge-cases (idempotent).
         let pdf_url = pdf_url.map(|u| normalize_coa_pdf_url(&u));
 
+        let judgment_tags = tags::detect_tags(row.title.as_deref(), summary.as_deref());
         match queries::upsert_judgment(
             pool,
             &row.case_number,
@@ -237,6 +239,8 @@ async fn scrape_one_url(
             pdf_url.as_deref(),
             None,
             summary.as_deref(),
+            source_url.as_deref(),
+            judgment_tags,
         )
         .await
         {
@@ -333,7 +337,7 @@ async fn fetch_year_ids(
 ///
 /// Rows are dropped when the case-number cell has no digits and does not start
 /// with '[', or matches a known navigation phrase.
-fn parse_coa_listing_page(html: &str) -> Vec<JudgmentRow> {
+pub fn parse_coa_listing_page(html: &str) -> Vec<JudgmentRow> {
     let doc = Html::parse_document(html);
     let row_sel = Selector::parse("table tbody tr").unwrap();
     let td_sel = Selector::parse("td").unwrap();

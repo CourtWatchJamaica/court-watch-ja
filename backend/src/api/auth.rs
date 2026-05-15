@@ -1,8 +1,13 @@
 use std::net::SocketAddr;
 use std::time::Instant;
 
-use axum::{extract::{ConnectInfo, State}, http::HeaderMap, Extension, Json};
+use axum::{
+    extract::{ConnectInfo, Query, State},
+    http::HeaderMap,
+    Extension, Json,
+};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::{
     api::errors::AppError,
@@ -47,12 +52,23 @@ pub struct AuthResponse {
 }
 
 #[derive(Serialize)]
+pub struct SignupResponse {
+    pub message: String,
+}
+
+#[derive(Serialize)]
 pub struct MeResponse {
     pub id: i32,
     pub email: String,
     pub role: String,
     pub display_name: Option<String>,
     pub created_at: String,
+    pub email_verified: bool,
+}
+
+#[derive(Deserialize)]
+pub struct VerifyTokenQuery {
+    pub token: String,
 }
 
 pub async fn signup(
@@ -60,7 +76,7 @@ pub async fn signup(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
     Json(body): Json<AuthRequest>,
-) -> Result<Json<AuthResponse>, AppError> {
+) -> Result<Json<SignupResponse>, AppError> {
     check_rate_limit(&state, &client_ip(&headers, &addr))?;
     if body.email.is_empty() || body.password.is_empty() {
         return Err(AppError::BadRequest("Email and password are required".into()));
@@ -72,17 +88,51 @@ pub async fn signup(
     let hash = bcrypt::hash(&body.password, bcrypt::DEFAULT_COST)
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
-    let user = queries::create_user(&state.db, &body.email, &hash)
-        .await
-        .map_err(|e| match e {
-            sqlx::Error::Database(ref dbe) if dbe.constraint() == Some("users_email_key") => {
-                AppError::BadRequest("Email already registered".into())
+    let user = match queries::create_user(&state.db, &body.email, &hash).await {
+        Ok(u) => u,
+        Err(sqlx::Error::Database(ref dbe)) if dbe.constraint() == Some("users_email_key") => {
+            // User already exists — allow resend only for unverified accounts.
+            let existing = queries::find_user_by_email(&state.db, &body.email)
+                .await?
+                .ok_or_else(|| AppError::Internal("User lookup failed".into()))?;
+            if existing.email_verified {
+                return Err(AppError::BadRequest("Email already registered".into()));
             }
-            other => AppError::Sqlx(other),
-        })?;
+            // Require correct password to prevent abuse of the resend path.
+            let valid = bcrypt::verify(&body.password, &existing.password_hash)
+                .map_err(|e| AppError::Internal(e.to_string()))?;
+            if !valid {
+                return Err(AppError::BadRequest("Email already registered".into()));
+            }
+            existing
+        }
+        Err(e) => return Err(AppError::Sqlx(e)),
+    };
 
-    let token = jwt::encode_token(user.id, &user.email, &user.role, &state.config.jwt_secret)?;
-    Ok(Json(AuthResponse { token }))
+    // Replace any existing token and issue a fresh 24-hour one.
+    queries::delete_verification_tokens_for_user(&state.db, user.id).await?;
+    let raw_token = Uuid::new_v4().to_string();
+    let expires_at = chrono::Utc::now().naive_utc() + chrono::Duration::hours(24);
+    queries::create_verification_token(&state.db, user.id, &raw_token, expires_at).await?;
+
+    if let Some(ref api_key) = state.config.resend_api_key {
+        let alias = std::env::var("RESEND_VERIFY_TEMPLATE")
+            .unwrap_or_else(|_| "verify-email".into());
+        let client = reqwest::Client::new();
+        let key = api_key.clone();
+        let to = body.email.clone();
+        tokio::spawn(async move {
+            if let Err(e) =
+                crate::notifications::email::send_email(&client, &key, &to, &alias).await
+            {
+                tracing::warn!("[Signup] Verification email failed: {e}");
+            }
+        });
+    }
+
+    Ok(Json(SignupResponse {
+        message: "Check your inbox to verify your email.".into(),
+    }))
 }
 
 pub async fn login(
@@ -103,6 +153,28 @@ pub async fn login(
         return Err(AppError::Unauthorized);
     }
 
+    if !user.email_verified {
+        return Err(AppError::EmailNotVerified);
+    }
+
+    let token = jwt::encode_token(user.id, &user.email, &user.role, &state.config.jwt_secret)?;
+    Ok(Json(AuthResponse { token }))
+}
+
+pub async fn verify_email(
+    State(state): State<AppState>,
+    Query(params): Query<VerifyTokenQuery>,
+) -> Result<Json<AuthResponse>, AppError> {
+    let user_id = queries::consume_verification_token(&state.db, &params.token)
+        .await?
+        .ok_or_else(|| AppError::BadRequest("Invalid or expired verification token".into()))?;
+
+    queries::mark_email_verified(&state.db, user_id).await?;
+
+    let user = queries::get_user_by_id(&state.db, user_id)
+        .await?
+        .ok_or(AppError::NotFound)?;
+
     let token = jwt::encode_token(user.id, &user.email, &user.role, &state.config.jwt_secret)?;
     Ok(Json(AuthResponse { token }))
 }
@@ -121,6 +193,7 @@ pub async fn me(
         role: user.role,
         display_name: user.display_name,
         created_at: user.created_at.to_string(),
+        email_verified: user.email_verified,
     }))
 }
 
@@ -130,6 +203,35 @@ pub struct UpdateProfileRequest {
     pub email: Option<String>,
     pub current_password: Option<String>, // required only when email / new_password is set
     pub new_password: Option<String>,
+}
+
+// ── OAuth sign-in ─────────────────────────────────────────────────────────────
+
+#[derive(Deserialize)]
+pub struct OAuthRequest {
+    pub provider: String,
+    pub email: String,
+    pub name: Option<String>,
+}
+
+pub async fn oauth_login(
+    State(state): State<AppState>,
+    Json(body): Json<OAuthRequest>,
+) -> Result<Json<AuthResponse>, AppError> {
+    if body.email.is_empty() {
+        return Err(AppError::BadRequest("Email is required".into()));
+    }
+
+    let user = queries::find_or_create_oauth_user(
+        &state.db,
+        &body.email,
+        body.name.as_deref(),
+    )
+    .await
+    .map_err(AppError::Sqlx)?;
+
+    let token = jwt::encode_token(user.id, &user.email, &user.role, &state.config.jwt_secret)?;
+    Ok(Json(AuthResponse { token }))
 }
 
 pub async fn update_profile(
@@ -173,9 +275,6 @@ pub async fn update_profile(
         None
     };
 
-    // Resolve the final display_name:
-    //   - body contains Some(s)  → trim it; empty string becomes NULL
-    //   - body contains None     → keep whatever is currently stored
     let final_display_name: Option<String> = match body.display_name {
         Some(ref s) => {
             let t = s.trim();
@@ -200,5 +299,6 @@ pub async fn update_profile(
         role: updated.role,
         display_name: updated.display_name,
         created_at: updated.created_at.to_string(),
+        email_verified: updated.email_verified,
     }))
 }

@@ -16,6 +16,8 @@ pub enum AppError {
     Internal(String),
     #[error("Too many requests")]
     TooManyRequests,
+    #[error("Email not verified")]
+    EmailNotVerified,
     #[error(transparent)]
     Sqlx(#[from] sqlx::Error),
     #[error(transparent)]
@@ -24,6 +26,17 @@ pub enum AppError {
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
+        if let Self::EmailNotVerified = self {
+            return (
+                StatusCode::FORBIDDEN,
+                Json(json!({
+                    "error": "Please verify your email before logging in.",
+                    "email_verified": false
+                })),
+            )
+                .into_response();
+        }
+
         if let Self::TooManyRequests = self {
             let mut res = (
                 StatusCode::TOO_MANY_REQUESTS,
@@ -41,7 +54,7 @@ impl IntoResponse for AppError {
             Self::Forbidden => (StatusCode::FORBIDDEN, self.to_string()),
             Self::BadRequest(m) => (StatusCode::BAD_REQUEST, m.clone()),
             Self::Internal(m) => (StatusCode::INTERNAL_SERVER_ERROR, m.clone()),
-            Self::TooManyRequests => unreachable!(),
+            Self::TooManyRequests | Self::EmailNotVerified => unreachable!(),
             Self::Sqlx(e) => {
                 tracing::error!("Database error: {:?}", e);
                 (StatusCode::INTERNAL_SERVER_ERROR, "Database error".into())

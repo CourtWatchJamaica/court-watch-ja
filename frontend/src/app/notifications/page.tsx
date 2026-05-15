@@ -104,6 +104,7 @@ function NotifRow({
 }
 
 export default function NotificationsPage() {
+  const router = useRouter();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [marking, setMarking] = useState(false);
@@ -206,6 +207,12 @@ export default function NotificationsPage() {
                 <p className="mt-1 text-xs text-white/20 max-w-[200px]">
                   Updates on your tracked cases will appear here.
                 </p>
+                <button
+                  onClick={() => router.push("/cases")}
+                  className="mt-4 rounded-xl border border-white/[0.1] bg-white/[0.05] px-4 py-2.5 text-xs font-semibold text-white/50 hover:text-white hover:bg-white/[0.08] transition-colors"
+                >
+                  Browse Cases
+                </button>
               </div>
             ) : (
               notifications.map((n) => (

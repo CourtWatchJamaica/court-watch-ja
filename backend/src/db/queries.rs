@@ -5,7 +5,7 @@ use super::models::*;
 
 // Explicit column lists — omit `search_vector` (tsvector, not decodable by sqlx).
 const J: &str =
-    "id, case_number, title, judge_name, court, date, pdf_url, local_pdf_path, summary_text, created_at, updated_at";
+    "id, case_number, title, judge_name, court, date, pdf_url, local_pdf_path, summary_text, created_at, updated_at, source_url, tags";
 const S: &str =
     "id, case_number, title, judge_name, court_division, event_type, event_date, event_time, lawyers, pdf_source_url, created_at";
 
@@ -36,7 +36,7 @@ pub async fn set_system_config(pool: &PgPool, key: &str, value: &str) -> sqlx::R
 pub async fn create_user(pool: &PgPool, email: &str, password_hash: &str) -> sqlx::Result<User> {
     sqlx::query_as::<_, User>(
         "INSERT INTO users (email, password_hash) VALUES ($1, $2)
-         RETURNING id, email, password_hash, role, display_name, created_at",
+         RETURNING id, email, password_hash, role, display_name, created_at, email_verified",
     )
     .bind(email)
     .bind(password_hash)
@@ -46,7 +46,7 @@ pub async fn create_user(pool: &PgPool, email: &str, password_hash: &str) -> sql
 
 pub async fn find_user_by_email(pool: &PgPool, email: &str) -> sqlx::Result<Option<User>> {
     sqlx::query_as::<_, User>(
-        "SELECT id, email, password_hash, role, display_name, created_at FROM users WHERE email = $1",
+        "SELECT id, email, password_hash, role, display_name, created_at, email_verified FROM users WHERE email = $1",
     )
     .bind(email)
     .fetch_optional(pool)
@@ -55,7 +55,7 @@ pub async fn find_user_by_email(pool: &PgPool, email: &str) -> sqlx::Result<Opti
 
 pub async fn get_user_by_id(pool: &PgPool, id: i32) -> sqlx::Result<Option<User>> {
     sqlx::query_as::<_, User>(
-        "SELECT id, email, password_hash, role, display_name, created_at FROM users WHERE id = $1",
+        "SELECT id, email, password_hash, role, display_name, created_at, email_verified FROM users WHERE id = $1",
     )
     .bind(id)
     .fetch_optional(pool)
@@ -66,7 +66,7 @@ pub async fn get_user_by_id(pool: &PgPool, id: i32) -> sqlx::Result<Option<User>
 
 pub async fn admin_list_users(pool: &PgPool) -> sqlx::Result<Vec<User>> {
     sqlx::query_as::<_, User>(
-        "SELECT id, email, password_hash, role, display_name, created_at FROM users ORDER BY created_at DESC",
+        "SELECT id, email, password_hash, role, display_name, created_at, email_verified FROM users ORDER BY created_at DESC",
     )
     .fetch_all(pool)
     .await
@@ -79,7 +79,7 @@ pub async fn admin_set_user_role(
 ) -> sqlx::Result<Option<User>> {
     sqlx::query_as::<_, User>(
         "UPDATE users SET role = $1 WHERE id = $2
-         RETURNING id, email, password_hash, role, display_name, created_at",
+         RETURNING id, email, password_hash, role, display_name, created_at, email_verified",
     )
     .bind(role)
     .bind(user_id)
@@ -108,7 +108,7 @@ pub async fn update_user_profile(
              email         = COALESCE($3, email),
              password_hash = COALESCE($4, password_hash)
          WHERE id = $1
-         RETURNING id, email, password_hash, role, display_name, created_at",
+         RETURNING id, email, password_hash, role, display_name, created_at, email_verified",
     )
     .bind(user_id)
     .bind(display_name)
@@ -369,8 +369,31 @@ pub async fn list_judgments(
     limit: i64,
     court: Option<&str>,
     judge: Option<&str>,
+    tag: Option<&str>,
 ) -> sqlx::Result<(Vec<Judgment>, i64)> {
     let offset = (page - 1).max(0) * limit;
+
+    // Tag filter path: filter by a single tag across all courts.
+    if let Some(tag_value) = tag {
+        let sql = format!(
+            "SELECT {J} FROM judgments
+             WHERE $1 = ANY(tags)
+             ORDER BY date DESC NULLS LAST, created_at DESC
+             LIMIT $2 OFFSET $3"
+        );
+        let rows = sqlx::query_as::<_, Judgment>(&sql)
+            .bind(tag_value)
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(pool)
+            .await?;
+        let total: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM judgments WHERE $1 = ANY(tags)")
+                .bind(tag_value)
+                .fetch_one(pool)
+                .await?;
+        return Ok((rows, total));
+    }
 
     // Judge-specific path: bypass court constraint, return that judge's judgments.
     // judge_name can be a comma-separated panel ("Harris JA, Brown JA, Jones JA"), so we
@@ -495,11 +518,13 @@ pub async fn upsert_judgment(
     pdf_url: Option<&str>,
     local_pdf_path: Option<&str>,
     summary_text: Option<&str>,
+    source_url: Option<&str>,
+    tags: Vec<String>,
 ) -> sqlx::Result<Judgment> {
     let sql = format!(
         "INSERT INTO judgments
-           (case_number, title, judge_name, court, date, pdf_url, local_pdf_path, summary_text, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+           (case_number, title, judge_name, court, date, pdf_url, local_pdf_path, summary_text, source_url, tags, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
          ON CONFLICT (case_number) DO UPDATE SET
            title          = COALESCE(EXCLUDED.title, judgments.title),
            judge_name     = COALESCE(EXCLUDED.judge_name, judgments.judge_name),
@@ -508,6 +533,8 @@ pub async fn upsert_judgment(
            pdf_url        = COALESCE(EXCLUDED.pdf_url, judgments.pdf_url),
            local_pdf_path = COALESCE(EXCLUDED.local_pdf_path, judgments.local_pdf_path),
            summary_text   = COALESCE(EXCLUDED.summary_text, judgments.summary_text),
+           source_url     = COALESCE(EXCLUDED.source_url, judgments.source_url),
+           tags           = CASE WHEN array_length(EXCLUDED.tags, 1) > 0 THEN EXCLUDED.tags ELSE judgments.tags END,
            updated_at     = NOW()
          RETURNING {J}"
     );
@@ -520,6 +547,8 @@ pub async fn upsert_judgment(
         .bind(pdf_url)
         .bind(local_pdf_path)
         .bind(summary_text)
+        .bind(source_url)
+        .bind(tags)
         .fetch_one(pool)
         .await
 }
@@ -539,9 +568,50 @@ pub async fn set_local_pdf_path(
     Ok(())
 }
 
+/// Persist a freshly-verified PDF URL and its source detail-page URL so that
+/// subsequent calls to the original-pdf endpoint return instantly from the DB.
+pub async fn cache_judgment_pdf_url(
+    pool: &PgPool,
+    id: i32,
+    pdf_url: &str,
+    source_url: &str,
+) -> sqlx::Result<()> {
+    sqlx::query(
+        "UPDATE judgments
+         SET pdf_url = $1, source_url = $2, updated_at = NOW()
+         WHERE id = $3",
+    )
+    .bind(pdf_url)
+    .bind(source_url)
+    .bind(id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 pub async fn judgments_needing_pdf(pool: &PgPool) -> sqlx::Result<Vec<Judgment>> {
     let sql = format!(
         "SELECT {J} FROM judgments WHERE pdf_url IS NOT NULL AND local_pdf_path IS NULL"
+    );
+    sqlx::query_as::<_, Judgment>(&sql).fetch_all(pool).await
+}
+
+/// Clear pdf_url and local_pdf_path when the downloaded content doesn't match the case.
+pub async fn nullify_judgment_pdf(pool: &PgPool, id: i32) -> sqlx::Result<()> {
+    sqlx::query(
+        "UPDATE judgments SET pdf_url = NULL, local_pdf_path = NULL, updated_at = NOW() WHERE id = $1",
+    )
+    .bind(id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// All judgments that have both a pdf_url and a local copy on disk.
+/// Used by the one-time mismatch cleanup.
+pub async fn judgments_with_local_pdf(pool: &PgPool) -> sqlx::Result<Vec<Judgment>> {
+    let sql = format!(
+        "SELECT {J} FROM judgments WHERE local_pdf_path IS NOT NULL AND pdf_url IS NOT NULL"
     );
     sqlx::query_as::<_, Judgment>(&sql).fetch_all(pool).await
 }
@@ -1809,6 +1879,126 @@ pub async fn check_notifications(pool: &PgPool) {
             available.len()
         );
     }
+}
+
+// ── OAuth user ────────────────────────────────────────────────────────────
+
+/// Find an existing user by email or create a new one for an OAuth sign-in.
+/// OAuth users are assigned an unguessable password hash so they can never
+/// log in via the password flow.
+pub async fn find_or_create_oauth_user(
+    pool: &PgPool,
+    email: &str,
+    display_name: Option<&str>,
+) -> sqlx::Result<User> {
+    // Fast path: existing user
+    if let Some(u) = find_user_by_email(pool, email).await? {
+        return Ok(u);
+    }
+
+    // Create; ON CONFLICT DO NOTHING guards against a race.
+    let maybe = sqlx::query_as::<_, User>(
+        "INSERT INTO users (email, password_hash, display_name, email_verified)
+         VALUES ($1, '$oauth$no_password', $2, TRUE)
+         ON CONFLICT (email) DO NOTHING
+         RETURNING id, email, password_hash, role, display_name, created_at, email_verified",
+    )
+    .bind(email)
+    .bind(display_name)
+    .fetch_optional(pool)
+    .await?;
+
+    if let Some(u) = maybe {
+        return Ok(u);
+    }
+
+    // ON CONFLICT fired — another request beat us; just fetch.
+    find_user_by_email(pool, email)
+        .await?
+        .ok_or(sqlx::Error::RowNotFound)
+}
+
+// ── Email verification ─────────────────────────────────────────────────────
+
+pub async fn create_verification_token(
+    pool: &PgPool,
+    user_id: i32,
+    token: &str,
+    expires_at: chrono::NaiveDateTime,
+) -> sqlx::Result<()> {
+    sqlx::query(
+        "INSERT INTO verification_tokens (token, user_id, expires_at) VALUES ($1, $2, $3)",
+    )
+    .bind(token)
+    .bind(user_id)
+    .bind(expires_at)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+pub async fn delete_verification_tokens_for_user(pool: &PgPool, user_id: i32) -> sqlx::Result<()> {
+    sqlx::query("DELETE FROM verification_tokens WHERE user_id = $1")
+        .bind(user_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+/// Atomically deletes the token if valid and not expired, returning its user_id.
+pub async fn consume_verification_token(
+    pool: &PgPool,
+    token: &str,
+) -> sqlx::Result<Option<i32>> {
+    sqlx::query_scalar(
+        "DELETE FROM verification_tokens WHERE token = $1 AND expires_at > NOW() RETURNING user_id",
+    )
+    .bind(token)
+    .fetch_optional(pool)
+    .await
+}
+
+pub async fn mark_email_verified(pool: &PgPool, user_id: i32) -> sqlx::Result<()> {
+    sqlx::query("UPDATE users SET email_verified = TRUE WHERE id = $1")
+        .bind(user_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+// ── Email notification dispatch ────────────────────────────────────────────
+
+#[derive(sqlx::FromRow)]
+pub struct PendingEmailRow {
+    pub email: String,
+    pub notification_type: String,
+    pub title: Option<String>,
+    pub message: Option<String>,
+}
+
+/// Returns notifications inserted in the last 15 minutes that should trigger
+/// an outbound email.  Called once per scraper run immediately after
+/// `check_notifications` populates the table.
+pub async fn recent_notifications_for_email(
+    pool: &PgPool,
+) -> sqlx::Result<Vec<PendingEmailRow>> {
+    sqlx::query_as::<_, PendingEmailRow>(
+        r#"SELECT u.email,
+                  n.type        AS notification_type,
+                  n.title,
+                  n.message
+           FROM   notifications n
+           JOIN   users u ON u.id = n.user_id
+           WHERE  n.sent_at > NOW() - INTERVAL '15 minutes'
+             AND  n.type IN (
+                    'case_available',
+                    'case_listed',
+                    'sitting_reminder_1d',
+                    'sitting_reminder_morning'
+                  )"#,
+    )
+    .fetch_all(pool)
+    .await
 }
 
 // ── Legal News ─────────────────────────────────────────────────────────────

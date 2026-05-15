@@ -15,7 +15,7 @@ use std::time::Duration;
 use tokio::time::sleep;
 use tracing::{info, warn};
 
-use super::{judgment_detail, ScraperState};
+use super::{judgment_detail, tags, ScraperState};
 use crate::db::queries;
 
 const BASE_URL: &str = "https://supremecourt.gov.jm";
@@ -76,19 +76,45 @@ pub async fn run(
                 }
             }
 
-            // Fetch detail page (if we have a URL)
-            let (pdf_url, summary) = if let Some(detail_url) = &row.detail_url {
-                let full_url = if detail_url.starts_with("http") {
-                    detail_url.clone()
-                } else {
-                    format!("{BASE_URL}{detail_url}")
-                };
+            // Resolve detail URL to an absolute source URL; warn if missing.
+            let source_url = match row.detail_url.as_ref() {
+                Some(d) => {
+                    let full = if d.starts_with("http") {
+                        d.clone()
+                    } else {
+                        format!("{BASE_URL}{d}")
+                    };
+                    info!(
+                        "SC listing pg {page} — {} → detail: {full}",
+                        row.case_number
+                    );
+                    Some(full)
+                }
+                None => {
+                    warn!(
+                        "SC listing pg {page} — {} has no detail URL (title cell had no link); skipping PDF fetch",
+                        row.case_number
+                    );
+                    None
+                }
+            };
+
+            // Fetch the detail page independently for each judgment row.
+            let (pdf_url, summary) = if let Some(ref full_url) = source_url {
                 sleep(Duration::from_secs(3)).await;
 
-                match judgment_detail::fetch(client, &full_url).await {
-                    Ok(detail) => (detail.pdf_url, detail.summary_text),
+                match judgment_detail::fetch(client, full_url, &row.case_number).await {
+                    Ok(detail) => {
+                        if detail.pdf_url.is_none() {
+                            warn!(
+                                "SC {} — detail page returned no PDF URL ({})",
+                                row.case_number, full_url
+                            );
+                        }
+                        (detail.pdf_url, detail.summary_text)
+                    }
                     Err(e) => {
-                        warn!("Detail fetch failed for {}: {e}", row.case_number);
+                        warn!("Detail fetch failed for {} ({}): {e}", row.case_number, full_url);
                         (None, None)
                     }
                 }
@@ -106,6 +132,7 @@ pub async fn run(
             }
 
             // Upsert judgment
+            let judgment_tags = tags::detect_tags(row.title.as_deref(), summary.as_deref());
             if let Err(e) = queries::upsert_judgment(
                 pool,
                 &row.case_number,
@@ -116,6 +143,8 @@ pub async fn run(
                 pdf_url.as_deref(),
                 None,
                 summary.as_deref(),
+                source_url.as_deref(),
+                judgment_tags,
             )
             .await
             {

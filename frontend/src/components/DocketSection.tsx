@@ -527,12 +527,12 @@ export function AddByNumberForm({ onRefresh }: { onRefresh: () => void }) {
           onBlur={() => setTimeout(() => setShowPreview(false), 150)}
           onFocus={() => { if (value.trim().length >= 3 && preview) setShowPreview(true); }}
           placeholder="e.g. HCV/01234/2025"
-          className="flex-1 min-w-0 rounded-lg border border-white/[0.1] bg-black/30 px-3 py-2 text-[12px] text-white placeholder-white/20 focus:outline-none focus:border-[#FED100]/40 focus:ring-1 focus:ring-[#FED100]/20 transition-colors"
+          className="flex-1 min-w-0 rounded-lg border border-white/[0.1] bg-black/30 px-3 py-2 text-[12px] text-white placeholder-white/20 focus:outline-none focus:border-[#FED100]/40 focus:ring-1 focus:ring-[#FED100]/20 transition-colors min-h-[44px]"
         />
         <button
           type="submit"
           disabled={loading || !value.trim()}
-          className="flex shrink-0 items-center gap-1 rounded-lg bg-[#FED100]/10 border border-[#FED100]/20 px-3 py-2 text-[11px] font-semibold text-[#FED100] hover:bg-[#FED100]/15 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="flex shrink-0 items-center gap-1 rounded-lg bg-[#FED100]/10 border border-[#FED100]/20 px-3 py-2 text-[11px] font-semibold text-[#FED100] hover:bg-[#FED100]/15 disabled:opacity-40 disabled:cursor-not-allowed transition-colors min-h-[44px]"
         >
           {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
           Track
@@ -696,7 +696,7 @@ function DocketEmpty({ onRefresh }: { onRefresh: () => void }) {
       <Button
         size="sm"
         onClick={() => router.push("/cases")}
-        className="h-8 bg-[#009B3A] px-4 text-xs text-white hover:bg-[#009B3A]/85"
+        className="h-11 sm:h-8 bg-[#009B3A] px-4 text-xs text-white hover:bg-[#009B3A]/85"
       >
         Browse Cases
       </Button>

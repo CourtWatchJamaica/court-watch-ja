@@ -15,6 +15,7 @@ pub struct User {
     pub role: String,
     pub display_name: Option<String>,
     pub created_at: NaiveDateTime,
+    pub email_verified: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
@@ -57,6 +58,12 @@ pub struct Judgment {
     /// Populated only by FTS queries via ts_headline; None otherwise.
     #[sqlx(default)]
     pub snippet: Option<String>,
+    /// URL of the court's own detail page for this judgment (stored at scrape time).
+    #[sqlx(default)]
+    pub source_url: Option<String>,
+    /// Taxonomy tags (e.g. ["tax_law"]).
+    #[sqlx(default)]
+    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]

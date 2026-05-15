@@ -22,6 +22,7 @@ import {
   ChevronRight,
   Loader2,
   X,
+  Landmark,
 } from "lucide-react";
 
 const LIMIT = 20;
@@ -238,6 +239,7 @@ export default function CasesPage() {
   const [activeTab, setActiveTab] = useState<Tab>("judgments");
   const [query, setQuery] = useState("");
   const [courtFilter, setCourtFilter] = useState<string | null>(null);
+  const [taxFilter, setTaxFilter] = useState(false);
 
   // Judgments — server-side pagination
   const [judgments, setJudgments] = useState<Judgment[]>([]);
@@ -253,7 +255,7 @@ export default function CasesPage() {
   const [loadingMore, setLoadingMore] = useState(false);
 
   const fetchJudgments = useCallback(
-    async (q: string, page: number, append: boolean, court?: string | null) => {
+    async (q: string, page: number, append: boolean, court?: string | null, tax?: boolean) => {
       if (append) {
         setLoadingMore(true);
       } else {
@@ -267,6 +269,7 @@ export default function CasesPage() {
           undefined,
           page,
           LIMIT,
+          tax ? "tax_law" : undefined,
         );
         setJudgementsTotal(res.total ?? res.judgments.length);
         setJudgments((prev) =>
@@ -330,7 +333,7 @@ export default function CasesPage() {
     setCourtFilter(initialCourt);
 
     if (initialTab === "judgments") {
-      void fetchJudgments(initialQ, 1, false, initialCourt);
+      void fetchJudgments(initialQ, 1, false, initialCourt, false);
     } else {
       void fetchSittings(initialQ, 1, false, initialCourt);
     }
@@ -360,19 +363,19 @@ export default function CasesPage() {
       setQuery(q);
       syncUrl(q, activeTab, courtFilter);
       if (activeTab === "judgments") {
-        void fetchJudgments(q, 1, false, courtFilter);
+        void fetchJudgments(q, 1, false, courtFilter, taxFilter);
       } else {
         void fetchSittings(q, 1, false, courtFilter);
       }
     },
-    [activeTab, courtFilter, fetchJudgments, fetchSittings, syncUrl],
+    [activeTab, courtFilter, taxFilter, fetchJudgments, fetchSittings, syncUrl],
   );
 
   const handleTabChange = (tab: Tab) => {
     setActiveTab(tab);
     syncUrl(query, tab, courtFilter);
     if (tab === "judgments") {
-      void fetchJudgments(query, 1, false, courtFilter);
+      void fetchJudgments(query, 1, false, courtFilter, taxFilter);
     } else {
       void fetchSittings(query, 1, false, courtFilter);
     }
@@ -382,7 +385,7 @@ export default function CasesPage() {
     setQuery("");
     syncUrl("", activeTab, courtFilter);
     if (activeTab === "judgments") {
-      void fetchJudgments("", 1, false, courtFilter);
+      void fetchJudgments("", 1, false, courtFilter, taxFilter);
     } else {
       void fetchSittings("", 1, false, courtFilter);
     }
@@ -392,9 +395,17 @@ export default function CasesPage() {
     setCourtFilter(null);
     syncUrl(query, activeTab, null);
     if (activeTab === "judgments") {
-      void fetchJudgments(query, 1, false, null);
+      void fetchJudgments(query, 1, false, null, taxFilter);
     } else {
       void fetchSittings(query, 1, false, null);
+    }
+  };
+
+  const handleToggleTaxFilter = () => {
+    const next = !taxFilter;
+    setTaxFilter(next);
+    if (activeTab === "judgments") {
+      void fetchJudgments(query, 1, false, courtFilter, next);
     }
   };
 
@@ -402,27 +413,27 @@ export default function CasesPage() {
     (newPage: number) => {
       if (activeTab === "judgments") {
         setJudgmentsPage(newPage);
-        void fetchJudgments(query, newPage, false, courtFilter);
+        void fetchJudgments(query, newPage, false, courtFilter, taxFilter);
       } else {
         setSittingsPage(newPage);
         void fetchSittings(query, newPage, false, courtFilter);
       }
       window.scrollTo({ top: 0, behavior: "smooth" });
     },
-    [activeTab, query, courtFilter, fetchJudgments, fetchSittings],
+    [activeTab, query, courtFilter, taxFilter, fetchJudgments, fetchSittings],
   );
 
   const handleLoadMore = useCallback(() => {
     if (activeTab === "judgments") {
       const nextPage = judgmentsPage + 1;
       setJudgmentsPage(nextPage);
-      void fetchJudgments(query, nextPage, true, courtFilter);
+      void fetchJudgments(query, nextPage, true, courtFilter, taxFilter);
     } else {
       const nextPage = sittingsPage + 1;
       setSittingsPage(nextPage);
       void fetchSittings(query, nextPage, true, courtFilter);
     }
-  }, [activeTab, judgmentsPage, sittingsPage, query, courtFilter, fetchJudgments, fetchSittings]);
+  }, [activeTab, judgmentsPage, sittingsPage, query, courtFilter, taxFilter, fetchJudgments, fetchSittings]);
 
   const hasMoreJudgments = judgments.length < judgementsTotal;
   const hasMoreSittings = sittings.length < sittingsTotal;
@@ -462,6 +473,23 @@ export default function CasesPage() {
                 Parish Court
               </button>
 
+              {/* Tax Law filter pill */}
+              {activeTab === "judgments" && (
+                <button
+                  onClick={handleToggleTaxFilter}
+                  className={[
+                    "flex items-center gap-1.5 rounded-full border px-3 py-2 text-[12px] font-semibold transition-colors",
+                    taxFilter
+                      ? "border-[#FED100]/50 bg-[#FED100]/15 text-[#FED100]"
+                      : "border-white/10 bg-white/[0.04] text-white/50 hover:bg-white/[0.08] hover:text-white/70",
+                  ].join(" ")}
+                >
+                  <Landmark className="h-3 w-3" />
+                  Tax Law
+                  {taxFilter && <X className="h-3 w-3 ml-0.5 opacity-70" />}
+                </button>
+              )}
+
               {/* Active court filter chip */}
               {courtFilter && (
                 <button
@@ -500,6 +528,7 @@ export default function CasesPage() {
                 ? `judgment${(totalCount ?? 0) !== 1 ? "s" : ""}`
                 : `sitting${(totalCount ?? 0) !== 1 ? "s" : ""}`}
               {courtFilter ? ` · ${courtFilter}` : ""}
+              {taxFilter ? " · Tax Law" : ""}
               {query ? ` matching "${query}"` : ""}
             </p>
           )}
@@ -532,7 +561,7 @@ export default function CasesPage() {
                   ) : (
                     <EmptyState
                       tab="judgments"
-                      hasQuery={!!(query || courtFilter)}
+                      hasQuery={!!(query || courtFilter || taxFilter)}
                       onClear={handleClearSearch}
                     />
                   )

@@ -61,6 +61,11 @@ pub async fn start(pool: PgPool, config: Arc<Config>) -> anyhow::Result<()> {
 /// (empty, or most-recent date > 7 days ago) and immediately runs the
 /// relevant scraper(s) if so.  If all tables are current, this is a no-op.
 pub async fn run_catchup_check(pool: &PgPool, config: &Config) -> anyhow::Result<()> {
+    // One-time cleanup: verify existing local PDFs contain their judgment's case number.
+    if let Err(e) = cleanup_mismatched_pdfs(pool).await {
+        error!("PDF mismatch cleanup error: {e}");
+    }
+
     let today = Utc::now().date_naive();
     let stale_threshold = Duration::days(7);
     // Judges scrapers and CoA backfill are throttled: at most once per 12 h in catchup.
@@ -526,17 +531,62 @@ pub async fn run_all(pool: &PgPool, config: &Config) -> anyhow::Result<()> {
         Err(e) => warn!("Judge cleanup failed: {e}"),
     }
 
-    // Spawn notification check non-blocking — scraper run is considered complete
-    // regardless of how long the notification queries take.
+    // Spawn notification check + email dispatch non-blocking.
     {
         let pool_n = pool.clone();
+        let client_n = client.clone();
+        let brevo_key = config.resend_api_key.clone();
         tokio::spawn(async move {
             crate::db::queries::check_notifications(&pool_n).await;
+            if let Some(ref key) = brevo_key {
+                dispatch_notification_emails(&pool_n, &client_n, key).await;
+            }
         });
     }
 
     info!("=== Scheduled scrape complete ===");
     Ok(())
+}
+
+// ── Notification email dispatch ───────────────────────────────────────────────
+
+async fn dispatch_notification_emails(
+    pool: &PgPool,
+    client: &reqwest::Client,
+    api_key: &str,
+) {
+    use crate::notifications::email;
+
+    let rows = match queries::recent_notifications_for_email(pool).await {
+        Ok(r) => r,
+        Err(e) => {
+            warn!("[Email] failed to query recent notifications: {e}");
+            return;
+        }
+    };
+
+    if rows.is_empty() {
+        return;
+    }
+
+    info!("[Email] dispatching {} notification email(s)", rows.len());
+
+    for row in rows {
+        let alias = match row.notification_type.as_str() {
+            "case_available" => std::env::var("RESEND_TEMPLATE_CASE_AVAILABLE")
+                .unwrap_or_else(|_| "case-available".into()),
+            "case_listed" => std::env::var("RESEND_TEMPLATE_CASE_LISTED")
+                .unwrap_or_else(|_| "case-listed".into()),
+            "sitting_reminder_1d" => std::env::var("RESEND_TEMPLATE_SITTING_1D")
+                .unwrap_or_else(|_| "sitting-reminder-1d".into()),
+            "sitting_reminder_morning" => std::env::var("RESEND_TEMPLATE_SITTING_MORNING")
+                .unwrap_or_else(|_| "sitting-reminder-morning".into()),
+            _ => continue,
+        };
+        if let Err(e) = email::send_email(client, api_key, &row.email, &alias).await {
+            warn!("[Email] send failed for {}: {e}", row.email);
+        }
+    }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -557,6 +607,74 @@ async fn load_cutoff_from_db(pool: &PgPool, config: &Config) -> NaiveDate {
             config.judgment_cutoff_date
         }
     }
+}
+
+/// One-time startup cleanup: reads every judgment that has a local PDF, extracts
+/// its text, and nullifies both `pdf_url` and `local_pdf_path` when the text does
+/// not contain the judgment's own case number.
+///
+/// Guarded by a `system_config` flag (`pdf_mismatch_cleanup_done = "1"`) so it
+/// only runs once even across restarts.
+pub async fn cleanup_mismatched_pdfs(pool: &PgPool) -> anyhow::Result<()> {
+    use crate::{db::queries, utils::pdf as pdf_utils};
+
+    // Guard: skip if already run.
+    match queries::get_system_config(pool, "pdf_mismatch_cleanup_done").await {
+        Ok(Some(v)) if v == "1" => return Ok(()),
+        _ => {}
+    }
+
+    let judgments = queries::judgments_with_local_pdf(pool).await?;
+    if judgments.is_empty() {
+        queries::set_system_config(pool, "pdf_mismatch_cleanup_done", "1").await.ok();
+        return Ok(());
+    }
+
+    info!(
+        "[Cleanup] Checking {} judgment(s) with local PDFs for case-number mismatch",
+        judgments.len()
+    );
+    let mut cleared = 0usize;
+
+    for judgment in &judgments {
+        let Some(ref path) = judgment.local_pdf_path else { continue };
+        let bytes = match tokio::fs::read(path).await {
+            Ok(b) => b,
+            Err(e) => {
+                warn!("[Cleanup] {} — cannot read {path}: {e}", judgment.case_number);
+                continue;
+            }
+        };
+
+        let text_opt = pdf_utils::extract_text_from_bytes(&bytes)
+            .ok()
+            .filter(|t| !t.trim().is_empty())
+            .or_else(|| pdf_utils::extract_text_ocr(&bytes));
+
+        let Some(text) = text_opt else {
+            // Can't read text — skip rather than incorrectly nullify.
+            warn!("[Cleanup] {} — no text extracted, skipping", judgment.case_number);
+            continue;
+        };
+
+        if !pdf_utils::pdf_contains_case_number(&text, &judgment.case_number) {
+            warn!(
+                "[Cleanup] {} — local PDF does not contain case number, nullifying",
+                judgment.case_number
+            );
+            match queries::nullify_judgment_pdf(pool, judgment.id).await {
+                Ok(_) => cleared += 1,
+                Err(e) => error!("[Cleanup] {} — failed to nullify: {e}", judgment.case_number),
+            }
+        }
+    }
+
+    info!(
+        "[Cleanup] Mismatch cleanup complete — {cleared}/{} cleared",
+        judgments.len()
+    );
+    queries::set_system_config(pool, "pdf_mismatch_cleanup_done", "1").await.ok();
+    Ok(())
 }
 
 /// Read already-downloaded CoA PDFs and fill in any missing judge names.
@@ -696,6 +814,28 @@ async fn download_pending_pdfs(
 
         match pdf_utils::download_pdf(client, &full_url).await {
             Ok(bytes) => {
+                // Extract text once — used for both verification and judge extraction.
+                let text_opt = pdf_utils::extract_text_from_bytes(&bytes)
+                    .ok()
+                    .filter(|t| !t.trim().is_empty())
+                    .or_else(|| pdf_utils::extract_text_ocr(&bytes));
+
+                // Verify the PDF belongs to this judgment.
+                // If text extraction failed entirely, assume correct to avoid dropping valid PDFs.
+                let case_number_found = text_opt
+                    .as_deref()
+                    .map(|t| pdf_utils::pdf_contains_case_number(t, &judgment.case_number))
+                    .unwrap_or(true);
+
+                if !case_number_found {
+                    warn!(
+                        "PDF mismatch: {} — content does not contain case number (url={full_url}), clearing pdf_url",
+                        judgment.case_number
+                    );
+                    let _ = queries::nullify_judgment_pdf(pool, judgment.id).await;
+                    continue;
+                }
+
                 if let Err(e) = tokio::fs::write(&dest, &bytes).await {
                     error!("Failed to write PDF {}: {e}", dest.display());
                     continue;
@@ -708,14 +848,10 @@ async fn download_pending_pdfs(
                     state.clear_pdf_failure(&full_url);
                 }
 
-                // For CoA judgments with no judge name yet, extract CORAM from the PDF text.
+                // For CoA judgments with no judge name yet, extract CORAM from the already-extracted text.
                 if judgment.court.as_deref() == Some("Court of Appeal")
                     && judgment.judge_name.is_none()
                 {
-                    let text_opt = pdf_utils::extract_text_from_bytes(&bytes)
-                        .ok()
-                        .filter(|t| !t.trim().is_empty())
-                        .or_else(|| pdf_utils::extract_text_ocr(&bytes));
                     if let Some(coram) = text_opt
                         .as_deref()
                         .and_then(super::judgment_detail::extract_coram_from_text)

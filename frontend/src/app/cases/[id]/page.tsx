@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import Navbar from "@/components/Navbar";
@@ -18,7 +18,13 @@ import {
   Bookmark,
   BookmarkCheck,
   Scale,
+  X,
+  AlertTriangle,
+  RefreshCw,
+  Loader2,
 } from "lucide-react";
+
+/* ── Skeletons / states ─────────────────────────────────────────────────────── */
 
 function DetailSkeleton() {
   return (
@@ -51,20 +57,155 @@ function DetailSkeleton() {
   );
 }
 
+/* ── PDF picker modal (glass, bottom-sheet on mobile) ───────────────────────── */
+
+function PdfPickerModal({
+  judgment,
+  onClose,
+}: {
+  judgment: Judgment;
+  onClose: () => void;
+}) {
+  const [originalLoading, setOriginalLoading] = useState(false);
+  const [originalError, setOriginalError] = useState<string | null>(null);
+
+  // Close on Escape
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const handleOriginalDownload = async () => {
+    setOriginalLoading(true);
+    setOriginalError(null);
+    try {
+      const { url } = await apiClient.getOriginalPdfUrl(judgment.id);
+      if (url) {
+        window.open(url, "_blank", "noopener,noreferrer");
+        onClose();
+      } else {
+        setOriginalError(
+          "Original PDF not found on the court website. You can download the CourtWatch Summary instead."
+        );
+      }
+    } catch {
+      setOriginalError(
+        "Couldn't reach the court website. Try the CourtWatch Summary instead."
+      );
+    } finally {
+      setOriginalLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center sm:p-4">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      {/* Sheet / Modal */}
+      <div
+        className="relative z-10 w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl border border-white/[0.1] bg-[#0d0d1a]/95 shadow-2xl backdrop-blur-xl ring-1 ring-inset ring-white/[0.04]"
+        style={{ paddingBottom: "calc(1.25rem + env(safe-area-inset-bottom, 0px))" }}
+      >
+        {/* Drag handle — mobile only */}
+        <div className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-white/[0.12] sm:hidden" />
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.07]">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#009B3A]">
+              Download
+            </p>
+            <p className="text-[14px] font-semibold text-white leading-tight mt-0.5">
+              Choose PDF
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-white/40 hover:text-white hover:bg-white/[0.07] transition-colors"
+            aria-label="Close"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Options */}
+        <div className="p-4 space-y-2.5">
+          {/* CourtWatch branded summary — uses local_pdf_path via backend PDF generator */}
+          <a
+            href={`${process.env.NEXT_PUBLIC_API_URL}/pdf/judgment/${judgment.id}`}
+            onClick={onClose}
+            className="group flex items-center gap-4 rounded-xl border border-[#009B3A]/25 bg-[#009B3A]/10 px-4 py-3.5 hover:bg-[#009B3A]/15 transition-colors"
+          >
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#009B3A]/20">
+              <FileText className="h-5 w-5 text-[#009B3A]" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[13px] font-semibold text-[#009B3A]">CourtWatch Summary</p>
+              <p className="text-[11px] text-[#009B3A]/55 mt-0.5">Branded PDF with case overview</p>
+            </div>
+            <Download className="h-4 w-4 shrink-0 text-[#009B3A]/60 group-hover:text-[#009B3A] transition-colors" />
+          </a>
+
+          {/* Original court judgment — verified live from court website */}
+          <button
+            onClick={handleOriginalDownload}
+            disabled={originalLoading}
+            className="group w-full flex items-center gap-4 rounded-xl border border-white/[0.1] bg-white/[0.04] px-4 py-3.5 hover:bg-white/[0.07] disabled:opacity-60 disabled:cursor-wait transition-colors"
+          >
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.07]">
+              {originalLoading ? (
+                <Loader2 className="h-5 w-5 text-white/50 animate-spin" />
+              ) : (
+                <Download className="h-5 w-5 text-white/60" />
+              )}
+            </div>
+            <div className="flex-1 min-w-0 text-left">
+              <p className="text-[13px] font-semibold text-white/80">Original Judgment</p>
+              <p className="text-[11px] text-white/40 mt-0.5">
+                {originalLoading ? "Checking court website…" : "Official court document (PDF)"}
+              </p>
+            </div>
+          </button>
+
+          {/* Inline error message */}
+          {originalError && (
+            <p className="rounded-xl border border-amber-500/20 bg-amber-500/[0.07] px-3 py-2.5 text-[11px] leading-snug text-amber-400/90">
+              {originalError}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Page ─────────────────────────────────────────────────────────────────── */
+
 export default function CaseDetailPage() {
   const params = useParams();
   const router = useRouter();
   const [judgment, setJudgment] = useState<Judgment | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
+  const [pdfPickerOpen, setPdfPickerOpen] = useState(false);
   const { isTracked, track } = useTracking();
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setLoading(true);
+    setFetchError(false);
     apiClient
       .getJudgment(params.id as string)
       .then(({ judgment: data }) => setJudgment(data))
-      .catch(console.error)
+      .catch(() => setFetchError(true))
       .finally(() => setLoading(false));
   }, [params.id]);
+
+  useEffect(() => { load(); }, [load]);
 
   const tracked = judgment ? isTracked(judgment.id, "judgment") : false;
 
@@ -83,6 +224,28 @@ export default function CaseDetailPage() {
 
           {loading ? (
             <DetailSkeleton />
+          ) : fetchError ? (
+            /* Network / server error — offer retry */
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.07] bg-[#0d0d1a] py-16 text-center px-6 gap-5">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-red-500/10 ring-1 ring-red-500/20">
+                <AlertTriangle className="h-6 w-6 text-red-400" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-white/70">
+                  Couldn&apos;t load this case
+                </p>
+                <p className="mt-1 text-xs text-white/35">
+                  Check your connection and try again.
+                </p>
+              </div>
+              <button
+                onClick={load}
+                className="flex items-center gap-2 rounded-xl border border-white/[0.12] bg-white/[0.05] px-4 py-2.5 text-sm font-medium text-white/60 hover:text-white hover:bg-white/[0.08] transition-colors"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Try again
+              </button>
+            </div>
           ) : !judgment ? (
             <div className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.07] bg-[#0d0d1a] py-16 text-center">
               <p className="text-sm text-white/40">Case not found.</p>
@@ -191,18 +354,18 @@ export default function CaseDetailPage() {
                 </div>
               )}
 
-              {/* PDF download */}
+              {/* PDF download — opens picker modal */}
               <div className="px-6 pb-6">
-                <a
-                  href={`${process.env.NEXT_PUBLIC_API_URL}/pdf/judgment/${judgment.id}`}
-                  className="group inline-flex items-center gap-2.5 rounded-xl border border-[#009B3A]/25 bg-[#009B3A]/10 px-4 py-2.5 text-[12px] font-semibold text-[#009B3A] hover:bg-[#009B3A]/15 transition-colors"
+                <button
+                  onClick={() => setPdfPickerOpen(true)}
+                  className="group inline-flex items-center gap-2.5 rounded-xl border border-[#009B3A]/25 bg-[#009B3A]/10 px-4 py-2.5 text-[12px] font-semibold text-[#009B3A] hover:bg-[#009B3A]/15 transition-colors min-h-[44px]"
                 >
                   <Download className="h-3.5 w-3.5" />
-                  Download Summary (PDF)
+                  Download PDF
                   <span className="font-mono text-[9px] font-normal text-[#009B3A]/50 group-hover:text-[#009B3A]/70 transition-colors">
-                    CourtWatch JA
+                    Choose format
                   </span>
-                </a>
+                </button>
               </div>
 
               {/* Footer */}
@@ -216,6 +379,14 @@ export default function CaseDetailPage() {
           )}
         </main>
       </div>
+
+      {/* PDF picker modal — rendered outside the main content so it overlays correctly */}
+      {pdfPickerOpen && judgment && (
+        <PdfPickerModal
+          judgment={judgment}
+          onClose={() => setPdfPickerOpen(false)}
+        />
+      )}
     </AuthGuard>
   );
 }

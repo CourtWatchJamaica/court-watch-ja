@@ -5,6 +5,7 @@ export interface User {
   display_name?: string | null;
   password_hash?: never;
   created_at: string;
+  email_verified: boolean;
 }
 
 export interface AdminUser {
@@ -66,6 +67,8 @@ export interface Judgment {
   created_at: string;
   updated_at: string;
   snippet?: string | null;
+  source_url?: string | null;
+  tags?: string[];
 }
 
 export interface CourtSitting {

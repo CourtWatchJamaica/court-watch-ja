@@ -10,6 +10,7 @@ pub mod parish_court_judges;
 pub mod parish_court_lists;
 pub mod pdf;
 pub mod runner;
+pub mod tags;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

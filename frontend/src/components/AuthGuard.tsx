@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiClient } from "@/lib/api";
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -11,9 +12,22 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     const token = localStorage.getItem("token");
     if (!token) {
       router.replace("/auth/login");
-    } else {
-      setIsAuthenticated(true);
+      return;
     }
+
+    apiClient
+      .getMe()
+      .then((user) => {
+        if (user.email_verified === false) {
+          router.replace("/check-email");
+        } else {
+          setIsAuthenticated(true);
+        }
+      })
+      .catch(() => {
+        localStorage.removeItem("token");
+        router.replace("/auth/login");
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -111,17 +111,27 @@ export default function JudgmentCarousel({ judgments }: JudgmentCarouselProps) {
   const total = judgments.length;
   const MAX_DOTS = 5;
 
+  // Use scrollTo on the container instead of scrollIntoView to prevent
+  // the browser from scrolling the page when the carousel auto-advances.
   const scrollToIndex = useCallback(
     (index: number) => {
       if (!scrollRef.current || index < 0 || index >= total) return;
-      const el = scrollRef.current.children[index] as HTMLElement | undefined;
+      const container = scrollRef.current;
+      const el = container.children[index] as HTMLElement | undefined;
       if (!el) return;
-      el.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+      container.scrollTo({ left: el.offsetLeft, behavior: "smooth" });
       setActiveIndex(index);
       setProgressKey((k) => k + 1);
     },
     [total],
   );
+
+  // Pause auto-advance when the browser tab loses visibility.
+  useEffect(() => {
+    const onVisibility = () => setPaused(document.hidden);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, []);
 
   useEffect(() => {
     if (paused || total <= 1) return;
@@ -207,9 +217,10 @@ export default function JudgmentCarousel({ judgments }: JudgmentCarouselProps) {
           <ChevronRight className="h-4 w-4" />
         </button>
 
+        {/* overscroll-x-contain stops horizontal swipe from propagating to the page */}
         <div
           ref={scrollRef}
-          className="flex overflow-x-scroll gap-3 px-4 [scroll-snap-type:x_mandatory] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="flex overflow-x-scroll gap-3 px-4 [scroll-snap-type:x_mandatory] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden overscroll-x-contain"
           style={{ scrollBehavior: "smooth" }}
         >
           {judgments.map((judgment) => (

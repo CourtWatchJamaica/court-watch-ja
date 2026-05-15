@@ -222,7 +222,7 @@ export default function Navbar() {
               {/* Court selector pill — visible on < lg, opens bottom sheet */}
               <button
                 onClick={() => setCourtSheetOpen(true)}
-                className="lg:hidden flex items-center gap-1.5 rounded-full border border-[#009B3A]/40 bg-[#009B3A]/10 px-2.5 py-1.5 text-[11px] font-semibold text-[#009B3A] transition-colors hover:bg-[#009B3A]/20"
+                className="lg:hidden flex items-center gap-1.5 rounded-full border border-[#009B3A]/40 bg-[#009B3A]/10 px-2.5 py-1.5 text-[11px] font-semibold text-[#009B3A] transition-colors hover:bg-[#009B3A]/20 min-h-[44px]"
               >
                 <span className="max-w-[72px] truncate hidden sm:inline">
                   {selectedCourt}
@@ -241,7 +241,7 @@ export default function Navbar() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="relative h-8 w-8 sm:h-9 sm:w-9 rounded-lg text-white/40 hover:text-white hover:bg-white/[0.07]"
+                  className="relative h-9 w-9 min-h-[44px] rounded-lg text-white/40 hover:text-white hover:bg-white/[0.07]"
                 >
                   <Bell className="h-4 w-4" />
                   {unreadCount > 0 && (
@@ -257,7 +257,7 @@ export default function Navbar() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className={`h-8 w-8 sm:h-9 sm:w-9 rounded-lg transition-colors ${
+                  className={`h-9 w-9 min-h-[44px] rounded-lg transition-colors ${
                     pathname.startsWith("/profile")
                       ? "text-[#009B3A] bg-[#009B3A]/10"
                       : "text-white/40 hover:text-white hover:bg-white/[0.07]"
@@ -297,7 +297,7 @@ export default function Navbar() {
                   variant="ghost"
                   size="icon"
                   onClick={() => setMoreOpen((v) => !v)}
-                  className="h-8 w-8 rounded-lg text-white/40 hover:text-white hover:bg-white/[0.07]"
+                  className="h-9 w-9 min-h-[44px] rounded-lg text-white/40 hover:text-white hover:bg-white/[0.07]"
                   aria-label="More options"
                 >
                   <MoreHorizontal className="h-4 w-4" />

@@ -19,6 +19,17 @@ import {
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
 
+export class ApiError extends Error {
+  status: number;
+  data: Record<string, unknown>;
+  constructor(message: string, status: number, data: Record<string, unknown>) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.data = data;
+  }
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token =
     typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -48,7 +59,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
     if (!res.ok) {
       const error = await res.json().catch(() => null);
-      throw new Error(error?.error || error?.message || `Request failed: ${res.status}`);
+      throw new ApiError(
+        error?.error || error?.message || `Request failed: ${res.status}`,
+        res.status,
+        error || {}
+      );
     }
 
     return res.json();
@@ -68,11 +83,17 @@ export interface CourtStats {
 
 export const apiClient = {
   // ── Auth ────────────────────────────────────────────────────────────────
-  async signup(email: string, password: string): Promise<{ token: string }> {
-    return request("/auth/signup", {
+  async signup(email: string, password: string): Promise<{ message: string }> {
+    return request<{ message: string }>("/auth/signup", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     });
+  },
+
+  async verifyEmail(token: string): Promise<{ token: string }> {
+    return request<{ token: string }>(
+      `/auth/verify-email?token=${encodeURIComponent(token)}`
+    );
   },
 
   async login(email: string, password: string): Promise<{ token: string }> {
@@ -106,6 +127,7 @@ export const apiClient = {
     judge?: string,
     page?: number,
     limit?: number,
+    tag?: string,
   ): Promise<{ judgments: Judgment[]; total: number }> {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
@@ -113,12 +135,17 @@ export const apiClient = {
     if (judge) params.set("judge", judge);
     if (page != null) params.set("page", String(page));
     if (limit != null) params.set("limit", String(limit));
+    if (tag) params.set("tag", tag);
     const qs = params.toString();
     return request(`/judgments${qs ? `?${qs}` : ""}`);
   },
 
   async getJudgment(id: string): Promise<{ judgment: Judgment }> {
     return request(`/judgments/${id}`);
+  },
+
+  async getOriginalPdfUrl(id: number): Promise<{ url: string | null }> {
+    return request(`/judgments/${id}/original-pdf`);
   },
 
   // ── Court Sittings ──────────────────────────────────────────────────────

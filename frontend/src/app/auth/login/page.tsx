@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
-import { apiClient } from "@/lib/api";
+import { apiClient, ApiError } from "@/lib/api";
 import { Scale, Loader2 } from "lucide-react";
 
 const googleEnabled = process.env.NEXT_PUBLIC_GOOGLE_OAUTH_ENABLED === "true";
@@ -14,21 +14,40 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [unverified, setUnverified] = useState(false);
+  const [resent, setResent] = useState(false);
+  const [resending, setResending] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setUnverified(false);
+    setResent(false);
     setLoading(true);
 
     try {
       const { token } = await apiClient.login(email, password);
       localStorage.setItem("token", token);
-      // Hard redirect so the root-layout Navbar remounts and re-reads the
-      // role from the new JWT, ensuring the admin shield appears immediately.
       window.location.href = "/";
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      if (err instanceof ApiError && err.data?.email_verified === false) {
+        setUnverified(true);
+      } else {
+        setError(err instanceof Error ? err.message : "Login failed");
+      }
       setLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    setResending(true);
+    try {
+      await apiClient.signup(email, password);
+      setResent(true);
+    } catch {
+      // best-effort; user can try logging in again later
+    } finally {
+      setResending(false);
     }
   };
 
@@ -162,6 +181,26 @@ export default function LoginPage() {
             {error && (
               <div className="rounded-xl bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-400">
                 {error}
+              </div>
+            )}
+
+            {unverified && !resent && (
+              <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 px-4 py-3 text-sm text-amber-300">
+                <p>Your email is not yet verified. Check your inbox for the verification link, or click below to resend.</p>
+                <button
+                  type="button"
+                  onClick={handleResend}
+                  disabled={resending}
+                  className="mt-2 font-medium text-[#009B3A] hover:underline disabled:opacity-50"
+                >
+                  {resending ? "Sending…" : "Resend verification email"}
+                </button>
+              </div>
+            )}
+
+            {resent && (
+              <div className="rounded-xl bg-green-500/10 border border-green-500/20 px-4 py-3 text-sm text-green-400">
+                Verification email resent. Check your inbox.
               </div>
             )}
 

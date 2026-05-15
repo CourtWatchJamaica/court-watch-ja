@@ -444,8 +444,14 @@ export default function NotificationSettingsPage() {
               <Bell className="mb-3 h-10 w-10 text-white/10" />
               <p className="text-sm text-white/40">No tracked cases</p>
               <p className="mt-1 text-[12px] text-white/25">
-                Track a case from the Cases page to set up alerts.
+                Track a case to set up custom alert schedules.
               </p>
+              <button
+                onClick={() => router.push("/cases")}
+                className="mt-4 rounded-xl border border-[#009B3A]/25 bg-[#009B3A]/10 px-4 py-2.5 text-xs font-semibold text-[#009B3A] hover:bg-[#009B3A]/15 transition-colors"
+              >
+                Browse Cases
+              </button>
             </div>
           ) : (
             /* ── Two-panel layout ── */

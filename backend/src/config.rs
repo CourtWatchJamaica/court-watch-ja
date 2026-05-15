@@ -9,6 +9,7 @@ pub struct Config {
     pub judgment_cutoff_date: NaiveDate,
     pub scraper_state_path: String,
     pub pdf_dir: String,
+    pub resend_api_key: Option<String>,
 }
 
 impl Config {
@@ -34,6 +35,7 @@ impl Config {
             scraper_state_path: env::var("SCRAPER_STATE_PATH")
                 .unwrap_or_else(|_| "./scraper_state.json".to_string()),
             pdf_dir: env::var("PDF_DIR").unwrap_or_else(|_| "./pdfs".to_string()),
+            resend_api_key: env::var("RESEND_API_KEY").ok(),
         })
     }
 }

@@ -2,6 +2,7 @@ mod api;
 mod config;
 mod db;
 mod middleware;
+mod notifications;
 mod scraper;
 mod utils;
 

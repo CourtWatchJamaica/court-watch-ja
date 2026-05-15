@@ -124,16 +124,16 @@ pub async fn run(
                 }
             }
 
+            // Resolve detail URL to an absolute source URL
+            let source_url = row.detail_url.as_ref().map(|d| {
+                if d.starts_with("http") { d.clone() } else { format!("{BASE_URL}{d}") }
+            });
+
             // Fetch detail page (if we have a URL)
-            let (pdf_url, summary) = if let Some(detail_url) = &row.detail_url {
-                let full_url = if detail_url.starts_with("http") {
-                    detail_url.clone()
-                } else {
-                    format!("{BASE_URL}{detail_url}")
-                };
+            let (pdf_url, summary) = if let Some(ref full_url) = source_url {
                 sleep(Duration::from_secs(3)).await;
 
-                match judgment_detail::fetch(client, &full_url).await {
+                match judgment_detail::fetch(client, full_url, &row.case_number).await {
                     Ok(detail) => (detail.pdf_url, detail.summary_text),
                     Err(e) => {
                         warn!("[Parish] detail fetch failed for {}: {e}", row.case_number);
@@ -173,6 +173,8 @@ pub async fn run(
                 pdf_url.as_deref(),
                 None,
                 summary.as_deref(),
+                source_url.as_deref(),
+                vec![],
             )
             .await
             {
