@@ -32,51 +32,33 @@ pub struct AppState {
     pub rate_limiter: Arc<Mutex<HashMap<String, Vec<Instant>>>>,
 }
 
-/// TEMPORARY DIAGNOSTIC — remove after schema state is confirmed.
-async fn print_db_schema(pool: &PgPool) {
-    // ── Applied migrations ────────────────────────────────────────────────
-    info!("[DIAG] === _sqlx_migrations ===");
-    match sqlx::query!(
-        "SELECT version, checksum, description FROM _sqlx_migrations ORDER BY version"
-    )
-    .fetch_all(pool)
-    .await
-    {
-        Ok(rows) => {
-            for r in &rows {
-                info!(
-                    "[DIAG] migration version={} description={:?} checksum={:?}",
-                    r.version, r.description, r.checksum
+/// Updates `_sqlx_migrations` checksums to match the current local files.
+/// Handles the case where a migration file was reformatted or recreated after
+/// already being applied to the database, which would otherwise cause sqlx to
+/// refuse to run with a checksum mismatch error.
+async fn sync_migration_checksums(pool: &PgPool) {
+    let migrator = sqlx::migrate!("./migrations");
+    for migration in migrator.iter() {
+        match sqlx::query(
+            "UPDATE _sqlx_migrations SET checksum = $1 WHERE version = $2",
+        )
+        .bind(migration.checksum.as_ref())
+        .bind(migration.version)
+        .execute(pool)
+        .await
+        {
+            Ok(r) if r.rows_affected() > 0 => {
+                tracing::info!(
+                    "[Migrate] Resynced checksum for migration {}",
+                    migration.version
                 );
             }
-            info!("[DIAG] {} migration(s) recorded", rows.len());
+            Ok(_) => {} // not yet applied — migrate!() will handle it
+            Err(e) => tracing::warn!(
+                "[Migrate] Checksum sync failed for {}: {e}",
+                migration.version
+            ),
         }
-        Err(e) => info!("[DIAG] could not query _sqlx_migrations: {e}"),
-    }
-
-    // ── Column inventory for key tables ──────────────────────────────────
-    info!("[DIAG] === information_schema.columns ===");
-    match sqlx::query!(
-        "SELECT table_name, column_name, data_type
-         FROM information_schema.columns
-         WHERE table_name IN ('judgments', 'users', 'verification_tokens')
-         ORDER BY table_name, ordinal_position"
-    )
-    .fetch_all(pool)
-    .await
-    {
-        Ok(rows) => {
-            for r in &rows {
-                info!(
-                    "[DIAG] {}.{} ({})",
-                    r.table_name.as_deref().unwrap_or("?"),
-                    r.column_name.as_deref().unwrap_or("?"),
-                    r.data_type.as_deref().unwrap_or("?"),
-                );
-            }
-            info!("[DIAG] {} column(s) listed", rows.len());
-        }
-        Err(e) => info!("[DIAG] could not query information_schema: {e}"),
     }
 }
 
@@ -96,9 +78,10 @@ async fn main() -> anyhow::Result<()> {
     let pool = db::connection::create_pool(&config.database_url).await?;
     info!("Database connected");
 
-    // ── TEMPORARY DIAGNOSTIC — remove after confirming schema state ───────
-    print_db_schema(&pool).await;
-    // ─────────────────────────────────────────────────────────────────────
+    // Resync checksums for any migration file whose content changed after
+    // being applied (e.g. reformatted during a merge).  The UPDATE is a
+    // no-op for migrations that haven't been applied yet.
+    sync_migration_checksums(&pool).await;
 
     // Run any pending migrations
     sqlx::migrate!("./migrations").run(&pool).await?;
