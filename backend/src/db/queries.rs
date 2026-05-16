@@ -89,10 +89,29 @@ pub async fn admin_set_user_role(
 }
 
 pub async fn admin_delete_user(pool: &PgPool, user_id: i32) -> sqlx::Result<bool> {
+    let mut tx = pool.begin().await?;
+
+    // Remove related rows in dependency order before deleting the user.
+    // user_case_settings cascades from user_cases, so no explicit delete needed.
+    sqlx::query("DELETE FROM notifications WHERE user_id = $1")
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("DELETE FROM user_cases WHERE user_id = $1")
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("DELETE FROM verification_tokens WHERE user_id = $1")
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await?;
+
     let result = sqlx::query("DELETE FROM users WHERE id = $1")
         .bind(user_id)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
+
+    tx.commit().await?;
     Ok(result.rows_affected() > 0)
 }
 
