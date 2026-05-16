@@ -1,4 +1,5 @@
 ALTER TABLE judgments ADD COLUMN IF NOT EXISTS tags TEXT[] NOT NULL DEFAULT '{}';
+<<<<<<< HEAD
 
 -- Backfill tax_law tag for existing judgments whose title or summary contains tax keywords
 UPDATE judgments
@@ -17,3 +18,5 @@ WHERE 'tax_law' != ALL(tags)
       'tax assessment|tax liability|tax evasion|commissioner of inland revenue|inland revenue|'
       'tax administration|value added tax|\bvat\b|withholding tax|tax compliance)'
   );
+=======
+>>>>>>> V4.3----UPDATE-UI-

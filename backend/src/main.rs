@@ -32,6 +32,54 @@ pub struct AppState {
     pub rate_limiter: Arc<Mutex<HashMap<String, Vec<Instant>>>>,
 }
 
+/// TEMPORARY DIAGNOSTIC — remove after schema state is confirmed.
+async fn print_db_schema(pool: &PgPool) {
+    // ── Applied migrations ────────────────────────────────────────────────
+    info!("[DIAG] === _sqlx_migrations ===");
+    match sqlx::query!(
+        "SELECT version, checksum, description FROM _sqlx_migrations ORDER BY version"
+    )
+    .fetch_all(pool)
+    .await
+    {
+        Ok(rows) => {
+            for r in &rows {
+                info!(
+                    "[DIAG] migration version={} description={:?} checksum={:?}",
+                    r.version, r.description, r.checksum
+                );
+            }
+            info!("[DIAG] {} migration(s) recorded", rows.len());
+        }
+        Err(e) => info!("[DIAG] could not query _sqlx_migrations: {e}"),
+    }
+
+    // ── Column inventory for key tables ──────────────────────────────────
+    info!("[DIAG] === information_schema.columns ===");
+    match sqlx::query!(
+        "SELECT table_name, column_name, data_type
+         FROM information_schema.columns
+         WHERE table_name IN ('judgments', 'users', 'verification_tokens')
+         ORDER BY table_name, ordinal_position"
+    )
+    .fetch_all(pool)
+    .await
+    {
+        Ok(rows) => {
+            for r in &rows {
+                info!(
+                    "[DIAG] {}.{} ({})",
+                    r.table_name.as_deref().unwrap_or("?"),
+                    r.column_name.as_deref().unwrap_or("?"),
+                    r.data_type.as_deref().unwrap_or("?"),
+                );
+            }
+            info!("[DIAG] {} column(s) listed", rows.len());
+        }
+        Err(e) => info!("[DIAG] could not query information_schema: {e}"),
+    }
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // ── Logging ───────────────────────────────────────────────────────────
@@ -47,6 +95,10 @@ async fn main() -> anyhow::Result<()> {
     // ── Database ──────────────────────────────────────────────────────────
     let pool = db::connection::create_pool(&config.database_url).await?;
     info!("Database connected");
+
+    // ── TEMPORARY DIAGNOSTIC — remove after confirming schema state ───────
+    print_db_schema(&pool).await;
+    // ─────────────────────────────────────────────────────────────────────
 
     // Run any pending migrations
     sqlx::migrate!("./migrations").run(&pool).await?;
