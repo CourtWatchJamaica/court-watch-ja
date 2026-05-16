@@ -89,6 +89,9 @@ pub struct ListParams {
     pub court: Option<String>,
     pub judge: Option<String>,
     pub tag: Option<String>,
+    pub date_from: Option<String>,
+    pub date_to: Option<String>,
+    pub case_number: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -102,6 +105,15 @@ pub struct JudgmentResponse {
     pub judgment: Judgment,
 }
 
+fn parse_date_opt(s: Option<&str>) -> Result<Option<chrono::NaiveDate>, AppError> {
+    match s {
+        None | Some("") => Ok(None),
+        Some(d) => chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d")
+            .map(Some)
+            .map_err(|_| AppError::BadRequest(format!("Invalid date: {d}. Use YYYY-MM-DD"))),
+    }
+}
+
 pub async fn list_judgments(
     State(state): State<AppState>,
     Query(params): Query<ListParams>,
@@ -111,9 +123,14 @@ pub async fn list_judgments(
     let q = params.q.as_deref();
     let court = params.court.as_deref().map(court_slug_to_name);
     let judge = params.judge.as_deref();
-
     let tag = params.tag.as_deref();
-    let (judgments, total) = queries::list_judgments(&state.db, q, page, limit, court, judge, tag).await?;
+    let date_from = parse_date_opt(params.date_from.as_deref())?;
+    let date_to = parse_date_opt(params.date_to.as_deref())?;
+    let case_number = params.case_number.as_deref();
+
+    let (judgments, total) = queries::list_judgments(
+        &state.db, q, page, limit, court, judge, tag, date_from, date_to, case_number,
+    ).await?;
     Ok(Json(JudgmentsResponse { judgments, total }))
 }
 

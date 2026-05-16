@@ -78,7 +78,7 @@ const SECTIONS = [
       },
       {
         q: "I'm not receiving notifications even though I track cases.",
-        a: "First, check that your notification preferences are enabled in Settings. If you've just started tracking a case, notifications are generated after the next scraper run — typically within 24 hours. If problems persist, contact us at hello@courtwatchja.com.",
+        a: "First, check that your notification preferences are enabled in Settings. If you've just started tracking a case, notifications are generated after the next scraper run — typically within 24 hours. If problems persist, contact us at courtwatchjamaica@protonmail.com.",
       },
     ],
   },
@@ -173,7 +173,7 @@ export default function HelpPage() {
             Our team is happy to assist with any questions.
           </p>
           <Link
-            href="mailto:hello@courtwatchja.com"
+            href="mailto:courtwatchjamaica@protonmail.com"
             className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#009B3A] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#009B3A]/85 transition-colors"
           >
             <Mail className="h-4 w-4" />

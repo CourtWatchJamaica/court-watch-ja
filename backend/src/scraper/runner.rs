@@ -572,18 +572,18 @@ async fn dispatch_notification_emails(
     info!("[Email] dispatching {} notification email(s)", rows.len());
 
     for row in rows {
-        let alias = match row.notification_type.as_str() {
-            "case_available" => std::env::var("RESEND_TEMPLATE_CASE_AVAILABLE")
-                .unwrap_or_else(|_| "case-available".into()),
-            "case_listed" => std::env::var("RESEND_TEMPLATE_CASE_LISTED")
-                .unwrap_or_else(|_| "case-listed".into()),
-            "sitting_reminder_1d" => std::env::var("RESEND_TEMPLATE_SITTING_1D")
-                .unwrap_or_else(|_| "sitting-reminder-1d".into()),
-            "sitting_reminder_morning" => std::env::var("RESEND_TEMPLATE_SITTING_MORNING")
-                .unwrap_or_else(|_| "sitting-reminder-morning".into()),
+        let (subject, html) = match row.notification_type.as_str() {
+            "case_available" | "case_listed" | "sitting_reminder_1d" | "sitting_reminder_morning" => {
+                let subj = row.title.clone().unwrap_or_else(|| "CourtWatch JA update".into());
+                let msg = row.message.as_deref().unwrap_or("").to_owned();
+                let body = format!(
+                    "<p>{msg}</p><p><a href=\"https://courtwatch.jm/cases\">View on CourtWatch JA</a></p>"
+                );
+                (subj, body)
+            }
             _ => continue,
         };
-        if let Err(e) = email::send_email(client, api_key, &row.email, &alias).await {
+        if let Err(e) = email::send_email(client, api_key, email::EmailSender::Alerts, &row.email, &subject, &html).await {
             warn!("[Email] send failed for {}: {e}", row.email);
         }
     }

@@ -1270,7 +1270,7 @@ export default function JudicialConstellation({ judges, connections }: Props) {
     }
     setDataLoading(true);
     Promise.allSettled([
-      apiClient.getJudgments(undefined, undefined, selectedJudge.name),
+      apiClient.getJudgments({ judge: selectedJudge.name }),
       apiClient.getCourtSittings({ judge: selectedJudge.name }),
     ])
       .then(([jRes, sRes]) => {

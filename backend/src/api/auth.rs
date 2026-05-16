@@ -44,6 +44,7 @@ fn client_ip(headers: &HeaderMap, addr: &SocketAddr) -> String {
 pub struct AuthRequest {
     pub email: String,
     pub password: String,
+    pub display_name: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -88,7 +89,12 @@ pub async fn signup(
     let hash = bcrypt::hash(&body.password, bcrypt::DEFAULT_COST)
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
-    let user = match queries::create_user(&state.db, &body.email, &hash).await {
+    let display_name = body.display_name.as_deref().and_then(|s| {
+        let t = s.trim();
+        if t.is_empty() { None } else { Some(t) }
+    });
+
+    let user = match queries::create_user(&state.db, &body.email, &hash, display_name).await {
         Ok(u) => u,
         Err(sqlx::Error::Database(ref dbe)) if dbe.constraint() == Some("users_email_key") => {
             // User already exists — allow resend only for unverified accounts.
@@ -116,14 +122,32 @@ pub async fn signup(
     queries::create_verification_token(&state.db, user.id, &raw_token, expires_at).await?;
 
     if let Some(ref api_key) = state.config.resend_api_key {
-        let alias = std::env::var("RESEND_VERIFY_TEMPLATE")
-            .unwrap_or_else(|_| "verify-email".into());
         let client = reqwest::Client::new();
         let key = api_key.clone();
         let to = body.email.clone();
+        let token = raw_token.clone();
         tokio::spawn(async move {
+            let app_url = std::env::var("APP_URL")
+                .unwrap_or_else(|_| "https://courtwatchjamaica.com".into());
+            let app_url = app_url.trim_end_matches('/');
+            let verify_url = format!("{app_url}/verify-email?token={token}");
+            let subject = "Verify your CourtWatch JA email";
+            let html = format!(
+                r#"<p>Thank you for signing up to <strong>CourtWatch JA</strong>.</p>
+<p>Click the link below to verify your email address:</p>
+<p><a href="{verify_url}">Verify Email Address</a></p>
+<p>This link expires in 24 hours. If you did not create an account, please ignore this email.</p>"#
+            );
             if let Err(e) =
-                crate::notifications::email::send_email(&client, &key, &to, &alias).await
+                crate::notifications::email::send_email(
+                    &client,
+                    &key,
+                    crate::notifications::email::EmailSender::Auth,
+                    &to,
+                    subject,
+                    &html,
+                )
+                .await
             {
                 tracing::warn!("[Signup] Verification email failed: {e}");
             }
@@ -233,6 +257,117 @@ pub async fn oauth_login(
     let token = jwt::encode_token(user.id, &user.email, &user.role, &state.config.jwt_secret)?;
     Ok(Json(AuthResponse { token }))
 }
+
+// ── Password-change via email verification ────────────────────────────────────
+
+#[derive(Deserialize)]
+pub struct RequestPasswordChangeRequest {
+    pub current_password: String,
+    pub new_password: String,
+}
+
+#[derive(Deserialize)]
+pub struct ConfirmPasswordChangeRequest {
+    pub token: String,
+}
+
+pub async fn request_password_change(
+    State(state): State<AppState>,
+    Extension(user_id): Extension<i32>,
+    Json(body): Json<RequestPasswordChangeRequest>,
+) -> Result<Json<SignupResponse>, AppError> {
+    if body.current_password.is_empty() {
+        return Err(AppError::BadRequest("Current password is required".into()));
+    }
+    if body.new_password.len() < 8 {
+        return Err(AppError::BadRequest(
+            "New password must be at least 8 characters".into(),
+        ));
+    }
+
+    let user = queries::get_user_by_id(&state.db, user_id)
+        .await?
+        .ok_or(AppError::NotFound)?;
+
+    let valid = bcrypt::verify(&body.current_password, &user.password_hash)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    if !valid {
+        return Err(AppError::BadRequest("Current password is incorrect".into()));
+    }
+
+    let pending_hash = bcrypt::hash(&body.new_password, bcrypt::DEFAULT_COST)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    let raw_token = Uuid::new_v4().to_string();
+    let expires_at = chrono::Utc::now().naive_utc() + chrono::Duration::minutes(15);
+    queries::create_password_change_token(
+        &state.db,
+        user_id,
+        &raw_token,
+        &pending_hash,
+        expires_at,
+    )
+    .await?;
+
+    if let Some(ref api_key) = state.config.resend_api_key {
+        let client = reqwest::Client::new();
+        let key = api_key.clone();
+        let email = user.email.clone();
+        let token = raw_token.clone();
+        tokio::spawn(async move {
+            let app_url = std::env::var("APP_URL")
+                .unwrap_or_else(|_| "https://courtwatchjamaica.com".into());
+            let app_url = app_url.trim_end_matches('/');
+            let confirm_url = format!("{app_url}/verify-password-change?token={token}");
+            let subject = "Confirm your CourtWatch JA password change";
+            let html = format!(
+                r#"<p>We received a request to change the password on your CourtWatch JA account.</p>
+<p>Click the link below to confirm. This link expires in <strong>15 minutes</strong>.</p>
+<p><a href="{confirm_url}">Confirm Password Change</a></p>
+<p>If you did not request this change, you can safely ignore this email — your password will not be changed.</p>"#
+            );
+            if let Err(e) = crate::notifications::email::send_email(
+                &client,
+                &key,
+                crate::notifications::email::EmailSender::Auth,
+                &email,
+                subject,
+                &html,
+            )
+            .await
+            {
+                tracing::warn!("[PasswordChange] Email failed: {e}");
+            }
+        });
+    }
+
+    Ok(Json(SignupResponse {
+        message: "Check your email. We sent a verification link to confirm this password change."
+            .into(),
+    }))
+}
+
+pub async fn confirm_password_change(
+    State(state): State<AppState>,
+    Json(body): Json<ConfirmPasswordChangeRequest>,
+) -> Result<Json<SignupResponse>, AppError> {
+    if body.token.is_empty() {
+        return Err(AppError::BadRequest("Token is required".into()));
+    }
+
+    let (user_id, pending_hash) =
+        queries::consume_password_change_token(&state.db, &body.token)
+            .await?
+            .ok_or_else(|| AppError::BadRequest("Invalid or expired token".into()))?;
+
+    queries::update_user_password(&state.db, user_id, &pending_hash).await?;
+
+    Ok(Json(SignupResponse {
+        message: "Password updated successfully.".into(),
+    }))
+}
+
+// ── Profile ───────────────────────────────────────────────────────────────────
 
 pub async fn update_profile(
     State(state): State<AppState>,

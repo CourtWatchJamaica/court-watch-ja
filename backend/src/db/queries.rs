@@ -33,13 +33,14 @@ pub async fn set_system_config(pool: &PgPool, key: &str, value: &str) -> sqlx::R
 
 // ── Users ──────────────────────────────────────────────────────────────────
 
-pub async fn create_user(pool: &PgPool, email: &str, password_hash: &str) -> sqlx::Result<User> {
+pub async fn create_user(pool: &PgPool, email: &str, password_hash: &str, display_name: Option<&str>) -> sqlx::Result<User> {
     sqlx::query_as::<_, User>(
-        "INSERT INTO users (email, password_hash) VALUES ($1, $2)
+        "INSERT INTO users (email, password_hash, display_name) VALUES ($1, $2, $3)
          RETURNING id, email, password_hash, role, display_name, created_at, email_verified",
     )
     .bind(email)
     .bind(password_hash)
+    .bind(display_name)
     .fetch_one(pool)
     .await
 }
@@ -369,123 +370,118 @@ pub async fn list_judgments(
     limit: i64,
     court: Option<&str>,
     judge: Option<&str>,
-    tag: Option<&str>,
+    tag: Option<&str>,           // comma-separated tags; OR logic
+    date_from: Option<NaiveDate>,
+    date_to: Option<NaiveDate>,
+    case_number: Option<&str>,
 ) -> sqlx::Result<(Vec<Judgment>, i64)> {
+    use sqlx::QueryBuilder;
+
     let offset = (page - 1).max(0) * limit;
+    let tags: Vec<String> = tag
+        .map(|t| t.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect())
+        .unwrap_or_default();
+    let has_fts = query.map_or(false, |q| !q.trim().is_empty());
+    // Court constraint is bypassed when a judge or tag filter is active.
+    let use_court = judge.is_none() && tags.is_empty();
+    let effective_court = if use_court { court.unwrap_or("Supreme Court") } else { "" };
 
-    // Tag filter path: filter by a single tag across all courts.
-    if let Some(tag_value) = tag {
-        let sql = format!(
-            "SELECT {J} FROM judgments
-             WHERE $1 = ANY(tags)
-             ORDER BY date DESC NULLS LAST, created_at DESC
-             LIMIT $2 OFFSET $3"
-        );
-        let rows = sqlx::query_as::<_, Judgment>(&sql)
-            .bind(tag_value)
-            .bind(limit)
-            .bind(offset)
-            .fetch_all(pool)
-            .await?;
-        let total: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM judgments WHERE $1 = ANY(tags)")
-                .bind(tag_value)
-                .fetch_one(pool)
-                .await?;
-        return Ok((rows, total));
+    // ── COUNT ──────────────────────────────────────────────────────────────
+    let mut cq: QueryBuilder<sqlx::Postgres> =
+        QueryBuilder::new("SELECT COUNT(*) FROM judgments WHERE 1=1");
+    if has_fts {
+        cq.push(" AND search_vector @@ websearch_to_tsquery('english', ");
+        cq.push_bind(query.unwrap().trim());
+        cq.push(")");
     }
-
-    // Judge-specific path: bypass court constraint, return that judge's judgments.
-    // judge_name can be a comma-separated panel ("Harris JA, Brown JA, Jones JA"), so we
-    // unnest the field and check whether the requested name appears in the list.
-    // ANY(ARRAY(SELECT ...)) in a WHERE clause is safe with sqlx (no type-inference issue).
-    if let Some(judge_name) = judge {
-        let sql = format!(
-            "SELECT {J} FROM judgments
-             WHERE judge_name IS NOT NULL
-               AND $1 = ANY(
-                     ARRAY(SELECT TRIM(p)
-                           FROM unnest(string_to_array(judge_name, ',')) p)
-                   )
-             ORDER BY date DESC NULLS LAST, created_at DESC
-             LIMIT $2 OFFSET $3"
-        );
-        let rows = sqlx::query_as::<_, Judgment>(&sql)
-            .bind(judge_name)
-            .bind(limit)
-            .bind(offset)
-            .fetch_all(pool)
-            .await?;
-        let total: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM judgments
-             WHERE judge_name IS NOT NULL
-               AND $1 = ANY(
-                     ARRAY(SELECT TRIM(p)
-                           FROM unnest(string_to_array(judge_name, ',')) p)
-                   )",
-        )
-        .bind(judge_name)
-        .fetch_one(pool)
-        .await?;
-        return Ok((rows, total));
+    if use_court {
+        cq.push(" AND court = ");
+        cq.push_bind(effective_court);
     }
+    if let Some(j) = judge {
+        cq.push(" AND judge_name IS NOT NULL AND ");
+        cq.push_bind(j);
+        cq.push(" = ANY(ARRAY(SELECT TRIM(p) FROM unnest(string_to_array(judge_name, ',')) p))");
+    }
+    if !tags.is_empty() {
+        cq.push(" AND tags && ");
+        cq.push_bind(tags.clone());
+    }
+    if let Some(df) = date_from {
+        cq.push(" AND date >= ");
+        cq.push_bind(df);
+    }
+    if let Some(dt) = date_to {
+        cq.push(" AND date <= ");
+        cq.push_bind(dt);
+    }
+    if let Some(cn) = case_number.filter(|s| !s.is_empty()) {
+        cq.push(" AND case_number ILIKE ");
+        cq.push_bind(format!("%{cn}%"));
+    }
+    let total: i64 = cq.build_query_scalar().fetch_one(pool).await?;
 
-    let effective_court = court.unwrap_or("Supreme Court");
-
-    if let Some(q) = query.filter(|q| !q.is_empty()) {
-        let sql = format!(
-            "SELECT {J},
-                    ts_headline('english',
-                        COALESCE(title,'') || ' ' || COALESCE(summary_text,''),
-                        websearch_to_tsquery('english', $1),
-                        'StartSel=[[, StopSel=]], MaxWords=15, MinWords=5'
-                    ) AS snippet
-             FROM judgments
-             WHERE search_vector @@ websearch_to_tsquery('english', $1) AND court = $2
-             ORDER BY ts_rank(search_vector, websearch_to_tsquery('english', $1)) DESC,
-                      date DESC NULLS LAST
-             LIMIT $3 OFFSET $4"
-        );
-        let rows = sqlx::query_as::<_, Judgment>(&sql)
-            .bind(q)
-            .bind(effective_court)
-            .bind(limit)
-            .bind(offset)
-            .fetch_all(pool)
-            .await?;
-
-        let total: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM judgments
-             WHERE search_vector @@ websearch_to_tsquery('english', $1) AND court = $2",
-        )
-        .bind(q)
-        .bind(effective_court)
-        .fetch_one(pool)
-        .await?;
-
-        Ok((rows, total))
+    // ── DATA ───────────────────────────────────────────────────────────────
+    let mut dq: QueryBuilder<sqlx::Postgres> = if has_fts {
+        let q = query.unwrap().trim();
+        let mut qb = QueryBuilder::new(format!(
+            "SELECT {J}, ts_headline('english', \
+             COALESCE(title,'') || ' ' || COALESCE(summary_text,''), \
+             websearch_to_tsquery('english', "
+        ));
+        qb.push_bind(q);
+        qb.push("), 'StartSel=[[, StopSel=]], MaxWords=15, MinWords=5') AS snippet \
+              FROM judgments WHERE 1=1");
+        qb
     } else {
-        let sql = format!(
-            "SELECT {J} FROM judgments
-             WHERE court = $1
-             ORDER BY date DESC NULLS LAST, created_at DESC
-             LIMIT $2 OFFSET $3"
-        );
-        let rows = sqlx::query_as::<_, Judgment>(&sql)
-            .bind(effective_court)
-            .bind(limit)
-            .bind(offset)
-            .fetch_all(pool)
-            .await?;
+        QueryBuilder::new(format!("SELECT {J} FROM judgments WHERE 1=1"))
+    };
 
-        let total: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM judgments WHERE court = $1")
-                .bind(effective_court)
-                .fetch_one(pool)
-                .await?;
-
-        Ok((rows, total))
+    if has_fts {
+        dq.push(" AND search_vector @@ websearch_to_tsquery('english', ");
+        dq.push_bind(query.unwrap().trim());
+        dq.push(")");
     }
+    if use_court {
+        dq.push(" AND court = ");
+        dq.push_bind(effective_court);
+    }
+    if let Some(j) = judge {
+        dq.push(" AND judge_name IS NOT NULL AND ");
+        dq.push_bind(j);
+        dq.push(" = ANY(ARRAY(SELECT TRIM(p) FROM unnest(string_to_array(judge_name, ',')) p))");
+    }
+    if !tags.is_empty() {
+        dq.push(" AND tags && ");
+        dq.push_bind(tags);
+    }
+    if let Some(df) = date_from {
+        dq.push(" AND date >= ");
+        dq.push_bind(df);
+    }
+    if let Some(dt) = date_to {
+        dq.push(" AND date <= ");
+        dq.push_bind(dt);
+    }
+    if let Some(cn) = case_number.filter(|s| !s.is_empty()) {
+        dq.push(" AND case_number ILIKE ");
+        dq.push_bind(format!("%{cn}%"));
+    }
+
+    if has_fts {
+        dq.push(" ORDER BY ts_rank(search_vector, websearch_to_tsquery('english', ");
+        dq.push_bind(query.unwrap().trim());
+        dq.push(")) DESC, date DESC NULLS LAST");
+    } else {
+        dq.push(" ORDER BY date DESC NULLS LAST, created_at DESC");
+    }
+    dq.push(" LIMIT ");
+    dq.push_bind(limit);
+    dq.push(" OFFSET ");
+    dq.push_bind(offset);
+
+    let rows = dq.build_query_as::<Judgment>().fetch_all(pool).await?;
+    Ok((rows, total))
 }
 
 pub async fn get_judgment_by_id(pool: &PgPool, id: i32) -> sqlx::Result<Option<Judgment>> {
@@ -722,6 +718,16 @@ pub async fn get_judgments_by_judge(
         .bind(judge_name)
         .fetch_all(pool)
         .await
+}
+
+pub async fn autocomplete_judges(pool: &PgPool, q: &str) -> sqlx::Result<Vec<String>> {
+    let pattern = format!("%{}%", q.trim());
+    sqlx::query_scalar(
+        "SELECT name FROM judges WHERE name ILIKE $1 ORDER BY name LIMIT 10",
+    )
+    .bind(pattern)
+    .fetch_all(pool)
+    .await
 }
 
 pub async fn upsert_judge(pool: &PgPool, name: &str, court: Option<&str>) -> sqlx::Result<Judge> {
@@ -1107,122 +1113,108 @@ fn sitting_court_filter(court: &str) -> &'static str {
 
 pub async fn list_court_sittings(
     pool: &PgPool,
+    query: Option<&str>,
     date_from: Option<NaiveDate>,
     date_to: Option<NaiveDate>,
     court: Option<&str>,
     judge: Option<&str>,
-) -> sqlx::Result<Vec<CourtSitting>> {
-    // Judge-specific path: return all sittings for that judge without court constraint.
-    // Use unnest to handle any future comma-separated judge_name values.
-    if let Some(judge_name) = judge {
-        let sql = format!(
-            "SELECT {S} FROM court_sittings
-             WHERE judge_name IS NOT NULL
-               AND $1 = ANY(
-                     ARRAY(SELECT TRIM(p)
-                           FROM unnest(string_to_array(judge_name, ',')) p)
-                   )
-             ORDER BY event_date DESC NULLS LAST, event_time NULLS LAST"
-        );
-        return sqlx::query_as::<_, CourtSitting>(&sql)
-            .bind(judge_name)
-            .fetch_all(pool)
-            .await;
+    case_number: Option<&str>,
+    page: i64,
+    limit: i64,
+) -> sqlx::Result<(Vec<CourtSitting>, i64)> {
+    use sqlx::QueryBuilder;
+
+    let offset = (page - 1).max(0) * limit;
+    let has_fts = query.map_or(false, |q| !q.trim().is_empty());
+
+    // ── COUNT ──────────────────────────────────────────────────────────────
+    let mut cq: QueryBuilder<sqlx::Postgres> =
+        QueryBuilder::new("SELECT COUNT(*) FROM court_sittings WHERE 1=1");
+    if has_fts {
+        cq.push(" AND search_vector @@ websearch_to_tsquery('english', ");
+        cq.push_bind(query.unwrap().trim());
+        cq.push(")");
+    }
+    if let Some(c) = court {
+        cq.push(format!(" AND {}", sitting_court_filter(c)));
+    }
+    if let Some(j) = judge {
+        cq.push(" AND judge_name IS NOT NULL AND ");
+        cq.push_bind(j);
+        cq.push(" = ANY(ARRAY(SELECT TRIM(p) FROM unnest(string_to_array(judge_name, ',')) p))");
+    }
+    if let Some(df) = date_from {
+        cq.push(" AND event_date >= ");
+        cq.push_bind(df);
+    }
+    if let Some(dt) = date_to {
+        cq.push(" AND event_date <= ");
+        cq.push_bind(dt);
+    }
+    if let Some(cn) = case_number.filter(|s| !s.is_empty()) {
+        cq.push(" AND case_number ILIKE ");
+        cq.push_bind(format!("%{cn}%"));
+    }
+    let total: i64 = cq.build_query_scalar().fetch_one(pool).await?;
+
+    // ── DATA ───────────────────────────────────────────────────────────────
+    let mut dq: QueryBuilder<sqlx::Postgres> = if has_fts {
+        let q = query.unwrap().trim();
+        let mut qb = QueryBuilder::new(format!(
+            "SELECT {S}, ts_headline('english', \
+             COALESCE(title,'') || ' ' || COALESCE(case_number,'') || ' ' || COALESCE(judge_name,''), \
+             websearch_to_tsquery('english', "
+        ));
+        qb.push_bind(q);
+        qb.push("), 'StartSel=[[, StopSel=]], MaxWords=15, MinWords=5') AS snippet \
+              FROM court_sittings WHERE 1=1");
+        qb
+    } else {
+        QueryBuilder::new(format!("SELECT {S} FROM court_sittings WHERE 1=1"))
+    };
+
+    if has_fts {
+        dq.push(" AND search_vector @@ websearch_to_tsquery('english', ");
+        dq.push_bind(query.unwrap().trim());
+        dq.push(")");
+    }
+    if let Some(c) = court {
+        dq.push(format!(" AND {}", sitting_court_filter(c)));
+    }
+    if let Some(j) = judge {
+        dq.push(" AND judge_name IS NOT NULL AND ");
+        dq.push_bind(j);
+        dq.push(" = ANY(ARRAY(SELECT TRIM(p) FROM unnest(string_to_array(judge_name, ',')) p))");
+    }
+    if let Some(df) = date_from {
+        dq.push(" AND event_date >= ");
+        dq.push_bind(df);
+    }
+    if let Some(dt) = date_to {
+        dq.push(" AND event_date <= ");
+        dq.push_bind(dt);
+    }
+    if let Some(cn) = case_number.filter(|s| !s.is_empty()) {
+        dq.push(" AND case_number ILIKE ");
+        dq.push_bind(format!("%{cn}%"));
     }
 
-    let court_filter = court.map(sitting_court_filter);
-
-    match (date_from, date_to, court_filter) {
-        (Some(from), Some(to), Some(filter)) => {
-            let sql = format!(
-                "SELECT {S} FROM court_sittings
-                 WHERE event_date BETWEEN $1 AND $2 AND {filter}
-                 ORDER BY event_date, event_time NULLS LAST"
-            );
-            sqlx::query_as::<_, CourtSitting>(&sql)
-                .bind(from)
-                .bind(to)
-                .fetch_all(pool)
-                .await
-        }
-        (Some(from), Some(to), None) => {
-            let sql = format!(
-                "SELECT {S} FROM court_sittings
-                 WHERE event_date BETWEEN $1 AND $2
-                 ORDER BY event_date, event_time NULLS LAST"
-            );
-            sqlx::query_as::<_, CourtSitting>(&sql)
-                .bind(from)
-                .bind(to)
-                .fetch_all(pool)
-                .await
-        }
-        (Some(from), None, Some(filter)) => {
-            let sql = format!(
-                "SELECT {S} FROM court_sittings
-                 WHERE event_date >= $1 AND {filter}
-                 ORDER BY event_date, event_time NULLS LAST"
-            );
-            sqlx::query_as::<_, CourtSitting>(&sql)
-                .bind(from)
-                .fetch_all(pool)
-                .await
-        }
-        (Some(from), None, None) => {
-            let sql = format!(
-                "SELECT {S} FROM court_sittings
-                 WHERE event_date >= $1
-                 ORDER BY event_date, event_time NULLS LAST"
-            );
-            sqlx::query_as::<_, CourtSitting>(&sql)
-                .bind(from)
-                .fetch_all(pool)
-                .await
-        }
-        (None, Some(to), Some(filter)) => {
-            let sql = format!(
-                "SELECT {S} FROM court_sittings
-                 WHERE event_date <= $1 AND {filter}
-                 ORDER BY event_date, event_time NULLS LAST"
-            );
-            sqlx::query_as::<_, CourtSitting>(&sql)
-                .bind(to)
-                .fetch_all(pool)
-                .await
-        }
-        (None, Some(to), None) => {
-            let sql = format!(
-                "SELECT {S} FROM court_sittings
-                 WHERE event_date <= $1
-                 ORDER BY event_date, event_time NULLS LAST"
-            );
-            sqlx::query_as::<_, CourtSitting>(&sql)
-                .bind(to)
-                .fetch_all(pool)
-                .await
-        }
-        (None, None, Some(filter)) => {
-            let sql = format!(
-                "SELECT {S} FROM court_sittings
-                 WHERE event_date >= CURRENT_DATE AND {filter}
-                 ORDER BY event_date, event_time NULLS LAST"
-            );
-            sqlx::query_as::<_, CourtSitting>(&sql)
-                .fetch_all(pool)
-                .await
-        }
-        (None, None, None) => {
-            let sql = format!(
-                "SELECT {S} FROM court_sittings
-                 WHERE event_date >= CURRENT_DATE
-                 ORDER BY event_date, event_time NULLS LAST"
-            );
-            sqlx::query_as::<_, CourtSitting>(&sql)
-                .fetch_all(pool)
-                .await
-        }
+    if has_fts {
+        dq.push(" ORDER BY ts_rank(search_vector, websearch_to_tsquery('english', ");
+        dq.push_bind(query.unwrap().trim());
+        dq.push(")) DESC, event_date DESC NULLS LAST");
+    } else {
+        dq.push(" ORDER BY event_date, event_time NULLS LAST");
     }
+    dq.push(" LIMIT ");
+    dq.push_bind(limit);
+    dq.push(" OFFSET ");
+    dq.push_bind(offset);
+
+    let rows = dq.build_query_as::<CourtSitting>().fetch_all(pool).await?;
+    Ok((rows, total))
 }
+
 
 pub async fn get_today_sittings(pool: &PgPool) -> sqlx::Result<Vec<CourtSitting>> {
     let sql = format!(
@@ -1938,10 +1930,12 @@ pub async fn create_verification_token(
 }
 
 pub async fn delete_verification_tokens_for_user(pool: &PgPool, user_id: i32) -> sqlx::Result<()> {
-    sqlx::query("DELETE FROM verification_tokens WHERE user_id = $1")
-        .bind(user_id)
-        .execute(pool)
-        .await?;
+    sqlx::query(
+        "DELETE FROM verification_tokens WHERE user_id = $1 AND token_type = 'email_verification'",
+    )
+    .bind(user_id)
+    .execute(pool)
+    .await?;
     Ok(())
 }
 
@@ -1951,11 +1945,70 @@ pub async fn consume_verification_token(
     token: &str,
 ) -> sqlx::Result<Option<i32>> {
     sqlx::query_scalar(
-        "DELETE FROM verification_tokens WHERE token = $1 AND expires_at > NOW() RETURNING user_id",
+        "DELETE FROM verification_tokens
+         WHERE token = $1 AND token_type = 'email_verification' AND expires_at > NOW()
+         RETURNING user_id",
     )
     .bind(token)
     .fetch_optional(pool)
     .await
+}
+
+/// Creates a password-change token, replacing any existing one for this user.
+pub async fn create_password_change_token(
+    pool: &PgPool,
+    user_id: i32,
+    token: &str,
+    pending_hash: &str,
+    expires_at: chrono::NaiveDateTime,
+) -> sqlx::Result<()> {
+    sqlx::query(
+        "DELETE FROM verification_tokens WHERE user_id = $1 AND token_type = 'password_change'",
+    )
+    .bind(user_id)
+    .execute(pool)
+    .await?;
+
+    sqlx::query(
+        "INSERT INTO verification_tokens (token, user_id, expires_at, token_type, pending_password_hash)
+         VALUES ($1, $2, $3, 'password_change', $4)",
+    )
+    .bind(token)
+    .bind(user_id)
+    .bind(expires_at)
+    .bind(pending_hash)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// Atomically consumes a password-change token, returning (user_id, pending_hash).
+pub async fn consume_password_change_token(
+    pool: &PgPool,
+    token: &str,
+) -> sqlx::Result<Option<(i32, String)>> {
+    let row: Option<(i32, Option<String>)> = sqlx::query_as(
+        "DELETE FROM verification_tokens
+         WHERE token = $1 AND token_type = 'password_change' AND expires_at > NOW()
+         RETURNING user_id, pending_password_hash",
+    )
+    .bind(token)
+    .fetch_optional(pool)
+    .await?;
+    Ok(row.and_then(|(uid, hash)| hash.map(|h| (uid, h))))
+}
+
+pub async fn update_user_password(
+    pool: &PgPool,
+    user_id: i32,
+    password_hash: &str,
+) -> sqlx::Result<()> {
+    sqlx::query("UPDATE users SET password_hash = $1 WHERE id = $2")
+        .bind(password_hash)
+        .bind(user_id)
+        .execute(pool)
+        .await?;
+    Ok(())
 }
 
 pub async fn mark_email_verified(pool: &PgPool, user_id: i32) -> sqlx::Result<()> {
@@ -2274,4 +2327,28 @@ pub async fn case_lookup(
     .await?;
 
     Ok((judgments, sittings))
+}
+
+// ── Public preview (no auth) ───────────────────────────────────────────────
+
+pub async fn get_preview_judgments(pool: &PgPool) -> sqlx::Result<Vec<Judgment>> {
+    sqlx::query_as::<_, Judgment>(
+        "SELECT id, case_number, title, judge_name, court, date, pdf_url, local_pdf_path, \
+         summary_text, created_at, updated_at, source_url, tags \
+         FROM judgments WHERE title IS NOT NULL \
+         ORDER BY date DESC NULLS LAST, id DESC LIMIT 3",
+    )
+    .fetch_all(pool)
+    .await
+}
+
+pub async fn get_preview_sittings(pool: &PgPool) -> sqlx::Result<Vec<CourtSitting>> {
+    sqlx::query_as::<_, CourtSitting>(
+        "SELECT id, case_number, title, judge_name, court_division, event_type, \
+         event_date, event_time, lawyers, pdf_source_url, created_at \
+         FROM court_sittings WHERE event_date >= CURRENT_DATE \
+         ORDER BY event_date ASC, id ASC LIMIT 3",
+    )
+    .fetch_all(pool)
+    .await
 }

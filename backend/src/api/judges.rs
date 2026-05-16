@@ -15,6 +15,16 @@ pub struct JudgesParams {
     pub court: Option<String>,
 }
 
+#[derive(Deserialize)]
+pub struct AutocompleteParams {
+    pub q: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct AutocompleteResponse {
+    pub names: Vec<String>,
+}
+
 #[derive(Serialize)]
 pub struct JudgesResponse {
     pub judges: Vec<JudgeWithCount>,
@@ -32,6 +42,18 @@ pub async fn list_judges(
 ) -> Result<Json<JudgesResponse>, AppError> {
     let judges = queries::list_judges(&state.db, params.court.as_deref()).await?;
     Ok(Json(JudgesResponse { judges }))
+}
+
+pub async fn autocomplete_judges(
+    State(state): State<AppState>,
+    Query(params): Query<AutocompleteParams>,
+) -> Result<Json<AutocompleteResponse>, AppError> {
+    let q = params.q.as_deref().unwrap_or("").trim();
+    if q.is_empty() {
+        return Ok(Json(AutocompleteResponse { names: vec![] }));
+    }
+    let names = queries::autocomplete_judges(&state.db, q).await?;
+    Ok(Json(AutocompleteResponse { names }))
 }
 
 pub async fn get_judge(

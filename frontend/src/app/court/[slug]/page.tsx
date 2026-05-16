@@ -62,7 +62,7 @@ export default function CourtPage() {
     setLoading(true);
     try {
       const [jRes, sRes, statsRes] = await Promise.all([
-        apiClient.getJudgments(undefined, court),
+        apiClient.getJudgments({ court }),
         apiClient.getCourtSittings({ court }),
         apiClient.getCourtStats(court),
       ]);

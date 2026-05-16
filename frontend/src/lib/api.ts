@@ -83,10 +83,10 @@ export interface CourtStats {
 
 export const apiClient = {
   // ── Auth ────────────────────────────────────────────────────────────────
-  async signup(email: string, password: string): Promise<{ message: string }> {
+  async signup(email: string, password: string, displayName?: string): Promise<{ message: string }> {
     return request<{ message: string }>("/auth/signup", {
       method: "POST",
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, display_name: displayName || null }),
     });
   },
 
@@ -120,22 +120,45 @@ export const apiClient = {
     });
   },
 
+  async requestPasswordChange(
+    current_password: string,
+    new_password: string,
+  ): Promise<{ message: string }> {
+    return request("/auth/request-password-change", {
+      method: "POST",
+      body: JSON.stringify({ current_password, new_password }),
+    });
+  },
+
+  async confirmPasswordChange(token: string): Promise<{ message: string }> {
+    return request("/auth/confirm-password-change", {
+      method: "POST",
+      body: JSON.stringify({ token }),
+    });
+  },
+
   // ── Judgments ───────────────────────────────────────────────────────────
-  async getJudgments(
-    q?: string,
-    court?: string,
-    judge?: string,
-    page?: number,
-    limit?: number,
-    tag?: string,
-  ): Promise<{ judgments: Judgment[]; total: number }> {
+  async getJudgments(opts?: {
+    q?: string;
+    court?: string;
+    judge?: string;
+    page?: number;
+    limit?: number;
+    tag?: string;
+    date_from?: string;
+    date_to?: string;
+    case_number?: string;
+  }): Promise<{ judgments: Judgment[]; total: number }> {
     const params = new URLSearchParams();
-    if (q) params.set("q", q);
-    if (court) params.set("court", court);
-    if (judge) params.set("judge", judge);
-    if (page != null) params.set("page", String(page));
-    if (limit != null) params.set("limit", String(limit));
-    if (tag) params.set("tag", tag);
+    if (opts?.q) params.set("q", opts.q);
+    if (opts?.court) params.set("court", opts.court);
+    if (opts?.judge) params.set("judge", opts.judge);
+    if (opts?.page != null) params.set("page", String(opts.page));
+    if (opts?.limit != null) params.set("limit", String(opts.limit));
+    if (opts?.tag) params.set("tag", opts.tag);
+    if (opts?.date_from) params.set("date_from", opts.date_from);
+    if (opts?.date_to) params.set("date_to", opts.date_to);
+    if (opts?.case_number) params.set("case_number", opts.case_number);
     const qs = params.toString();
     return request(`/judgments${qs ? `?${qs}` : ""}`);
   },
@@ -149,12 +172,17 @@ export const apiClient = {
   },
 
   // ── Court Sittings ──────────────────────────────────────────────────────
+  async getJudgesAutocomplete(q: string): Promise<{ names: string[] }> {
+    return request(`/judges/autocomplete?q=${encodeURIComponent(q)}`);
+  },
+
   async getCourtSittings(opts?: {
     q?: string;
     court?: string;
     date_from?: string;
     date_to?: string;
     judge?: string;
+    case_number?: string;
     page?: number;
     limit?: number;
   }): Promise<{ sittings: CourtSitting[]; total: number }> {
@@ -164,6 +192,7 @@ export const apiClient = {
     if (opts?.date_from) params.set("date_from", opts.date_from);
     if (opts?.date_to) params.set("date_to", opts.date_to);
     if (opts?.judge) params.set("judge", opts.judge);
+    if (opts?.case_number) params.set("case_number", opts.case_number);
     if (opts?.page != null) params.set("page", String(opts.page));
     if (opts?.limit != null) params.set("limit", String(opts.limit));
     const qs = params.toString();

@@ -1,6 +1,8 @@
 "use client";
 
+import { Suspense } from "react";
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import Navbar from "@/components/Navbar";
 import { apiClient } from "@/lib/api";
@@ -145,6 +147,7 @@ function SubmitButton({
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 function ProfilePage() {
+  const searchParams = useSearchParams();
   const [user, setUser] = useState<User | null>(null);
   const [userLoading, setUserLoading] = useState(true);
 
@@ -164,7 +167,11 @@ function ProfilePage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordLoading, setPasswordLoading] = useState(false);
-  const [passwordFeedback, setPasswordFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [passwordFeedback, setPasswordFeedback] = useState<{ type: "success" | "error"; message: string } | null>(
+    searchParams.get("success") === "password_changed"
+      ? { type: "success", message: "Password updated successfully." }
+      : null,
+  );
 
   const loadUser = useCallback(async () => {
     try {
@@ -253,18 +260,15 @@ function ProfilePage() {
     }
     setPasswordLoading(true);
     try {
-      await apiClient.updateProfile({
-        current_password: currentPassword,
-        new_password: newPassword,
-      });
+      const res = await apiClient.requestPasswordChange(currentPassword, newPassword);
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-      setPasswordFeedback({ type: "success", message: "Password changed successfully." });
+      setPasswordFeedback({ type: "success", message: res.message });
     } catch (err) {
       setPasswordFeedback({
         type: "error",
-        message: err instanceof Error ? err.message : "Failed to change password.",
+        message: err instanceof Error ? err.message : "Failed to request password change.",
       });
     } finally {
       setPasswordLoading(false);
@@ -414,7 +418,9 @@ function ProfilePage() {
 export default function ProfilePageWrapper() {
   return (
     <AuthGuard>
-      <ProfilePage />
+      <Suspense>
+        <ProfilePage />
+      </Suspense>
     </AuthGuard>
   );
 }

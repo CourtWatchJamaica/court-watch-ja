@@ -187,7 +187,7 @@ export default function SettingsPage() {
                 </Card>
               </Link>
 
-              <Link href="mailto:hello@courtwatchja.com" className="group">
+              <Link href="mailto:courtwatchjamaica@protonmail.com" className="group">
                 <Card className="border-border bg-card h-full transition-colors group-hover:border-[#009B3A]/30">
                   <CardContent className="flex items-center justify-between p-5">
                     <div className="flex items-center gap-3">
@@ -196,7 +196,7 @@ export default function SettingsPage() {
                       </div>
                       <div>
                         <p className="text-sm font-semibold">Contact Us</p>
-                        <p className="text-xs text-muted-foreground">hello@courtwatchja.com</p>
+                        <p className="text-xs text-muted-foreground">courtwatchjamaica@protonmail.com</p>
                       </div>
                     </div>
                     <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />

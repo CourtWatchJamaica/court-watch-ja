@@ -11,6 +11,7 @@ pub mod news;
 pub mod notifications;
 pub mod parish_cases;
 pub mod pdf;
+pub mod public;
 pub mod tracking;
 
 pub fn court_slug_to_name(slug: &str) -> &'static str {
@@ -45,21 +46,25 @@ pub fn router(state: AppState) -> Router {
         .route("/api/auth/login", post(auth::login))
         .route("/api/auth/oauth", post(auth::oauth_login))
         .route("/api/auth/verify-email", get(auth::verify_email))
+        .route("/api/auth/confirm-password-change", post(auth::confirm_password_change))
         .route("/api/maintenance/status", get(maintenance::status))
         .route("/api/parish-cases", get(parish_cases::list_parish_cases))
         .route("/api/parish-cases/:id", get(parish_cases::get_parish_case_by_id))
         .route("/api/parish-summary", get(parish_cases::parish_summary))
         .route("/api/pdf/judgment/:id", get(pdf::judgment_pdf))
-        .route("/api/pdf/sitting/:id", get(pdf::sitting_pdf));
+        .route("/api/pdf/sitting/:id", get(pdf::sitting_pdf))
+        .route("/api/public/preview", get(public::get_preview));
 
     // ── Protected (any authenticated user) ───────────────────────────────
     let protected = Router::new()
         .route("/api/auth/me", get(auth::me))
         .route("/api/user/profile", put(auth::update_profile))
+        .route("/api/auth/request-password-change", post(auth::request_password_change))
         .route("/api/judgments", get(judgments::list_judgments))
         .route("/api/judgments/:id", get(judgments::get_judgment))
         .route("/api/judgments/:id/original-pdf", get(judgments::get_original_pdf_url))
         .route("/api/judges", get(judges::list_judges))
+        .route("/api/judges/autocomplete", get(judges::autocomplete_judges))
         .route("/api/judges/:id", get(judges::get_judge))
         .route("/api/judge-connections", get(judge_connections::list_judge_connections))
         .route("/api/user/cases", get(tracking::get_user_cases))
