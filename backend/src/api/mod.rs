@@ -59,6 +59,7 @@ pub fn router(state: AppState) -> Router {
     let protected = Router::new()
         .route("/api/auth/me", get(auth::me))
         .route("/api/user/profile", put(auth::update_profile))
+        .route("/api/user/account", delete(auth::delete_own_account))
         .route("/api/auth/request-password-change", post(auth::request_password_change))
         .route("/api/judgments", get(judgments::list_judgments))
         .route("/api/judgments/:id", get(judgments::get_judgment))

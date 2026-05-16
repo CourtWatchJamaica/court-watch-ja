@@ -7,6 +7,7 @@ import AuthGuard from "@/components/AuthGuard";
 import Navbar from "@/components/Navbar";
 import { apiClient } from "@/lib/api";
 import type { User } from "@/lib/types";
+import { useRouter } from "next/navigation";
 import {
   UserCircle2,
   Mail,
@@ -16,6 +17,7 @@ import {
   AlertCircle,
   Loader2,
   Pencil,
+  Trash2,
 } from "lucide-react";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -123,6 +125,99 @@ function Field({
   );
 }
 
+// ── Delete account modal ──────────────────────────────────────────────────────
+
+function DeleteAccountModal({
+  onClose,
+  onConfirm,
+  loading,
+  feedback,
+}: {
+  onClose: () => void;
+  onConfirm: () => void;
+  loading: boolean;
+  feedback: { type: "success" | "error"; message: string } | null;
+}) {
+  const [confirmText, setConfirmText] = useState("");
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl border border-border bg-background/95 backdrop-blur-sm p-6 space-y-5 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-500/10 shrink-0">
+            <Trash2 className="h-4 w-4 text-red-400" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-foreground">Delete Account</h2>
+            <p className="text-[11px] text-muted-foreground">This cannot be undone</p>
+          </div>
+        </div>
+
+        {/* Warning */}
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          All your tracked cases, notification preferences, and account data will be{" "}
+          <span className="text-foreground font-medium">permanently deleted</span>. There is no recovery.
+        </p>
+
+        {/* Confirmation input */}
+        <div className="space-y-1.5">
+          <label htmlFor="modal-delete-confirm" className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Type DELETE to confirm
+          </label>
+          <input
+            id="modal-delete-confirm"
+            type="text"
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            placeholder="DELETE"
+            autoFocus
+            className="w-full rounded-xl border border-red-500/30 bg-background/50 px-4 py-3 text-sm text-foreground placeholder-muted-foreground/40 focus:outline-none focus:border-red-500/60 focus:ring-1 focus:ring-red-500/25 transition-colors"
+          />
+        </div>
+
+        {feedback && <Banner type={feedback.type} message={feedback.message} />}
+
+        {/* Actions */}
+        <div className="flex items-center gap-3 pt-1">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            className="flex-1 rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-foreground/70 hover:bg-muted/40 transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={loading || confirmText.toUpperCase() !== "DELETE"}
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 active:scale-[0.97] transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+            Delete My Account
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Submit button ─────────────────────────────────────────────────────────────
 
 function SubmitButton({
@@ -148,6 +243,7 @@ function SubmitButton({
 
 function ProfilePage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [userLoading, setUserLoading] = useState(true);
 
@@ -172,6 +268,31 @@ function ProfilePage() {
       ? { type: "success", message: "Password updated successfully." }
       : null,
   );
+
+  // Delete account state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteFeedback, setDeleteFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [deleteGoodbye, setDeleteGoodbye] = useState(false);
+
+  const handleDeleteAccount = async () => {
+    setDeleteLoading(true);
+    setDeleteFeedback(null);
+    try {
+      await apiClient.deleteAccount();
+      localStorage.removeItem("token");
+      setShowDeleteModal(false);
+      setDeleteGoodbye(true);
+      setTimeout(() => router.push("/"), 2000);
+    } catch (err) {
+      setDeleteFeedback({
+        type: "error",
+        message: err instanceof Error ? err.message : "Failed to delete account.",
+      });
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
 
   const loadUser = useCallback(async () => {
     try {
@@ -409,6 +530,34 @@ function ProfilePage() {
             <SubmitButton loading={passwordLoading} label="Change Password" />
           </form>
         </SectionCard>
+
+        {/* ── Delete account ── */}
+        <div className="pt-2 pb-2">
+          {deleteGoodbye ? (
+            <div className="flex items-center gap-2.5 rounded-xl border border-[#009B3A]/30 bg-[#009B3A]/10 px-4 py-3 text-[13px] text-[#009B3A]">
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+              Your account has been deleted. Redirecting…
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowDeleteModal(true)}
+              className="flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/5 px-5 py-2.5 text-sm font-semibold text-red-400 hover:bg-red-500/10 hover:border-red-500/50 active:scale-[0.97] transition-all duration-150"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete Account
+            </button>
+          )}
+        </div>
+
+        {showDeleteModal && (
+          <DeleteAccountModal
+            onClose={() => { setShowDeleteModal(false); setDeleteFeedback(null); }}
+            onConfirm={handleDeleteAccount}
+            loading={deleteLoading}
+            feedback={deleteFeedback}
+          />
+        )}
 
       </main>
     </div>

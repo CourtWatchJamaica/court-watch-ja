@@ -367,6 +367,21 @@ pub async fn confirm_password_change(
     }))
 }
 
+// ── Self-service account deletion ─────────────────────────────────────────────
+
+pub async fn delete_own_account(
+    State(state): State<AppState>,
+    Extension(user_id): Extension<i32>,
+) -> Result<Json<SignupResponse>, AppError> {
+    let deleted = queries::admin_delete_user(&state.db, user_id).await?;
+    if !deleted {
+        return Err(AppError::NotFound);
+    }
+    Ok(Json(SignupResponse {
+        message: "Account deleted.".into(),
+    }))
+}
+
 // ── Profile ───────────────────────────────────────────────────────────────────
 
 pub async fn update_profile(

@@ -120,6 +120,10 @@ export const apiClient = {
     });
   },
 
+  async deleteAccount(): Promise<{ message: string }> {
+    return request("/user/account", { method: "DELETE" });
+  },
+
   async requestPasswordChange(
     current_password: string,
     new_password: string,
