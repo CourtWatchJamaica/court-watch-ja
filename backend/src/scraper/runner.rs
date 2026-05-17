@@ -74,14 +74,14 @@ pub async fn run_catchup_check(pool: &PgPool, config: &Config) -> anyhow::Result
     let throttle = Duration::hours(12);
 
     // ── Load ScraperState early — needed for throttle checks ─────────────────
-    let mut state = ScraperState::load(&config.scraper_state_path).await;
+    let mut state = ScraperState::load_from_db(pool, &config.scraper_state_path).await;
 
     // ── Stale court-list PDF eviction ────────────────────────────────────────
     // Returns (sc_cleared, coa_cleared) — non-zero values force the corresponding
     // court-lists scraper to run even if the staleness date check says it's current.
     let (sc_evicted, coa_evicted) = evict_stale_court_list_pdfs(pool, &mut state).await;
     if sc_evicted + coa_evicted > 0 {
-        state.save(&config.scraper_state_path).await.ok();
+        state.save_to_db(pool).await.ok();
     }
 
     // ── Supreme Court judgments ──────────────────────────────────────────────
@@ -275,12 +275,12 @@ pub async fn run_catchup_check(pool: &PgPool, config: &Config) -> anyhow::Result
         if let Err(e) = judgments::run(pool, &mut state, cutoff, &client).await {
             error!("Catch-up SC judgment scraper error: {e}");
         }
-        state.save(&config.scraper_state_path).await.ok();
+        state.save_to_db(pool).await.ok();
 
         if let Err(e) = download_pending_pdfs(pool, config, &client, &mut state).await {
             error!("Catch-up SC PDF download error: {e}");
         }
-        state.save(&config.scraper_state_path).await.ok();
+        state.save_to_db(pool).await.ok();
     }
 
     if coa_judgments_stale || coa_needs_judge_backfill {
@@ -295,12 +295,12 @@ pub async fn run_catchup_check(pool: &PgPool, config: &Config) -> anyhow::Result
         if coa_needs_judge_backfill {
             state.last_coa_judge_backfill_at = Some(Utc::now());
         }
-        state.save(&config.scraper_state_path).await.ok();
+        state.save_to_db(pool).await.ok();
 
         if let Err(e) = download_pending_pdfs(pool, config, &client, &mut state).await {
             error!("Catch-up CoA PDF download error: {e}");
         }
-        state.save(&config.scraper_state_path).await.ok();
+        state.save_to_db(pool).await.ok();
 
         // Backfill judge names for CoA PDFs already on disk (including newly downloaded ones).
         if let Err(e) = backfill_coa_judge_names(pool).await {
@@ -321,7 +321,7 @@ pub async fn run_catchup_check(pool: &PgPool, config: &Config) -> anyhow::Result
         if let Err(e) = parish_court::run(pool, &mut state, cutoff, &client).await {
             error!("Catch-up Parish judgment scraper error: {e}");
         }
-        state.save(&config.scraper_state_path).await.ok();
+        state.save_to_db(pool).await.ok();
     }
 
     if sc_sittings_stale {
@@ -329,7 +329,7 @@ pub async fn run_catchup_check(pool: &PgPool, config: &Config) -> anyhow::Result
         if let Err(e) = court_lists::run(pool, &mut state, &client, &config.pdf_dir).await {
             error!("Catch-up SC court-lists scraper error: {e}");
         }
-        state.save(&config.scraper_state_path).await.ok();
+        state.save_to_db(pool).await.ok();
     }
 
     if coa_sittings_stale {
@@ -337,7 +337,7 @@ pub async fn run_catchup_check(pool: &PgPool, config: &Config) -> anyhow::Result
         if let Err(e) = appeal_court_lists::run(pool, &mut state, &client, &config.pdf_dir).await {
             error!("Catch-up CoA court-lists scraper error: {e}");
         }
-        state.save(&config.scraper_state_path).await.ok();
+        state.save_to_db(pool).await.ok();
     }
 
     if coa_judges_missing {
@@ -346,7 +346,7 @@ pub async fn run_catchup_check(pool: &PgPool, config: &Config) -> anyhow::Result
             error!("Catch-up CoA judges scraper error: {e}");
         }
         state.last_appeal_judges_scraped_at = Some(Utc::now());
-        state.save(&config.scraper_state_path).await.ok();
+        state.save_to_db(pool).await.ok();
     }
 
     if parish_judgments_stale || parish_sittings_stale || parish_cases_empty {
@@ -359,7 +359,7 @@ pub async fn run_catchup_check(pool: &PgPool, config: &Config) -> anyhow::Result
         {
             error!("Catch-up Parish case scraper error: {e}");
         }
-        state.save(&config.scraper_state_path).await.ok();
+        state.save_to_db(pool).await.ok();
     }
 
     // Remove any non-judge entries that scrapers may have introduced this run.
@@ -381,7 +381,7 @@ pub async fn run_all(pool: &PgPool, config: &Config) -> anyhow::Result<()> {
 
     let client = super::http_client()?;
 
-    let mut state = ScraperState::load(&config.scraper_state_path).await;
+    let mut state = ScraperState::load_from_db(pool, &config.scraper_state_path).await;
 
     // Log permanently-skipped PDFs so operators can investigate or clear them.
     if !state.pdf_skipped.is_empty() {
@@ -400,13 +400,13 @@ pub async fn run_all(pool: &PgPool, config: &Config) -> anyhow::Result<()> {
     if let Err(e) = judgments::run(pool, &mut state, cutoff, &client).await {
         error!("SC judgment scraper error: {e}");
     }
-    state.save(&config.scraper_state_path).await.ok();
+    state.save_to_db(pool).await.ok();
 
     // 2. PDF download for Supreme Court judgments that have a pdf_url but no local copy
     if let Err(e) = download_pending_pdfs(pool, config, &client, &mut state).await {
         error!("PDF download step error: {e}");
     }
-    state.save(&config.scraper_state_path).await.ok();
+    state.save_to_db(pool).await.ok();
 
     // 3. Supreme Court court lists (PDFs)
     // Clear stale processed-URL entries for any PDFs whose DB rows are all 'Civil'
@@ -416,14 +416,14 @@ pub async fn run_all(pool: &PgPool, config: &Config) -> anyhow::Result<()> {
         info!(
             "  Stale eviction: {sc_evicted} SC + {coa_evicted} CoA URL(s) cleared before court-lists run"
         );
-        state.save(&config.scraper_state_path).await.ok();
+        state.save_to_db(pool).await.ok();
     }
 
     info!("-- Starting Supreme Court court-lists scraper");
     if let Err(e) = court_lists::run(pool, &mut state, &client, &config.pdf_dir).await {
         error!("SC court-lists scraper error: {e}");
     }
-    state.save(&config.scraper_state_path).await.ok();
+    state.save_to_db(pool).await.ok();
 
     // 4. Supreme Court judges — only if we haven't scraped in the last 6 days
     let should_scrape_sc_judges = state
@@ -437,7 +437,7 @@ pub async fn run_all(pool: &PgPool, config: &Config) -> anyhow::Result<()> {
             error!("SC judges scraper error: {e}");
         } else {
             state.last_judges_scraped_at = Some(Utc::now());
-            state.save(&config.scraper_state_path).await.ok();
+            state.save_to_db(pool).await.ok();
         }
     }
 
@@ -454,13 +454,13 @@ pub async fn run_all(pool: &PgPool, config: &Config) -> anyhow::Result<()> {
             (0, 0)
         }
     };
-    state.save(&config.scraper_state_path).await.ok();
+    state.save_to_db(pool).await.ok();
 
     // 6. PDF downloads for Court of Appeal judgments
     if let Err(e) = download_pending_pdfs(pool, config, &client, &mut state).await {
         error!("[CoA] PDF download step error: {e}");
     }
-    state.save(&config.scraper_state_path).await.ok();
+    state.save_to_db(pool).await.ok();
 
     // 6b. Backfill judge names for CoA PDFs already on disk
     if let Err(e) = backfill_coa_judge_names(pool).await {
@@ -482,7 +482,7 @@ pub async fn run_all(pool: &PgPool, config: &Config) -> anyhow::Result<()> {
                 0
             }
         };
-    state.save(&config.scraper_state_path).await.ok();
+    state.save_to_db(pool).await.ok();
 
     info!(
         "[CoA] Civil judgments: {coa_civil} | Criminal judgments: {coa_criminal} | \
@@ -501,7 +501,7 @@ pub async fn run_all(pool: &PgPool, config: &Config) -> anyhow::Result<()> {
             error!("[CoA] Judges scraper error: {e}");
         } else {
             state.last_appeal_judges_scraped_at = Some(Utc::now());
-            state.save(&config.scraper_state_path).await.ok();
+            state.save_to_db(pool).await.ok();
         }
     }
 
@@ -512,7 +512,7 @@ pub async fn run_all(pool: &PgPool, config: &Config) -> anyhow::Result<()> {
     {
         error!("[Parish] Case scraper error: {e}");
     }
-    state.save(&config.scraper_state_path).await.ok();
+    state.save_to_db(pool).await.ok();
 
     // 10. Parish Court judgment scraper — graceful no-op if site unavailable
     info!(
@@ -522,7 +522,7 @@ pub async fn run_all(pool: &PgPool, config: &Config) -> anyhow::Result<()> {
     if let Err(e) = parish_court::run(pool, &mut state, cutoff, &client).await {
         error!("[Parish] Judgment scraper error: {e}");
     }
-    state.save(&config.scraper_state_path).await.ok();
+    state.save_to_db(pool).await.ok();
 
     // Remove any non-judge entries introduced by scrapers this run.
     match queries::cleanup_judges_table(pool).await {

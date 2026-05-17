@@ -117,7 +117,7 @@ pub async fn set_config(
 // ── Scraper ────────────────────────────────────────────────────────────────
 
 pub async fn get_scraper_state(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
-    let scraper_state = ScraperState::load(&state.config.scraper_state_path).await;
+    let scraper_state = ScraperState::load_from_db(&state.db, &state.config.scraper_state_path).await;
     let is_running = state.scraper_running.load(Ordering::SeqCst);
 
     Ok(Json(json!({
@@ -212,10 +212,10 @@ pub async fn remove_skipped_pdf(
     State(state): State<AppState>,
     Json(body): Json<RemoveSkippedBody>,
 ) -> Result<Json<Value>, AppError> {
-    let mut scraper_state = ScraperState::load(&state.config.scraper_state_path).await;
+    let mut scraper_state = ScraperState::load_from_db(&state.db, &state.config.scraper_state_path).await;
     scraper_state.clear_pdf_failure(&body.url);
     scraper_state
-        .save(&state.config.scraper_state_path)
+        .save_to_db(&state.db)
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?;
     Ok(Json(json!({ "removed": true, "url": body.url })))
@@ -377,10 +377,10 @@ pub async fn skip_pdf(
     State(state): State<AppState>,
     Json(body): Json<RemoveSkippedBody>,
 ) -> Result<Json<Value>, AppError> {
-    let mut scraper_state = ScraperState::load(&state.config.scraper_state_path).await;
+    let mut scraper_state = ScraperState::load_from_db(&state.db, &state.config.scraper_state_path).await;
     scraper_state.skip_pdf_permanently(&body.url);
     scraper_state
-        .save(&state.config.scraper_state_path)
+        .save_to_db(&state.db)
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?;
     Ok(Json(json!({ "skipped": true, "url": body.url })))

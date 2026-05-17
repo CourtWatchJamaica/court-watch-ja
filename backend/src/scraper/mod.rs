@@ -14,9 +14,11 @@ pub mod tags;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
 use std::collections::HashMap;
 use std::path::Path;
 use tokio::fs;
+use tracing::warn;
 
 /// Persisted between runs so we can resume from where we left off.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -88,6 +90,45 @@ impl ScraperState {
         }
         let json = serde_json::to_string_pretty(self)?;
         fs::write(path, json).await?;
+        Ok(())
+    }
+
+    /// Load state from the `scraper_state` DB table.
+    /// Falls back to the JSON file (one-time migration path) if the DB row is absent.
+    pub async fn load_from_db(pool: &PgPool, json_path: &str) -> Self {
+        match sqlx::query_scalar::<_, serde_json::Value>(
+            "SELECT value FROM scraper_state WHERE key = 'main'",
+        )
+        .fetch_optional(pool)
+        .await
+        {
+            Ok(Some(value)) => serde_json::from_value(value).unwrap_or_default(),
+            Ok(None) => {
+                // First boot after migration — try to seed from the JSON file.
+                let from_json = Self::load(json_path).await;
+                if let Err(e) = from_json.save_to_db(pool).await {
+                    warn!("Failed to seed scraper_state table from JSON: {e}");
+                }
+                from_json
+            }
+            Err(e) => {
+                warn!("Failed to load scraper state from DB: {e}; using default");
+                Self::default()
+            }
+        }
+    }
+
+    /// Persist state to the `scraper_state` DB table (upsert on key = 'main').
+    pub async fn save_to_db(&self, pool: &PgPool) -> anyhow::Result<()> {
+        let value = serde_json::to_value(self)?;
+        sqlx::query(
+            "INSERT INTO scraper_state (key, value, updated_at)
+             VALUES ('main', $1, NOW())
+             ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()",
+        )
+        .bind(value)
+        .execute(pool)
+        .await?;
         Ok(())
     }
 
