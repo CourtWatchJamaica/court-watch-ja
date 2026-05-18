@@ -234,11 +234,12 @@ export default function Dashboard() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
+      const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "America/Jamaica" });
       const [judgmentsRes, casesRes, sittingsRes, userRes, notifsRes] =
         await Promise.all([
           apiClient.getJudgments(),
           apiClient.getUserCases(),
-          apiClient.getCourtSittings(),
+          apiClient.getCourtSittings({ date_from: todayStr, limit: 20 }),
           apiClient.getMe(),
           apiClient.getNotifications(),
         ]);

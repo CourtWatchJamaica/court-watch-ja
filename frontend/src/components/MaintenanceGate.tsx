@@ -44,7 +44,7 @@ export default function MaintenanceGate({ children }: { children: React.ReactNod
 
   if (maintenance && !isAdmin) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] px-6">
+      <div className="min-h-screen flex items-center justify-center bg-background px-6">
         <div
           className="fixed top-0 left-0 right-0 h-[3px] z-50"
           style={{
@@ -56,14 +56,14 @@ export default function MaintenanceGate({ children }: { children: React.ReactNod
           <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#FED100]/10 ring-1 ring-[#FED100]/25">
             <Wrench className="h-8 w-8 text-[#FED100]" />
           </div>
-          <h1 className="text-2xl font-bold text-white mb-3">
+          <h1 className="text-2xl font-bold text-foreground mb-3">
             Down for Maintenance
           </h1>
-          <p className="text-sm text-white/50 leading-relaxed">
+          <p className="text-sm text-muted-foreground leading-relaxed">
             CourtWatch JA is temporarily unavailable while we make improvements.
             We&apos;ll be back shortly.
           </p>
-          <p className="mt-8 text-[11px] text-white/20">
+          <p className="mt-8 text-[11px] text-muted-foreground/40">
             Jamaica&apos;s premier legal case tracker
           </p>
         </div>

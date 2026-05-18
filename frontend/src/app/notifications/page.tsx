@@ -8,32 +8,38 @@ import { apiClient } from "@/lib/api";
 import { Notification } from "@/lib/types";
 import { Bell, FileText, Calendar, CheckCheck, Megaphone, PartyPopper, ExternalLink, Info, AlertTriangle, AlertOctagon } from "lucide-react";
 
-const TYPE_META: Record<string, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
-  new_judgment:             { label: "New Judgment",      color: "bg-[#009B3A]/15 text-[#009B3A]",   icon: FileText      },
-  sitting_changed:          { label: "Sitting Updated",   color: "bg-[#FED100]/15 text-[#FED100]",   icon: Calendar      },
-  case_listed:              { label: "Case Listed",       color: "bg-blue-500/15 text-blue-400",      icon: Calendar      },
-  case_available:           { label: "Case Available",    color: "bg-[#009B3A]/15 text-[#009B3A]",   icon: FileText      },
-  sitting_reminder_1d:      { label: "Hearing Tomorrow",  color: "bg-amber-400/15 text-amber-400",   icon: Calendar      },
-  sitting_reminder_morning: { label: "Hearing Today",     color: "bg-red-500/15 text-red-400",        icon: Calendar      },
-  announcement:             { label: "Announcement",      color: "bg-[#FED100]/15 text-[#FED100]",   icon: Megaphone     },
-  welcome:                  { label: "Welcome",           color: "bg-[#009B3A]/15 text-[#009B3A]",   icon: PartyPopper   },
+type NotifMetaEntry = {
+  label: string;
+  bg: string;
+  text: string;
+  icon: React.ComponentType<{ className?: string }>;
 };
 
-const SEVERITY_META: Record<string, { color: string; icon: React.ComponentType<{ className?: string }> }> = {
-  info:     { color: "bg-blue-500/15 text-blue-400",    icon: Info           },
-  warning:  { color: "bg-amber-400/15 text-amber-400",  icon: AlertTriangle  },
-  critical: { color: "bg-red-500/15 text-red-400",      icon: AlertOctagon   },
+const TYPE_META: Record<string, NotifMetaEntry> = {
+  new_judgment:             { label: "New Judgment",      bg: "bg-[#009B3A]/15", text: "text-[#009B3A]",                          icon: FileText      },
+  sitting_changed:          { label: "Sitting Updated",   bg: "bg-[#FED100]/15", text: "text-amber-600 dark:text-[#FED100]",       icon: Calendar      },
+  case_listed:              { label: "Case Listed",       bg: "bg-blue-500/15",  text: "text-blue-600 dark:text-blue-400",          icon: Calendar      },
+  case_available:           { label: "Case Available",    bg: "bg-[#009B3A]/15", text: "text-[#009B3A]",                          icon: FileText      },
+  sitting_reminder_1d:      { label: "Hearing Tomorrow",  bg: "bg-amber-400/15", text: "text-amber-600 dark:text-amber-400",        icon: Calendar      },
+  sitting_reminder_morning: { label: "Hearing Today",     bg: "bg-red-500/15",   text: "text-red-600 dark:text-red-400",            icon: Calendar      },
+  announcement:             { label: "Announcement",      bg: "bg-[#FED100]/15", text: "text-amber-600 dark:text-[#FED100]",       icon: Megaphone     },
+  welcome:                  { label: "Welcome",           bg: "bg-[#009B3A]/15", text: "text-[#009B3A]",                          icon: PartyPopper   },
 };
 
-function NotifMeta(notif: { type: string; severity?: string | null }) {
-  // For types that have their own identity (announcement, welcome, case-specific),
-  // use the type meta. For generic types with a non-info severity, override with severity colors.
+const SEVERITY_META: Record<string, { bg: string; text: string; icon: React.ComponentType<{ className?: string }> }> = {
+  info:     { bg: "bg-blue-500/15",  text: "text-blue-600 dark:text-blue-400",   icon: Info           },
+  warning:  { bg: "bg-amber-400/15", text: "text-amber-600 dark:text-amber-400", icon: AlertTriangle  },
+  critical: { bg: "bg-red-500/15",   text: "text-red-600 dark:text-red-400",     icon: AlertOctagon   },
+};
+
+function NotifMeta(notif: { type: string; severity?: string | null }): NotifMetaEntry {
   const typeMeta = TYPE_META[notif.type];
   if (typeMeta) return typeMeta;
   if (notif.severity && notif.severity !== "info" && SEVERITY_META[notif.severity]) {
-    return { label: notif.severity.charAt(0).toUpperCase() + notif.severity.slice(1), ...SEVERITY_META[notif.severity] };
+    const s = SEVERITY_META[notif.severity];
+    return { label: notif.severity.charAt(0).toUpperCase() + notif.severity.slice(1), ...s };
   }
-  return { label: notif.type, color: "bg-white/[0.07] text-white/50", icon: Bell };
+  return { label: notif.type, bg: "bg-muted", text: "text-muted-foreground", icon: Bell };
 }
 
 function formatRelative(ts: string): string {
@@ -73,8 +79,8 @@ function NotifRow({
   return (
     <button
       onClick={handleClick}
-      className={`group w-full text-left flex items-start gap-4 px-4 py-4 transition-colors hover:bg-white/[0.02] ${
-        isUnread ? "bg-white/[0.015]" : ""
+      className={`group w-full text-left flex items-start gap-4 px-4 py-4 transition-colors hover:bg-muted/30 ${
+        isUnread ? "bg-muted/20" : ""
       }`}
     >
       {/* Unread dot */}
@@ -83,19 +89,19 @@ function NotifRow({
       </div>
 
       {/* Icon */}
-      <div className={`shrink-0 rounded-xl p-2 ${meta.color.split(" ")[0]}`}>
-        <Icon className={`h-4 w-4 ${meta.color.split(" ")[1]}`} />
+      <div className={`shrink-0 rounded-xl p-2 ${meta.bg}`}>
+        <Icon className={`h-4 w-4 ${meta.text}`} />
       </div>
 
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1.5">
-          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${meta.color}`}>
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${meta.bg} ${meta.text}`}>
             {meta.label}
           </span>
-          <span className="text-[10px] text-white/25">{formatRelative(notif.sent_at)}</span>
+          <span className="text-[10px] text-muted-foreground/50">{formatRelative(notif.sent_at)}</span>
         </div>
-        <p className={`text-sm font-medium leading-snug ${isUnread ? "text-white/85" : "text-white/55"}`}>
+        <p className={`text-sm font-medium leading-snug ${isUnread ? "text-foreground" : "text-foreground/65"}`}>
           {notif.title
             ? notif.title
             : notif.type === "new_judgment"
@@ -107,7 +113,7 @@ function NotifRow({
                   : `Sitting schedule changed — Case #${notif.case_id}`}
         </p>
         {notif.message && (
-          <p className={`mt-0.5 text-xs leading-relaxed line-clamp-3 ${isUnread ? "text-white/45" : "text-white/30"}`}>
+          <p className={`mt-0.5 text-xs leading-relaxed line-clamp-3 ${isUnread ? "text-muted-foreground" : "text-muted-foreground/70"}`}>
             {notif.message}
           </p>
         )}
@@ -198,7 +204,7 @@ export default function NotificationsPage() {
               <button
                 onClick={handleMarkAllRead}
                 disabled={marking}
-                className="flex items-center gap-1.5 rounded-xl bg-white/[0.05] px-3 py-2 text-xs font-medium text-white/50 hover:text-white/80 hover:bg-white/[0.08] disabled:opacity-50 transition-colors"
+                className="flex items-center gap-1.5 rounded-xl bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-50 transition-colors"
               >
                 <CheckCheck className="h-3.5 w-3.5" />
                 Mark all read
@@ -207,33 +213,33 @@ export default function NotificationsPage() {
           </div>
 
           {/* List */}
-          <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a] overflow-hidden divide-y divide-white/[0.04]">
+          <div className="rounded-2xl border border-border bg-card overflow-hidden divide-y divide-border">
             {loading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <div key={i} className="flex items-start gap-4 px-4 py-4 animate-pulse">
-                  <div className="mt-1 w-2 h-2 rounded-full bg-white/[0.06]" />
-                  <div className="h-9 w-9 rounded-xl bg-white/[0.06] shrink-0" />
+                  <div className="mt-1 w-2 h-2 rounded-full bg-muted" />
+                  <div className="h-9 w-9 rounded-xl bg-muted shrink-0" />
                   <div className="flex-1 space-y-2">
                     <div className="flex gap-2">
-                      <div className="h-4 w-24 rounded-full bg-white/[0.06]" />
-                      <div className="h-4 w-12 rounded bg-white/[0.04]" />
+                      <div className="h-4 w-24 rounded-full bg-muted" />
+                      <div className="h-4 w-12 rounded bg-muted/60" />
                     </div>
-                    <div className="h-3.5 w-3/4 rounded bg-white/[0.04]" />
+                    <div className="h-3.5 w-3/4 rounded bg-muted/60" />
                   </div>
                 </div>
               ))
             ) : notifications.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-center">
-                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/[0.04]">
-                  <Bell className="h-7 w-7 text-white/15" />
+                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted/30">
+                  <Bell className="h-7 w-7 text-muted-foreground/30" />
                 </div>
-                <p className="text-sm font-medium text-white/35">No notifications yet</p>
-                <p className="mt-1 text-xs text-white/20 max-w-[200px]">
+                <p className="text-sm font-medium text-muted-foreground">No notifications yet</p>
+                <p className="mt-1 text-xs text-muted-foreground/60 max-w-[200px]">
                   Updates on your tracked cases will appear here.
                 </p>
                 <button
                   onClick={() => router.push("/cases")}
-                  className="mt-4 rounded-xl border border-white/[0.1] bg-white/[0.05] px-4 py-2.5 text-xs font-semibold text-white/50 hover:text-white hover:bg-white/[0.08] transition-colors"
+                  className="mt-4 rounded-xl border border-border bg-muted/30 px-4 py-2.5 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                 >
                   Browse Cases
                 </button>
@@ -246,7 +252,7 @@ export default function NotificationsPage() {
           </div>
 
           {!loading && notifications.length > 0 && (
-            <p className="mt-4 text-center text-[11px] text-white/20">
+            <p className="mt-4 text-center text-[11px] text-muted-foreground/40">
               Showing the 100 most recent notifications
             </p>
           )}

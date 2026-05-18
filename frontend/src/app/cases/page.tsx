@@ -28,7 +28,7 @@ import {
 const LIMIT = 20;
 
 const TODAY = typeof window !== "undefined"
-  ? new Date().toISOString().split("T")[0]
+  ? new Date().toLocaleDateString("en-CA", { timeZone: "America/Jamaica" })
   : "";
 
 type Tab = "judgments" | "sittings";
@@ -524,7 +524,7 @@ export default function CasesPage() {
     async (q: string, page: number, append: boolean, f: Filters) => {
       append ? setLoadingMore(true) : (setLoading(true), setSittingsPage(page));
       try {
-        const today = TODAY || new Date().toISOString().split("T")[0];
+        const today = TODAY || new Date().toLocaleDateString("en-CA", { timeZone: "America/Jamaica" });
         const res = await apiClient.getCourtSittings({
           q: q || undefined,
           court: f.court || undefined,

@@ -1548,7 +1548,6 @@ pub async fn check_notifications(pool: &PgPool) {
          FROM user_cases uc
          JOIN judgments j ON j.id = uc.case_id
          WHERE uc.case_type = 'judgment'
-           AND j.created_at > NOW() - INTERVAL '48 hours'
            AND NOT EXISTS (
                SELECT 1 FROM notifications n
                WHERE n.user_id = uc.user_id
