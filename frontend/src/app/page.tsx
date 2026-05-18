@@ -424,8 +424,23 @@ function LandingPage() {
     setShowPopup(true);
   }, []);
 
+  const orgSchema = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "CourtWatch JA",
+    url: "https://courtwatchjamaica.com",
+    description:
+      "Free Jamaican court case tracker. Search Supreme Court and Court of Appeal judgments, browse upcoming court lists, track cases, and get notified.",
+    foundingLocation: { "@type": "Country", name: "Jamaica" },
+    areaServed: { "@type": "Country", name: "Jamaica" },
+  };
+
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(orgSchema) }}
+      />
       <style>{`
         /* ── Floating scales background icon ── */
         @keyframes floatScale {
@@ -658,24 +673,24 @@ function LandingPage() {
               <ScrollFadeIn delay={0}>
                 <FeatureCard
                   icon={Calendar}
-                  title="Real-Time Court Lists"
-                  description="Updated Monday, Wednesday, and Friday directly from official Supreme Court and Court of Appeal sources."
+                  title="Jamaica Supreme Court & Appeal Lists"
+                  description="Court lists updated Monday, Wednesday, and Friday directly from official Jamaica Supreme Court and Court of Appeal sources."
                   accent="green"
                 />
               </ScrollFadeIn>
               <ScrollFadeIn delay={120}>
                 <FeatureCard
                   icon={Bell}
-                  title="Track Any Case"
-                  description="Enter your case number and get notified by email the moment it appears on a court list or new judgment is filed."
+                  title="Track Any Jamaican Case"
+                  description="Enter your case number and get notified by email the moment it appears on a Jamaican court list or a new judgment is filed."
                   accent="gold"
                 />
               </ScrollFadeIn>
               <ScrollFadeIn delay={240}>
                 <FeatureCard
                   icon={Users}
-                  title="Judges & Analytics"
-                  description="Explore the Judicial Constellation — an interactive 3D map of judges — and browse Parish Court crime data by location."
+                  title="Legal Research & Analytics"
+                  description="Browse Jamaica's judicial records, explore the Judicial Constellation — a 3D map of judges — and search Parish Court criminal case data by parish."
                   accent="purple"
                 />
               </ScrollFadeIn>

@@ -3,7 +3,9 @@ import { Scale, ArrowLeft } from "lucide-react";
 
 export const metadata = {
   title: "Terms of Service — CourtWatch JA",
-  description: "Terms of Service for CourtWatch JA.",
+  description:
+    "Terms of Service for CourtWatch JA, Jamaica's free Jamaican court case tracker. Court information provided for convenience only — not legal advice.",
+  alternates: { canonical: "https://courtwatchjamaica.com/terms" },
 };
 
 export default function TermsPage() {

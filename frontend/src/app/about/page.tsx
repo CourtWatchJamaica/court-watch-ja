@@ -2,9 +2,10 @@ import Link from "next/link";
 import { Scale, ArrowLeft, MapPin } from "lucide-react";
 
 export const metadata = {
-  title: "About — CourtWatch JA",
+  title: "About CourtWatch JA — Free Jamaican Court Case Tracker",
   description:
-    "CourtWatch JA makes Jamaican court information accessible to everyone.",
+    "CourtWatch JA makes Jamaican court information — Supreme Court judgments, Court of Appeal decisions, and Parish Court records — freely accessible to lawyers, journalists, students, and the public.",
+  alternates: { canonical: "https://courtwatchjamaica.com/about" },
 };
 
 export default function AboutPage() {
@@ -41,7 +42,7 @@ export default function AboutPage() {
 
         {/* Tagline */}
         <p className="text-xl sm:text-2xl font-medium text-[#FED100] mb-10">
-          Track di case dem. Stay informed.
+          Free Jamaican court records — for everyone.
         </p>
 
         {/* Mission */}
@@ -50,13 +51,15 @@ export default function AboutPage() {
             Our Mission
           </h2>
           <p className="text-white/70 leading-relaxed text-base sm:text-lg">
-            CourtWatch JA makes Jamaican court information accessible to
-            everyone — lawyers, journalists, students, and the public. Court
-            data in Jamaica has historically been difficult to access and harder
-            to search. We believe transparency in the legal system matters, and
-            that anyone with an internet connection should be able to know when
-            their case is listed, read published judgments, and understand what
-            is happening in Jamaica&apos;s courts.
+            CourtWatch JA makes Jamaican court information — Supreme Court
+            judgments, Court of Appeal decisions, and Parish Court records —
+            accessible to everyone: lawyers, journalists, students, and the
+            general public. Court data in Jamaica has historically been
+            difficult to access and harder to search. We believe transparency
+            in the Jamaican legal system matters, and that anyone with an
+            internet connection should be able to know when their case is
+            listed, read published judgments, and understand what is happening
+            in Jamaica&apos;s courts.
           </p>
         </div>
 
@@ -70,29 +73,31 @@ export default function AboutPage() {
               <span className="mt-0.5 h-4 w-4 shrink-0 rounded-full border border-[#009B3A]/30 bg-[#009B3A]/10 flex items-center justify-center">
                 <span className="h-1.5 w-1.5 rounded-full bg-[#009B3A]" />
               </span>
-              Automatically source and publish Supreme Court and Court of Appeal
-              judgments and court lists three times per week.
+              Automatically source and publish Jamaica Supreme Court and Court
+              of Appeal judgments and court lists three times per week.
             </li>
             <li className="flex gap-3">
               <span className="mt-0.5 h-4 w-4 shrink-0 rounded-full border border-[#009B3A]/30 bg-[#009B3A]/10 flex items-center justify-center">
                 <span className="h-1.5 w-1.5 rounded-full bg-[#009B3A]" />
               </span>
-              Send email notifications when a tracked case appears on a new
-              court list or a related judgment is published.
+              Send email notifications when a tracked Jamaican court case
+              appears on a new court list or a related judgment is published.
             </li>
             <li className="flex gap-3">
               <span className="mt-0.5 h-4 w-4 shrink-0 rounded-full border border-[#009B3A]/30 bg-[#009B3A]/10 flex items-center justify-center">
                 <span className="h-1.5 w-1.5 rounded-full bg-[#009B3A]" />
               </span>
-              Provide an interactive Judicial Constellation. a 3D map of
-              Jamaica&apos;s judges and their relationships across cases.
+              Provide an interactive Judicial Constellation — a 3D map of
+              Jamaica&apos;s judges and their case relationships across the
+              legal system.
             </li>
             <li className="flex gap-3">
               <span className="mt-0.5 h-4 w-4 shrink-0 rounded-full border border-[#009B3A]/30 bg-[#009B3A]/10 flex items-center justify-center">
                 <span className="h-1.5 w-1.5 rounded-full bg-[#009B3A]" />
               </span>
-              Aggregate Parish Court crime data so communities can stay informed
-              about local proceedings.
+              Aggregate Parish Court criminal case data so communities can stay
+              informed about local legal proceedings across Jamaica&apos;s
+              fourteen parishes.
             </li>
           </ul>
         </div>

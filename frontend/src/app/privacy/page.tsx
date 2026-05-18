@@ -3,7 +3,9 @@ import { Scale, ArrowLeft } from "lucide-react";
 
 export const metadata = {
   title: "Privacy Policy — CourtWatch JA",
-  description: "How CourtWatch JA collects and uses your data.",
+  description:
+    "How CourtWatch JA, Jamaica's free court case tracker, collects and uses your personal data. We never sell your information.",
+  alternates: { canonical: "https://courtwatchjamaica.com/privacy" },
 };
 
 export default function PrivacyPage() {

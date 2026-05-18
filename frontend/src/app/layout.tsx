@@ -18,19 +18,21 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
-  title: "CourtWatch JA — Jamaican Legal Case Tracker",
+  metadataBase: new URL("https://courtwatchjamaica.com"),
+  title: "CourtWatch JA — Free Jamaican Court Case Tracker",
   description:
-    "Track Jamaican court judgments, monitor cases, and stay informed on the latest legal decisions.",
+    "Search Supreme Court and Court of Appeal judgments, browse upcoming court lists, track cases, and get notified. Free access to Jamaican court records.",
+  keywords:
+    "Jamaica court, Supreme Court, Court of Appeal, judgment, case tracker, Parish Court, legal research, Jamaican law",
   icons: {
     icon: [{ url: "/icons/higher-court.svg", type: "image/svg+xml" }],
     shortcut: ["/icons/higher-court.svg"],
     apple: [{ url: "/icons/higher-court.svg" }],
   },
   openGraph: {
-    title: "CourtWatch JA — Jamaican Legal Case Tracker",
+    title: "CourtWatch JA — Free Jamaican Court Case Tracker",
     description:
-      "Track Jamaican court judgments, monitor cases, and stay informed on the latest legal decisions from Jamaica's Supreme Court, Court of Appeal, and Parish Courts.",
+      "Search Supreme Court and Court of Appeal judgments, browse upcoming court lists, track cases, and get notified. Free access to Jamaican court records.",
     siteName: "CourtWatch JA",
     locale: "en_JM",
     type: "website",
@@ -39,15 +41,15 @@ export const metadata: Metadata = {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "CourtWatch JA — Jamaican Legal Case Tracker",
+        alt: "CourtWatch JA — Free Jamaican Court Case Tracker",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "CourtWatch JA — Jamaican Legal Case Tracker",
+    title: "CourtWatch JA — Free Jamaican Court Case Tracker",
     description:
-      "Track Jamaican court judgments, monitor cases, and stay informed on the latest legal decisions.",
+      "Search Supreme Court and Court of Appeal judgments, browse upcoming court lists, track cases, and get notified. Free access to Jamaican court records.",
     images: ["/og-image.png"],
   },
 };
