@@ -22,6 +22,7 @@ import {
 import { VerdictIcon } from "@/components/icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Notification } from "@/lib/types";
+import WelcomeGuide from "@/components/WelcomeGuide";
 
 function AnnouncementBanner({
   notif,
@@ -228,6 +229,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [announcements, setAnnouncements] = useState<Notification[]>([]);
   const [dismissedIds, setDismissedIds] = useState<Set<number>>(new Set());
+  const [welcomeNotif, setWelcomeNotif] = useState<Notification | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -250,6 +252,10 @@ export default function Dashboard() {
           (n) => n.type === "announcement" && n.read_at === null,
         ),
       );
+      const welcome = notifsRes.notifications.find(
+        (n) => n.type === "welcome" && n.read_at === null,
+      );
+      setWelcomeNotif(welcome ?? null);
     } catch (error) {
       console.error("Failed to fetch dashboard data:", error);
     } finally {
@@ -398,6 +404,13 @@ export default function Dashboard() {
 
         <LegalPulse />
       </main>
+
+      {welcomeNotif && (
+        <WelcomeGuide
+          notificationId={welcomeNotif.id}
+          onClose={() => setWelcomeNotif(null)}
+        />
+      )}
     </div>
   );
 }

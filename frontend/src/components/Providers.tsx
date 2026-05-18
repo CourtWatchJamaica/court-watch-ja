@@ -6,6 +6,7 @@ import { CourtProvider } from "@/lib/court-context";
 import { ChambersProvider } from "@/lib/chambers-context";
 import { TrackingProvider } from "@/lib/tracking-context";
 import MaintenanceGate from "@/components/MaintenanceGate";
+import PromoModal from "@/components/PromoModal";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -14,7 +15,10 @@ export default function Providers({ children }: { children: React.ReactNode }) {
         <CourtProvider>
           <ChambersProvider>
             <TrackingProvider>
-              <MaintenanceGate>{children}</MaintenanceGate>
+              <MaintenanceGate>
+                {children}
+                <PromoModal />
+              </MaintenanceGate>
             </TrackingProvider>
           </ChambersProvider>
         </CourtProvider>

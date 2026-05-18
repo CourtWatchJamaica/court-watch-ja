@@ -18,6 +18,15 @@ use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 use config::Config;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServiceAlert {
+    pub title: String,
+    pub message: String,
+    pub severity: String,
+    pub enabled: bool,
+}
 
 /// Shared application state injected into every handler.
 #[derive(Clone)]
@@ -30,6 +39,8 @@ pub struct AppState {
     pub maintenance_mode: Arc<AtomicBool>,
     /// Per-IP request timestamps for auth endpoint rate limiting (5 req / 60 s).
     pub rate_limiter: Arc<Mutex<HashMap<String, Vec<Instant>>>>,
+    /// In-memory service alert shown to all users (cleared on restart).
+    pub service_alert: Arc<Mutex<Option<ServiceAlert>>>,
 }
 
 /// Updates `_sqlx_migrations` checksums to match the current local files.
@@ -149,6 +160,7 @@ async fn main() -> anyhow::Result<()> {
         scraper_running: Arc::new(AtomicBool::new(false)),
         maintenance_mode: Arc::new(AtomicBool::new(false)),
         rate_limiter,
+        service_alert: Arc::new(Mutex::new(None)),
     };
 
     // ── CORS ──────────────────────────────────────────────────────────────

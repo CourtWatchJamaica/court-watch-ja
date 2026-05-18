@@ -1,0 +1,2 @@
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS link     TEXT;
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS severity TEXT NOT NULL DEFAULT 'info';

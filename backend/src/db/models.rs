@@ -108,6 +108,10 @@ pub struct Notification {
     pub title: Option<String>,
     #[sqlx(default)]
     pub message: Option<String>,
+    #[sqlx(default)]
+    pub link: Option<String>,
+    #[sqlx(default)]
+    pub severity: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
@@ -163,6 +167,20 @@ pub struct ParishCourtCase {
 pub struct ParishSummary {
     pub name: String,
     pub total_cases: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct Promo {
+    pub id: i32,
+    pub title: String,
+    pub message: String,
+    pub url: Option<String>,
+    pub url_text: Option<String>,
+    pub display_frequency: String,
+    pub starts_at: Option<NaiveDateTime>,
+    pub ends_at: Option<NaiveDateTime>,
+    pub enabled: bool,
+    pub created_at: NaiveDateTime,
 }
 
 // ── Case-lookup projections (used only by the /case-lookup handler) ──────────

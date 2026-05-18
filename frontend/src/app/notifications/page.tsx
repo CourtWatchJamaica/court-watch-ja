@@ -6,20 +6,34 @@ import AuthGuard from "@/components/AuthGuard";
 import Navbar from "@/components/Navbar";
 import { apiClient } from "@/lib/api";
 import { Notification } from "@/lib/types";
-import { Bell, FileText, Calendar, CheckCheck, Megaphone } from "lucide-react";
+import { Bell, FileText, Calendar, CheckCheck, Megaphone, PartyPopper, ExternalLink, Info, AlertTriangle, AlertOctagon } from "lucide-react";
 
 const TYPE_META: Record<string, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
-  new_judgment:             { label: "New Judgment",      color: "bg-[#009B3A]/15 text-[#009B3A]",   icon: FileText  },
-  sitting_changed:          { label: "Sitting Updated",   color: "bg-[#FED100]/15 text-[#FED100]",   icon: Calendar  },
-  case_listed:              { label: "Case Listed",       color: "bg-blue-500/15 text-blue-400",      icon: Calendar  },
-  case_available:           { label: "Case Available",    color: "bg-[#009B3A]/15 text-[#009B3A]",   icon: FileText  },
-  sitting_reminder_1d:      { label: "Hearing Tomorrow",  color: "bg-amber-400/15 text-amber-400",   icon: Calendar  },
-  sitting_reminder_morning: { label: "Hearing Today",     color: "bg-red-500/15 text-red-400",        icon: Calendar  },
-  announcement:             { label: "Announcement",      color: "bg-[#FED100]/15 text-[#FED100]",   icon: Megaphone },
+  new_judgment:             { label: "New Judgment",      color: "bg-[#009B3A]/15 text-[#009B3A]",   icon: FileText      },
+  sitting_changed:          { label: "Sitting Updated",   color: "bg-[#FED100]/15 text-[#FED100]",   icon: Calendar      },
+  case_listed:              { label: "Case Listed",       color: "bg-blue-500/15 text-blue-400",      icon: Calendar      },
+  case_available:           { label: "Case Available",    color: "bg-[#009B3A]/15 text-[#009B3A]",   icon: FileText      },
+  sitting_reminder_1d:      { label: "Hearing Tomorrow",  color: "bg-amber-400/15 text-amber-400",   icon: Calendar      },
+  sitting_reminder_morning: { label: "Hearing Today",     color: "bg-red-500/15 text-red-400",        icon: Calendar      },
+  announcement:             { label: "Announcement",      color: "bg-[#FED100]/15 text-[#FED100]",   icon: Megaphone     },
+  welcome:                  { label: "Welcome",           color: "bg-[#009B3A]/15 text-[#009B3A]",   icon: PartyPopper   },
 };
 
-function NotifMeta(type: string) {
-  return TYPE_META[type] ?? { label: type, color: "bg-white/[0.07] text-white/50", icon: Bell };
+const SEVERITY_META: Record<string, { color: string; icon: React.ComponentType<{ className?: string }> }> = {
+  info:     { color: "bg-blue-500/15 text-blue-400",    icon: Info           },
+  warning:  { color: "bg-amber-400/15 text-amber-400",  icon: AlertTriangle  },
+  critical: { color: "bg-red-500/15 text-red-400",      icon: AlertOctagon   },
+};
+
+function NotifMeta(notif: { type: string; severity?: string | null }) {
+  // For types that have their own identity (announcement, welcome, case-specific),
+  // use the type meta. For generic types with a non-info severity, override with severity colors.
+  const typeMeta = TYPE_META[notif.type];
+  if (typeMeta) return typeMeta;
+  if (notif.severity && notif.severity !== "info" && SEVERITY_META[notif.severity]) {
+    return { label: notif.severity.charAt(0).toUpperCase() + notif.severity.slice(1), ...SEVERITY_META[notif.severity] };
+  }
+  return { label: notif.type, color: "bg-white/[0.07] text-white/50", icon: Bell };
 }
 
 function formatRelative(ts: string): string {
@@ -42,7 +56,7 @@ function NotifRow({
   onRead: (id: number) => void;
 }) {
   const router = useRouter();
-  const meta = NotifMeta(notif.type);
+  const meta = NotifMeta(notif);
   const Icon = meta.icon;
   const isUnread = notif.read_at === null;
 
@@ -75,13 +89,13 @@ function NotifRow({
 
       {/* Content */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
+        <div className="flex items-center gap-2 mb-1.5">
           <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${meta.color}`}>
             {meta.label}
           </span>
           <span className="text-[10px] text-white/25">{formatRelative(notif.sent_at)}</span>
         </div>
-        <p className={`text-sm leading-snug ${isUnread ? "text-white/80 font-medium" : "text-white/50"}`}>
+        <p className={`text-sm font-medium leading-snug ${isUnread ? "text-white/85" : "text-white/55"}`}>
           {notif.title
             ? notif.title
             : notif.type === "new_judgment"
@@ -92,11 +106,21 @@ function NotifRow({
                   ? `Your case has been listed for a sitting — #${notif.case_id}`
                   : `Sitting schedule changed — Case #${notif.case_id}`}
         </p>
-        {notif.message && !notif.title && (
-          <p className="mt-0.5 text-xs text-white/30 line-clamp-2">{notif.message}</p>
+        {notif.message && (
+          <p className={`mt-0.5 text-xs leading-relaxed line-clamp-3 ${isUnread ? "text-white/45" : "text-white/30"}`}>
+            {notif.message}
+          </p>
         )}
-        {notif.message && notif.title && (
-          <p className="mt-0.5 text-xs text-white/35 line-clamp-2">{notif.message}</p>
+        {notif.link && (
+          <a
+            href={notif.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-[#009B3A] hover:underline"
+          >
+            View <ExternalLink className="h-3 w-3" />
+          </a>
         )}
       </div>
     </button>

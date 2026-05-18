@@ -194,6 +194,7 @@ pub async fn verify_email(
         .ok_or_else(|| AppError::BadRequest("Invalid or expired verification token".into()))?;
 
     queries::mark_email_verified(&state.db, user_id).await?;
+    let _ = queries::create_welcome_notification(&state.db, user_id).await;
 
     let user = queries::get_user_by_id(&state.db, user_id)
         .await?
@@ -253,6 +254,8 @@ pub async fn oauth_login(
     )
     .await
     .map_err(AppError::Sqlx)?;
+
+    let _ = queries::create_welcome_notification(&state.db, user.id).await;
 
     let token = jwt::encode_token(user.id, &user.email, &user.role, &state.config.jwt_secret)?;
     Ok(Json(AuthResponse { token }))

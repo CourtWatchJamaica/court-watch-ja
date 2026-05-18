@@ -1,4 +1,4 @@
-use chrono::{NaiveDate, NaiveTime};
+use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use sqlx::PgPool;
 
 use super::models::*;
@@ -1072,12 +1072,29 @@ pub async fn upsert_user_case_settings(
 
 pub async fn get_notifications(pool: &PgPool, user_id: i32) -> sqlx::Result<Vec<Notification>> {
     sqlx::query_as::<_, Notification>(
-        r#"SELECT id, user_id, case_id, "type", sent_at, read_at, title, message
+        r#"SELECT id, user_id, case_id, "type", sent_at, read_at, title, message, link, severity
            FROM notifications WHERE user_id = $1 ORDER BY sent_at DESC LIMIT 100"#,
     )
     .bind(user_id)
     .fetch_all(pool)
     .await
+}
+
+pub async fn create_welcome_notification(pool: &PgPool, user_id: i32) -> sqlx::Result<()> {
+    sqlx::query(
+        r#"INSERT INTO notifications (user_id, case_id, type, title, message, severity)
+           SELECT $1, NULL, 'welcome',
+                  'Welcome to CourtWatch JA!',
+                  'You now have access to Jamaica''s most comprehensive court tracker. Let us show you around.',
+                  'info'
+           WHERE NOT EXISTS (
+               SELECT 1 FROM notifications WHERE user_id = $1 AND type = 'welcome'
+           )"#,
+    )
+    .bind(user_id)
+    .execute(pool)
+    .await?;
+    Ok(())
 }
 
 pub async fn get_unread_notification_count(pool: &PgPool, user_id: i32) -> sqlx::Result<i64> {
@@ -2370,4 +2387,124 @@ pub async fn get_preview_sittings(pool: &PgPool) -> sqlx::Result<Vec<CourtSittin
     )
     .fetch_all(pool)
     .await
+}
+
+// ── Promos ────────────────────────────────────────────────────────────────────
+
+fn parse_dt(s: &str) -> Option<NaiveDateTime> {
+    NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S")
+        .or_else(|_| NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M"))
+        .ok()
+}
+
+pub async fn get_active_promo(pool: &PgPool, user_id: Option<i32>) -> sqlx::Result<Option<Promo>> {
+    sqlx::query_as::<_, Promo>(
+        r#"SELECT id, title, message, url, url_text, display_frequency, starts_at, ends_at, enabled, created_at
+           FROM promos
+           WHERE enabled = true
+             AND (starts_at IS NULL OR starts_at <= NOW())
+             AND (ends_at IS NULL OR ends_at >= NOW())
+             AND (
+               $1::INT IS NULL
+               OR display_frequency = 'every_session'
+               OR NOT EXISTS (
+                 SELECT 1 FROM promo_dismissals pd
+                 WHERE pd.promo_id = promos.id
+                   AND pd.user_id = $1
+                   AND (
+                     (display_frequency = 'once')
+                     OR (display_frequency = 'daily' AND pd.dismissed_at >= date_trunc('day', NOW()))
+                     OR (display_frequency = 'weekly' AND pd.dismissed_at >= NOW() - INTERVAL '7 days')
+                   )
+               )
+             )
+           ORDER BY created_at DESC
+           LIMIT 1"#,
+    )
+    .bind(user_id)
+    .fetch_optional(pool)
+    .await
+}
+
+pub async fn dismiss_promo(pool: &PgPool, user_id: i32, promo_id: i32) -> sqlx::Result<()> {
+    sqlx::query(
+        "INSERT INTO promo_dismissals (user_id, promo_id, dismissed_at)
+         VALUES ($1, $2, NOW())
+         ON CONFLICT (user_id, promo_id) DO UPDATE SET dismissed_at = NOW()",
+    )
+    .bind(user_id)
+    .bind(promo_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+pub async fn admin_list_promos(pool: &PgPool) -> sqlx::Result<Vec<Promo>> {
+    sqlx::query_as::<_, Promo>(
+        "SELECT id, title, message, url, url_text, display_frequency, starts_at, ends_at, enabled, created_at
+         FROM promos ORDER BY created_at DESC",
+    )
+    .fetch_all(pool)
+    .await
+}
+
+pub struct PromoInput<'a> {
+    pub title: &'a str,
+    pub message: &'a str,
+    pub url: Option<&'a str>,
+    pub url_text: Option<&'a str>,
+    pub display_frequency: &'a str,
+    pub starts_at: Option<NaiveDateTime>,
+    pub ends_at: Option<NaiveDateTime>,
+    pub enabled: bool,
+}
+
+pub async fn admin_create_promo(pool: &PgPool, input: PromoInput<'_>) -> sqlx::Result<Promo> {
+    sqlx::query_as::<_, Promo>(
+        "INSERT INTO promos (title, message, url, url_text, display_frequency, starts_at, ends_at, enabled)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         RETURNING id, title, message, url, url_text, display_frequency, starts_at, ends_at, enabled, created_at",
+    )
+    .bind(input.title)
+    .bind(input.message)
+    .bind(input.url)
+    .bind(input.url_text)
+    .bind(input.display_frequency)
+    .bind(input.starts_at)
+    .bind(input.ends_at)
+    .bind(input.enabled)
+    .fetch_one(pool)
+    .await
+}
+
+pub async fn admin_update_promo(pool: &PgPool, id: i32, input: PromoInput<'_>) -> sqlx::Result<Option<Promo>> {
+    sqlx::query_as::<_, Promo>(
+        "UPDATE promos SET title=$1, message=$2, url=$3, url_text=$4, display_frequency=$5,
+         starts_at=$6, ends_at=$7, enabled=$8
+         WHERE id=$9
+         RETURNING id, title, message, url, url_text, display_frequency, starts_at, ends_at, enabled, created_at",
+    )
+    .bind(input.title)
+    .bind(input.message)
+    .bind(input.url)
+    .bind(input.url_text)
+    .bind(input.display_frequency)
+    .bind(input.starts_at)
+    .bind(input.ends_at)
+    .bind(input.enabled)
+    .bind(id)
+    .fetch_optional(pool)
+    .await
+}
+
+pub async fn admin_delete_promo(pool: &PgPool, id: i32) -> sqlx::Result<bool> {
+    let res = sqlx::query("DELETE FROM promos WHERE id = $1")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(res.rows_affected() > 0)
+}
+
+pub fn parse_promo_dt(s: &str) -> Option<NaiveDateTime> {
+    parse_dt(s)
 }

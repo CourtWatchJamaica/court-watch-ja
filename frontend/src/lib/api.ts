@@ -11,7 +11,9 @@ import {
   ParishCaseDetail,
   ParishCourtCase,
   ParishSummary,
+  Promo,
   ScraperStatus,
+  ServiceAlert,
   SystemConfigEntry,
   User,
   UserCase,
@@ -510,6 +512,79 @@ export const apiClient = {
     if (opts?.limit != null) params.set("limit", String(opts.limit));
     const qs = params.toString();
     return request(`/legal-news${qs ? `?${qs}` : ""}`);
+  },
+
+  // ── Service Alert ────────────────────────────────────────────────────────
+  async getServiceAlert(): Promise<{ alert: ServiceAlert | null }> {
+    return request("/service-alert");
+  },
+
+  async adminSetServiceAlert(data: {
+    title?: string;
+    message?: string;
+    severity?: string;
+    enabled?: boolean;
+  }): Promise<{ alert: ServiceAlert | null }> {
+    return request("/admin/service-alert", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  // ── Promos ────────────────────────────────────────────────────────────────
+  async getActivePromo(): Promise<{ promo: Promo | null }> {
+    return request("/promo/active");
+  },
+
+  async dismissPromo(promo_id: number): Promise<{ dismissed: boolean }> {
+    return request("/promo/dismiss", {
+      method: "POST",
+      body: JSON.stringify({ promo_id }),
+    });
+  },
+
+  // ── Admin: Promos ─────────────────────────────────────────────────────────
+  async adminListPromos(): Promise<{ promos: Promo[] }> {
+    return request("/admin/promos");
+  },
+
+  async adminCreatePromo(data: {
+    title: string;
+    message: string;
+    url?: string;
+    url_text?: string;
+    display_frequency?: string;
+    starts_at?: string;
+    ends_at?: string;
+    enabled?: boolean;
+  }): Promise<{ promo: Promo }> {
+    return request("/admin/promos", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async adminUpdatePromo(
+    id: number,
+    data: {
+      title: string;
+      message: string;
+      url?: string;
+      url_text?: string;
+      display_frequency?: string;
+      starts_at?: string;
+      ends_at?: string;
+      enabled?: boolean;
+    },
+  ): Promise<{ promo: Promo }> {
+    return request(`/admin/promos/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async adminDeletePromo(id: number): Promise<{ deleted: boolean }> {
+    return request(`/admin/promos/${id}`, { method: "DELETE" });
   },
 
   // ── Admin: Announce ───────────────────────────────────────────────────────

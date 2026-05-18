@@ -117,6 +117,15 @@ export interface Notification {
   read_at: string | null;
   title?: string | null;
   message?: string | null;
+  link?: string | null;
+  severity?: string | null;
+}
+
+export interface ServiceAlert {
+  title: string;
+  message: string;
+  severity: "info" | "warning" | "critical";
+  enabled: boolean;
 }
 
 export interface ParishCourtCase {
@@ -168,6 +177,19 @@ export interface CaseLookupResult {
   }>;
   has_upcoming: boolean;
   has_past: boolean;
+}
+
+export interface Promo {
+  id: number;
+  title: string;
+  message: string;
+  url: string | null;
+  url_text: string | null;
+  display_frequency: "once" | "daily" | "weekly" | "every_session";
+  starts_at: string | null;
+  ends_at: string | null;
+  enabled: boolean;
+  created_at: string;
 }
 
 export interface LegalNewsItem {

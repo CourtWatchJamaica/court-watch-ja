@@ -14,6 +14,8 @@ import {
   ChevronRight,
   Upload,
   Megaphone,
+  Sparkles,
+  AlertTriangle,
 } from "lucide-react";
 
 const NAV = [
@@ -23,6 +25,8 @@ const NAV = [
   { href: "/admin/scraper", label: "Scraper", icon: Cpu },
   { href: "/admin/upload", label: "Upload", icon: Upload },
   { href: "/admin/announce", label: "Announce", icon: Megaphone },
+  { href: "/admin/promos", label: "Promos", icon: Sparkles },
+  { href: "/admin/alerts", label: "Alerts", icon: AlertTriangle },
   { href: "/admin/logs", label: "Logs", icon: ScrollText },
   { href: "/admin/config", label: "Config", icon: Settings },
 ];

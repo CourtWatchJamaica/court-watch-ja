@@ -22,6 +22,7 @@ import {
 import { HigherCourtIcon, CourtroomIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import ThemeToggle from "@/components/ThemeToggle";
+import ServiceAlertBanner from "@/components/ServiceAlertBanner";
 import { apiClient } from "@/lib/api";
 import {
   useCourt,
@@ -335,6 +336,7 @@ export default function Navbar() {
           </div>
         </div>
       </nav>
+      <ServiceAlertBanner />
 
       {/* Mobile bottom nav — untouched */}
       <div className="md:hidden fixed bottom-0 inset-x-0 z-50 flex justify-center pointer-events-none">

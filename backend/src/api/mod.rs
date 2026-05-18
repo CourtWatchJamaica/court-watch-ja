@@ -11,7 +11,9 @@ pub mod news;
 pub mod notifications;
 pub mod parish_cases;
 pub mod pdf;
+pub mod promos;
 pub mod public;
+pub mod service_alert;
 pub mod tracking;
 
 pub fn court_slug_to_name(slug: &str) -> &'static str {
@@ -53,7 +55,9 @@ pub fn router(state: AppState) -> Router {
         .route("/api/parish-summary", get(parish_cases::parish_summary))
         .route("/api/pdf/judgment/:id", get(pdf::judgment_pdf))
         .route("/api/pdf/sitting/:id", get(pdf::sitting_pdf))
-        .route("/api/public/preview", get(public::get_preview));
+        .route("/api/public/preview", get(public::get_preview))
+        .route("/api/promo/active", get(promos::get_active_promo))
+        .route("/api/service-alert", get(service_alert::get_service_alert));
 
     // ── Protected (any authenticated user) ───────────────────────────────
     let protected = Router::new()
@@ -84,6 +88,7 @@ pub fn router(state: AppState) -> Router {
         .route("/api/court-sittings/today", get(court_sittings::today_sittings))
         .route("/api/court-sittings/:id", get(court_sittings::get_sitting))
         .route("/api/court-stats", get(court_stats::get_court_stats))
+        .route("/api/promo/dismiss", post(promos::dismiss_promo))
         .layer(middleware::from_fn_with_state(state.clone(), require_auth));
 
     // ── Admin (admin + super_admin) ───────────────────────────────────────
@@ -110,6 +115,11 @@ pub fn router(state: AppState) -> Router {
         .route("/api/admin/announce", post(admin::announce))
         .route("/api/admin/maintenance", post(admin::toggle_maintenance))
         .route("/api/admin/upload-pdf", post(admin::upload_pdf))
+        .route("/api/admin/promos", get(promos::admin_list_promos))
+        .route("/api/admin/promos", post(promos::admin_create_promo))
+        .route("/api/admin/promos/:id", put(promos::admin_update_promo))
+        .route("/api/admin/promos/:id", delete(promos::admin_delete_promo))
+        .route("/api/admin/service-alert", post(service_alert::set_service_alert))
         .layer(middleware::from_fn(require_admin))
         .layer(middleware::from_fn_with_state(state.clone(), require_auth));
 
