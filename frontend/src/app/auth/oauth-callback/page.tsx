@@ -35,6 +35,10 @@ export default function OAuthCallbackPage() {
         .then((data) => {
           if (data.token) {
             localStorage.setItem("token", data.token);
+            // TODO: replace REPLACE_WITH_CONVERSION_LABEL with your Google Ads conversion label
+            // Note: fires for all OAuth sign-ins; add isNewUser from backend to restrict to new accounts only
+            const w = window as Window & { gtag?: (...args: unknown[]) => void };
+            w.gtag?.("event", "conversion", { send_to: "AW-18168669700/REPLACE_WITH_CONVERSION_LABEL" });
             window.location.href = "/";
           } else {
             router.replace("/auth/login?error=oauth");

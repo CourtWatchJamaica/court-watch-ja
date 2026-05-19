@@ -24,6 +24,9 @@ function VerifyEmailContent() {
       .verifyEmail(token)
       .then(({ token: jwt }) => {
         localStorage.setItem("token", jwt);
+        // TODO: replace REPLACE_WITH_CONVERSION_LABEL with your Google Ads conversion label
+        const w = window as Window & { gtag?: (...args: unknown[]) => void };
+        w.gtag?.("event", "conversion", { send_to: "AW-18168669700/REPLACE_WITH_CONVERSION_LABEL" });
         setStatus("success");
         setTimeout(() => router.replace("/"), 1800);
       })
