@@ -2172,104 +2172,91 @@ pub async fn list_legal_news(
 
 const PC: &str = "id, parish, accused_name, offence, status, week_of, pdf_source_url, created_at, COALESCE(case_type, 'criminal') AS case_type";
 
+/// Return the raw SQL ILIKE fragment for a given category, or `""` if unknown.
+/// The strings are all hardcoded constants — no user input reaches the SQL.
+fn parish_category_clause(category: &str) -> &'static str {
+    match category.to_lowercase().trim() {
+        "violent" => "offence ILIKE ANY(ARRAY[\
+            '%murder%','%manslaughter%','%assault%','%wounding%',\
+            '%robbery%','%rape%','%sexual%','%grievous%',\
+            '%gun%','%firearm%','%ammunition%','%shooting%',\
+            '%stabbing%','%arson%','%abduction%','%threat%'])",
+        "drugs" => "offence ILIKE ANY(ARRAY[\
+            '%ganja%','%cannabis%','%cocaine%','%crack%',\
+            '%dangerous drug%','%controlled substance%',\
+            '%drug trafficking%','%traffick%','%cultivation%'])",
+        "property" => "offence ILIKE ANY(ARRAY[\
+            '%larceny%','%praedial%','%theft%','%stealing%',\
+            '%receiving stolen%','%burglary%','%housebreaking%',\
+            '%fraud%','%forgery%','%obtaining%','%false pretence%',\
+            '%malicious%','%damage%','%embezzlement%','%counterfeit%',\
+            '%identity%','%access device%'])",
+        "other" => "NOT offence ILIKE ANY(ARRAY[\
+            '%murder%','%manslaughter%','%assault%','%wounding%',\
+            '%robbery%','%rape%','%sexual%','%grievous%',\
+            '%gun%','%firearm%','%shooting%','%stabbing%','%arson%',\
+            '%ganja%','%cannabis%','%cocaine%','%drug%','%traffick%',\
+            '%larceny%','%theft%','%burglary%','%housebreaking%',\
+            '%fraud%','%forgery%','%obtaining%','%malicious%'])",
+        _ => "",
+    }
+}
+
 pub async fn list_parish_cases(
     pool: &PgPool,
     parish: Option<&str>,
     q: Option<&str>,
+    category: Option<&str>,
     page: i64,
     limit: i64,
 ) -> sqlx::Result<(Vec<ParishCourtCase>, i64)> {
+    use sqlx::QueryBuilder;
+
     let offset = (page - 1).max(0) * limit;
+    let search_pattern = q.map(|s| format!("%{}%", s.to_lowercase()));
+    let cat_clause = category.map(parish_category_clause).unwrap_or("");
 
-    let (rows, total) = match (parish, q) {
-        (Some(p), Some(search)) => {
-            let pattern = format!("%{}%", search.to_lowercase());
-            let sql = format!(
-                "SELECT {PC} FROM parish_court_cases
-                 WHERE parish = $1
-                   AND (LOWER(accused_name) LIKE $2 OR LOWER(offence) LIKE $2)
-                 ORDER BY week_of DESC NULLS LAST, id DESC
-                 LIMIT $3 OFFSET $4"
-            );
-            let rows = sqlx::query_as::<_, ParishCourtCase>(&sql)
-                .bind(p)
-                .bind(&pattern)
-                .bind(limit)
-                .bind(offset)
-                .fetch_all(pool)
-                .await?;
-            let total: i64 = sqlx::query_scalar(
-                "SELECT COUNT(*) FROM parish_court_cases
-                 WHERE parish = $1 AND (LOWER(accused_name) LIKE $2 OR LOWER(offence) LIKE $2)",
-            )
-            .bind(p)
-            .bind(&pattern)
-            .fetch_one(pool)
-            .await?;
-            (rows, total)
-        }
-        (Some(p), None) => {
-            let sql = format!(
-                "SELECT {PC} FROM parish_court_cases
-                 WHERE parish = $1
-                 ORDER BY week_of DESC NULLS LAST, id DESC
-                 LIMIT $2 OFFSET $3"
-            );
-            let rows = sqlx::query_as::<_, ParishCourtCase>(&sql)
-                .bind(p)
-                .bind(limit)
-                .bind(offset)
-                .fetch_all(pool)
-                .await?;
-            let total: i64 =
-                sqlx::query_scalar("SELECT COUNT(*) FROM parish_court_cases WHERE parish = $1")
-                    .bind(p)
-                    .fetch_one(pool)
-                    .await?;
-            (rows, total)
-        }
-        (None, Some(search)) => {
-            let pattern = format!("%{}%", search.to_lowercase());
-            let sql = format!(
-                "SELECT {PC} FROM parish_court_cases
-                 WHERE LOWER(accused_name) LIKE $1 OR LOWER(offence) LIKE $1 OR LOWER(parish) LIKE $1
-                 ORDER BY week_of DESC NULLS LAST, id DESC
-                 LIMIT $2 OFFSET $3"
-            );
-            let rows = sqlx::query_as::<_, ParishCourtCase>(&sql)
-                .bind(&pattern)
-                .bind(limit)
-                .bind(offset)
-                .fetch_all(pool)
-                .await?;
-            let total: i64 = sqlx::query_scalar(
-                "SELECT COUNT(*) FROM parish_court_cases
-                 WHERE LOWER(accused_name) LIKE $1 OR LOWER(offence) LIKE $1 OR LOWER(parish) LIKE $1",
-            )
-            .bind(&pattern)
-            .fetch_one(pool)
-            .await?;
-            (rows, total)
-        }
-        (None, None) => {
-            let sql = format!(
-                "SELECT {PC} FROM parish_court_cases
-                 ORDER BY week_of DESC NULLS LAST, id DESC
-                 LIMIT $1 OFFSET $2"
-            );
-            let rows = sqlx::query_as::<_, ParishCourtCase>(&sql)
-                .bind(limit)
-                .bind(offset)
-                .fetch_all(pool)
-                .await?;
-            let total: i64 =
-                sqlx::query_scalar("SELECT COUNT(*) FROM parish_court_cases")
-                    .fetch_one(pool)
-                    .await?;
-            (rows, total)
-        }
-    };
+    // Build shared WHERE fragment via a helper closure that applies conditions
+    // to whichever QueryBuilder is passed in.
+    macro_rules! apply_filters {
+        ($qb:expr) => {{
+            if let Some(p) = parish {
+                $qb.push(" AND parish = ");
+                $qb.push_bind(p);
+            }
+            if let Some(ref pat) = search_pattern {
+                $qb.push(" AND (LOWER(accused_name) LIKE ");
+                $qb.push_bind(pat.clone());
+                $qb.push(" OR LOWER(offence) LIKE ");
+                $qb.push_bind(pat.clone());
+                if parish.is_none() {
+                    $qb.push(" OR LOWER(parish) LIKE ");
+                    $qb.push_bind(pat.clone());
+                }
+                $qb.push(")");
+            }
+            if !cat_clause.is_empty() {
+                $qb.push(format!(" AND {cat_clause}"));
+            }
+        }};
+    }
 
+    // ── Count ─────────────────────────────────────────────────────────────────
+    let mut cq: QueryBuilder<sqlx::Postgres> =
+        QueryBuilder::new("SELECT COUNT(*) FROM parish_court_cases WHERE 1=1");
+    apply_filters!(cq);
+    let total: i64 = cq.build_query_scalar().fetch_one(pool).await?;
+
+    // ── Data ──────────────────────────────────────────────────────────────────
+    let mut dq: QueryBuilder<sqlx::Postgres> =
+        QueryBuilder::new(format!("SELECT {PC} FROM parish_court_cases WHERE 1=1"));
+    apply_filters!(dq);
+    dq.push(" ORDER BY week_of DESC NULLS LAST, id DESC LIMIT ");
+    dq.push_bind(limit);
+    dq.push(" OFFSET ");
+    dq.push_bind(offset);
+
+    let rows = dq.build_query_as::<ParishCourtCase>().fetch_all(pool).await?;
     Ok((rows, total))
 }
 

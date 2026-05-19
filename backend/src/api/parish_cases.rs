@@ -14,6 +14,8 @@ pub struct CasesQuery {
     pub q: Option<String>,
     pub page: Option<i64>,
     pub limit: Option<i64>,
+    /// Filter by offence category: "Violent", "Property", "Drugs", or "Other".
+    pub category: Option<String>,
     /// Filter: return only cases where week_of >= this date (YYYY-MM-DD).
     pub date_from: Option<String>,
 }
@@ -49,6 +51,7 @@ pub async fn list_parish_cases(
         &state.db,
         params.parish.as_deref(),
         params.q.as_deref(),
+        params.category.as_deref(),
         page,
         limit,
     )
