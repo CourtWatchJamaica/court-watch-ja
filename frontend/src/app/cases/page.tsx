@@ -559,7 +559,7 @@ export default function CasesPage() {
     async (q: string, page: number, append: boolean, f: Filters) => {
       append ? setLoadingMore(true) : (setLoading(true), setSittingsPage(page));
       try {
-        const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "America/Jamaica" });
+        const todayStr = new Date().toLocaleDateString("en-CA");
         const weekMonday = getWeekMonday();
         const isParishOnly = f.court === "Parish Court";
         const includeParish = !f.court || isParishOnly;
@@ -583,18 +583,22 @@ export default function CasesPage() {
         }
 
         if (includeParish && !append) {
-          const parishRes = await apiClient.getParishCases({
-            q: q || undefined,
-            date_from: f.dateFrom || weekMonday,
-            limit: 200,
-          });
-          const adapted = parishRes.cases.map(adaptParishCase);
-          if (isParishOnly) {
-            merged = adapted;
-            total = parishRes.total ?? adapted.length;
-          } else {
-            merged = sortByEventDate([...merged, ...adapted]);
-            total += parishRes.total ?? adapted.length;
+          try {
+            const parishRes = await apiClient.getParishCases({
+              q: q || undefined,
+              date_from: f.dateFrom || weekMonday,
+              limit: 200,
+            });
+            const adapted = parishRes.cases.map(adaptParishCase);
+            if (isParishOnly) {
+              merged = adapted;
+              total = parishRes.total ?? adapted.length;
+            } else {
+              merged = sortByEventDate([...merged, ...adapted]);
+              total += parishRes.total ?? adapted.length;
+            }
+          } catch (parishErr) {
+            console.error("Failed to fetch parish cases:", parishErr);
           }
         }
 

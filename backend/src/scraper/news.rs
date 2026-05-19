@@ -15,7 +15,6 @@ const FEEDS: &[(&str, &str)] = &[
     ("Jamaica Observer", "https://www.jamaicaobserver.com/feed/"),
     ("Loop Jamaica", "https://jamaica.loopnews.com/feed"),
     ("RJR News", "http://rjrnewsonline.com/feed"),
-    ("Jamaica Star", "http://jamaica-star.com/feed"),
 ];
 
 // ── Keyword lists ─────────────────────────────────────────────────────────
