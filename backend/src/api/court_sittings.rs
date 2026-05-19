@@ -44,7 +44,7 @@ pub async fn list_sittings(
     Query(params): Query<SittingsParams>,
 ) -> Result<Json<SittingsResponse>, AppError> {
     let page = params.page.unwrap_or(1).max(1);
-    let limit = params.limit.unwrap_or(20).clamp(1, 100);
+    let limit = params.limit.unwrap_or(20).clamp(1, 500);
     let q = params.q.as_deref();
     let court = params.court.as_deref();
     let judge = params.judge.as_deref();

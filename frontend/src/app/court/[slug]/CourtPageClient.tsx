@@ -61,9 +61,22 @@ export default function CourtPage() {
     if (!court) return;
     setLoading(true);
     try {
+      // Compute Monday–Sunday of the current Jamaica week using local date
+      const todayStr = new Date().toLocaleDateString("en-CA");
+      const [yr, mo, dy] = todayStr.split("-").map(Number);
+      const base = new Date(Date.UTC(yr, mo - 1, dy));
+      const dow = base.getUTCDay(); // 0 = Sunday
+      const daysToMonday = dow === 0 ? 6 : dow - 1;
+      const monday = new Date(base);
+      monday.setUTCDate(base.getUTCDate() - daysToMonday);
+      const sunday = new Date(monday);
+      sunday.setUTCDate(monday.getUTCDate() + 6);
+      const weekStart = monday.toISOString().split("T")[0];
+      const weekEnd = sunday.toISOString().split("T")[0];
+
       const [jRes, sRes, statsRes] = await Promise.all([
         apiClient.getJudgments({ court }),
-        apiClient.getCourtSittings({ court }),
+        apiClient.getCourtSittings({ court, date_from: weekStart, date_to: weekEnd, limit: 100 }),
         apiClient.getCourtStats(court),
       ]);
       setJudgments(jRes.judgments.slice(0, 6));
@@ -93,11 +106,8 @@ export default function CourtPage() {
     );
   }
 
-  const today = new Date().toISOString().split("T")[0];
-  const weekEnd = new Date(Date.now() + 7 * 86_400_000).toISOString().split("T")[0];
-  const thisWeekSittings = sittings.filter(
-    (s) => s.event_date && s.event_date >= today && s.event_date <= weekEnd,
-  );
+  // sittings is already filtered to the current Jamaica week by fetchData
+  const thisWeekSittings = sittings;
 
   return (
     <AuthGuard>
