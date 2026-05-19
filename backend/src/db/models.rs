@@ -161,6 +161,8 @@ pub struct ParishCourtCase {
     pub week_of: Option<NaiveDate>,
     pub pdf_source_url: Option<String>,
     pub created_at: NaiveDateTime,
+    #[sqlx(default)]
+    pub case_type: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]

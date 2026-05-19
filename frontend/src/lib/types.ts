@@ -139,6 +139,7 @@ export interface ParishCourtCase {
   week_of: string | null; // "YYYY-MM-DD"
   pdf_source_url: string | null;
   created_at: string;
+  case_type: string; // "criminal" | "civil"
 }
 
 export interface ParishSummary {

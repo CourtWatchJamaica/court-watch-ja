@@ -2170,7 +2170,7 @@ pub async fn list_legal_news(
 
 // ── Parish Court Cases ─────────────────────────────────────────────────────
 
-const PC: &str = "id, parish, accused_name, offence, status, week_of, pdf_source_url, created_at";
+const PC: &str = "id, parish, accused_name, offence, status, week_of, pdf_source_url, created_at, COALESCE(case_type, 'criminal') AS case_type";
 
 pub async fn list_parish_cases(
     pool: &PgPool,
@@ -2378,12 +2378,19 @@ pub async fn upsert_parish_case(
     status: Option<&str>,
     week_of: Option<NaiveDate>,
     pdf_source_url: &str,
+    case_type: &str,
 ) -> sqlx::Result<()> {
     sqlx::query(
         "INSERT INTO parish_court_cases
-             (parish, accused_name, offence, status, week_of, pdf_source_url)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         ON CONFLICT DO NOTHING",
+             (parish, accused_name, offence, status, week_of, pdf_source_url, case_type)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT (
+             parish,
+             COALESCE(accused_name,   ''),
+             COALESCE(offence,        ''),
+             COALESCE(week_of,        '1970-01-01'::date),
+             COALESCE(pdf_source_url, '')
+         ) DO NOTHING",
     )
     .bind(parish)
     .bind(accused_name)
@@ -2391,6 +2398,7 @@ pub async fn upsert_parish_case(
     .bind(status)
     .bind(week_of)
     .bind(pdf_source_url)
+    .bind(case_type)
     .execute(pool)
     .await?;
     Ok(())

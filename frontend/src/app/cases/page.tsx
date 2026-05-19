@@ -85,12 +85,16 @@ function getWeekMonday(): string {
 }
 
 function adaptParishCase(c: ParishCourtCase): CourtSitting {
+  const isCivil = c.case_type === "civil";
+  const title = isCivil
+    ? `${c.accused_name ?? "Unknown"} v ${c.offence ?? "Unknown"} — ${c.parish} Parish Court`
+    : c.accused_name
+    ? `${c.accused_name} — ${c.parish} Parish Court`
+    : `${c.parish} Parish Court`;
   return {
     id: c.id,
     case_number: null,
-    title: c.accused_name
-      ? `${c.accused_name} — ${c.parish} Parish Court`
-      : `${c.parish} Parish Court`,
+    title,
     judge_name: null,
     court_division: "Parish Court",
     event_type: c.status ?? null,
@@ -99,7 +103,7 @@ function adaptParishCase(c: ParishCourtCase): CourtSitting {
     lawyers: null,
     pdf_source_url: c.pdf_source_url ?? null,
     created_at: c.created_at,
-    snippet: c.offence ?? null,
+    snippet: isCivil ? null : (c.offence ?? null),
     _source: "parish",
   };
 }

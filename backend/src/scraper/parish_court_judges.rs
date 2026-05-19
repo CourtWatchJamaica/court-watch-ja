@@ -36,6 +36,7 @@ struct ParsedRow {
     accused_name: Option<String>,
     offence: Option<String>,
     status: Option<String>,
+    case_type: String,
 }
 
 pub async fn run(
@@ -124,6 +125,7 @@ pub async fn run(
                     row.status.as_deref(),
                     week_of,
                     pdf_url,
+                    &row.case_type,
                 )
                 .await
                 {
@@ -351,22 +353,32 @@ fn sanitize_filename(url: &str) -> String {
 
 // ── Case row parser ───────────────────────────────────────────────────────────
 
-/// Parse accused / offence / status rows from OCR text.
+/// Parse case rows from OCR text, tracking civil vs criminal sections.
 ///
-/// Column boundaries are detected by runs of 3+ spaces/tabs.
-/// Name regex accepts title-case and ALL-CAPS.
-/// Status codes: 1-5 uppercase letters, optionally slash-separated (CPH, H/A, …).
+/// Section is determined by header keywords:
+///   civil section    → "plaintiff", "civil list", "civil division"
+///   criminal section → "accused", "criminal list", "criminal division"
+///
+/// Civil rows:   PLAINTIFF | DEFENDANT | [MATTER] | STATUS
+/// Criminal rows: ACCUSED  | OFFENCE…  | STATUS
+///
+/// Column boundaries: runs of 3+ spaces/tabs.
+/// Status codes: 1–5 uppercase letters, optionally slash-separated (H/A, …).
 fn parse_case_rows(text: &str) -> Vec<ParsedRow> {
     let col_sep = Regex::new(r"[ \t]{3,}").unwrap();
     let name_re = Regex::new(r"(?i)^[A-Za-z][A-Za-z'\-]+(,\s*|\s+)[A-Za-z]").unwrap();
     let status_re = Regex::new(r"^[A-Z]{1,5}(/[A-Z]{1,5})?$").unwrap();
 
-    const SKIP_WORDS: &[&str] = &[
-        "accused", "offence", "offenses", "status", "plaintiff", "defendant",
-        "case no", "court list", "civil list", "criminal list", "matter",
-        "division", "parish", "week of", "page ", "continued",
+    // Words that switch section context when found in a line
+    const CIVIL_SIGNALS: &[&str] = &["plaintiff", "civil list", "civil division"];
+    const CRIMINAL_SIGNALS: &[&str] = &["accused", "criminal list", "criminal division"];
+    // Words that mean the line is metadata/header with no case data
+    const SKIP_CONTENT: &[&str] = &[
+        "offence", "offenses", "status", "defendant", "matter",
+        "case no", "court list", "division", "parish", "week of", "page ", "continued",
     ];
 
+    let mut is_civil = false; // default to criminal until a header says otherwise
     let mut rows = Vec::new();
 
     for raw_line in text.lines() {
@@ -375,7 +387,17 @@ fn parse_case_rows(text: &str) -> Vec<ParsedRow> {
             continue;
         }
         let lower = line.to_lowercase();
-        if SKIP_WORDS.iter().any(|kw| lower.contains(kw)) {
+
+        // Section switching — these lines are headers, not data rows
+        if CIVIL_SIGNALS.iter().any(|kw| lower.contains(kw)) {
+            is_civil = true;
+            continue;
+        }
+        if CRIMINAL_SIGNALS.iter().any(|kw| lower.contains(kw)) {
+            is_civil = false;
+            continue;
+        }
+        if SKIP_CONTENT.iter().any(|kw| lower.contains(kw)) {
             continue;
         }
 
@@ -399,16 +421,31 @@ fn parse_case_rows(text: &str) -> Vec<ParsedRow> {
             continue;
         }
 
-        let (accused_name, offence) = if cols.len() >= 4 && name_re.is_match(cols[1]) {
-            let matter = cols[2..cols.len() - 1].join(" ");
-            (
-                format!("{} v {}", title_case(first), title_case(cols[1])),
-                matter,
-            )
-        } else if cols.len() >= 3 {
-            (title_case(first), cols[1..cols.len() - 1].join(" "))
+        let (accused_name, offence, case_type) = if is_civil {
+            // Civil: col[0]=plaintiff, col[1]=defendant (must look like a name), [col[2..n-1]=matter]
+            if cols.len() < 3 || !name_re.is_match(cols[1]) {
+                continue;
+            }
+            let defendant = title_case(cols[1]);
+            let matter = if cols.len() >= 4 {
+                cols[2..cols.len() - 1].join(" ")
+            } else {
+                String::new()
+            };
+            let offence_val = if matter.trim().is_empty() {
+                defendant
+            } else {
+                format!("{defendant} — {matter}")
+            };
+            (title_case(first), offence_val, "civil")
         } else {
-            (title_case(first), String::new())
+            // Criminal: col[0]=accused, col[1..n-1]=offence
+            let offence_val = if cols.len() >= 3 {
+                cols[1..cols.len() - 1].join(" ")
+            } else {
+                String::new()
+            };
+            (title_case(first), offence_val, "criminal")
         };
 
         if accused_name.split_whitespace().count() < 2 {
@@ -423,6 +460,7 @@ fn parse_case_rows(text: &str) -> Vec<ParsedRow> {
                 Some(offence.trim().to_string())
             },
             status: Some(status_raw.to_string()),
+            case_type: case_type.to_string(),
         });
     }
 
@@ -504,5 +542,33 @@ COURT LIST - CIVIL DIVISION
         let xml = format!("{url} {url}");
         let urls = extract_pdf_urls_from_rss(&xml);
         assert_eq!(urls.len(), 1);
+    }
+
+    #[test]
+    fn detects_civil_section() {
+        let ocr = "\
+PLAINTIFF                              DEFENDANT                                  STATUS
+Crawford, Ellis                        Wright, Wilford                            DJ
+Daley, Charmaine                       Stephenson, Khani                          M
+ACCUSED                                OFFENCE                                    STATUS
+Brown, Peter                           Larceny                                    CPH
+";
+        let rows = parse_case_rows(ocr);
+        assert_eq!(rows.len(), 3, "got {}: {rows:?}", rows.len());
+        assert_eq!(rows[0].case_type, "civil");
+        assert_eq!(rows[0].accused_name.as_deref(), Some("Crawford, Ellis"));
+        assert_eq!(rows[0].offence.as_deref(), Some("Wright, Wilford"));
+        assert_eq!(rows[1].case_type, "civil");
+        assert_eq!(rows[2].case_type, "criminal");
+        assert_eq!(rows[2].accused_name.as_deref(), Some("Brown, Peter"));
+    }
+
+    #[test]
+    fn criminal_rows_have_criminal_case_type() {
+        let ocr =
+            "Riley, Coleman                         Unlawful wounding                          M\n";
+        let rows = parse_case_rows(ocr);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].case_type, "criminal");
     }
 }
