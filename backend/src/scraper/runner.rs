@@ -146,11 +146,21 @@ pub async fn run_catchup_check(pool: &PgPool, config: &Config) -> anyhow::Result
     if coa_empty {
         info!("Forcing CoA scraper — no Court of Appeal sittings yet");
     }
+    let coa_no_upcoming = !coa_empty
+        && queries::count_upcoming_sittings_for_court(pool, "Court of Appeal")
+            .await
+            .ok()
+            .unwrap_or(0)
+            == 0;
+    if coa_no_upcoming {
+        info!("Forcing CoA scraper — 0 upcoming Court of Appeal sittings");
+    }
     let coa_sittings_stale = coa_sitting_date
         .map(|d| today - d > stale_threshold)
         .unwrap_or(true)
         || coa_evicted > 0
-        || coa_empty;
+        || coa_empty
+        || coa_no_upcoming;
 
     // ── Parish Court sittings ────────────────────────────────────────────────
     let parish_sitting_date = queries::most_recent_sitting_date_by_court(pool, "Parish Court")
@@ -1039,31 +1049,51 @@ async fn evict_stale_court_list_pdfs(
             }
         }
         Ok(_) => {
-            // CoA count > 0: per-URL Civil check for any URL stored before the fix.
-            let mut coa_cleared = 0usize;
-            for url in state
-                .processed_appeal_pdf_urls
-                .iter()
-                .filter(|u| u.contains("courtofappeal.gov.jm"))
-                .cloned()
-                .collect::<Vec<_>>()
-            {
-                match queries::has_any_civil_sittings_for_url(pool, &url).await {
-                    Ok(true) => {
-                        if let Err(e) = queries::delete_civil_sittings_for_url(pool, &url).await {
-                            warn!("  Failed to delete stale CoA Civil rows for {url}: {e}");
-                        }
-                        state.processed_appeal_pdf_urls.retain(|u2| u2 != &url);
-                        coa_cleared += 1;
-                    }
-                    Ok(false) => {}
-                    Err(e) => warn!("DB check failed for {url}: {e}"),
+            // CoA has rows — check whether any are upcoming.
+            // When 0 upcoming sittings exist, clear the processed-URL list so the
+            // court-lists scraper re-downloads weekly PDFs (courts update PDF content
+            // at the same URL for the new week rather than publishing a new link).
+            let upcoming = queries::count_upcoming_sittings_for_court(pool, "Court of Appeal")
+                .await
+                .ok()
+                .unwrap_or(1);
+            if upcoming == 0 {
+                let evicted = state.processed_appeal_pdf_urls.len();
+                state.processed_appeal_pdf_urls.clear();
+                if evicted > 0 {
+                    info!(
+                        "Eviction: CoA — 0 upcoming sittings, cleared {evicted} processed URL(s) \
+                         to force re-download on next court-lists run"
+                    );
                 }
+                evicted
+            } else {
+                // Per-URL Civil check for any URL stored before the fix.
+                let mut coa_cleared = 0usize;
+                for url in state
+                    .processed_appeal_pdf_urls
+                    .iter()
+                    .filter(|u| u.contains("courtofappeal.gov.jm"))
+                    .cloned()
+                    .collect::<Vec<_>>()
+                {
+                    match queries::has_any_civil_sittings_for_url(pool, &url).await {
+                        Ok(true) => {
+                            if let Err(e) = queries::delete_civil_sittings_for_url(pool, &url).await {
+                                warn!("  Failed to delete stale CoA Civil rows for {url}: {e}");
+                            }
+                            state.processed_appeal_pdf_urls.retain(|u2| u2 != &url);
+                            coa_cleared += 1;
+                        }
+                        Ok(false) => {}
+                        Err(e) => warn!("DB check failed for {url}: {e}"),
+                    }
+                }
+                if coa_cleared > 0 {
+                    info!("Eviction: CoA — evicting {coa_cleared} URL(s) with Civil sittings");
+                }
+                coa_cleared
             }
-            if coa_cleared > 0 {
-                info!("Eviction: CoA — evicting {coa_cleared} URL(s) with Civil sittings");
-            }
-            coa_cleared
         }
         Err(e) => { warn!("CoA sitting count failed: {e}"); 0 }
     };

@@ -478,6 +478,7 @@ export const apiClient = {
     category?: string;
     page?: number;
     limit?: number;
+    date_from?: string;
   }): Promise<{ cases: ParishCourtCase[]; total: number }> {
     const params = new URLSearchParams();
     if (opts?.parish) params.set("parish", opts.parish);
@@ -485,6 +486,7 @@ export const apiClient = {
     if (opts?.category) params.set("category", opts.category);
     if (opts?.page) params.set("page", String(opts.page));
     if (opts?.limit) params.set("limit", String(opts.limit));
+    if (opts?.date_from) params.set("date_from", opts.date_from);
     const qs = params.toString();
     return request(`/parish-cases${qs ? `?${qs}` : ""}`);
   },

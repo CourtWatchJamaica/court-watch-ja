@@ -2,6 +2,7 @@ use axum::{
     extract::{Path, Query, State},
     Json,
 };
+use chrono::NaiveDate;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
@@ -13,6 +14,8 @@ pub struct CasesQuery {
     pub q: Option<String>,
     pub page: Option<i64>,
     pub limit: Option<i64>,
+    /// Filter: return only cases where week_of >= this date (YYYY-MM-DD).
+    pub date_from: Option<String>,
 }
 
 pub async fn list_parish_cases(
@@ -21,6 +24,26 @@ pub async fn list_parish_cases(
 ) -> Json<Value> {
     let page = params.page.unwrap_or(1).max(1);
     let limit = params.limit.unwrap_or(5000).clamp(1, 5000);
+
+    // If date_from is provided, use the week-filtered query.
+    if let Some(ref df) = params.date_from {
+        if let Ok(week_from) = NaiveDate::parse_from_str(df, "%Y-%m-%d") {
+            return match queries::list_parish_cases_from_week(
+                &state.db,
+                week_from,
+                params.parish.as_deref(),
+                limit,
+            )
+            .await
+            {
+                Ok((cases, total)) => Json(json!({ "cases": cases, "total": total })),
+                Err(e) => {
+                    tracing::error!("list_parish_cases_from_week error: {e}");
+                    Json(json!({ "cases": [], "total": 0 }))
+                }
+            };
+        }
+    }
 
     match queries::list_parish_cases(
         &state.db,

@@ -402,8 +402,9 @@ pub async fn list_judgments(
         .unwrap_or_default();
     let has_fts = query.map_or(false, |q| !q.trim().is_empty());
     // Court constraint is bypassed when a judge or tag filter is active.
+    // When active but no specific court is chosen, all courts are returned
+    // and the ORDER BY applies court priority instead.
     let use_court = judge.is_none() && tags.is_empty();
-    let effective_court = if use_court { court.unwrap_or("Supreme Court") } else { "" };
 
     // ── COUNT ──────────────────────────────────────────────────────────────
     let mut cq: QueryBuilder<sqlx::Postgres> =
@@ -414,8 +415,10 @@ pub async fn list_judgments(
         cq.push(")");
     }
     if use_court {
-        cq.push(" AND court = ");
-        cq.push_bind(effective_court);
+        if let Some(c) = court {
+            cq.push(" AND court = ");
+            cq.push_bind(c);
+        }
     }
     if let Some(j) = judge {
         cq.push(" AND judge_name IS NOT NULL AND ");
@@ -462,8 +465,10 @@ pub async fn list_judgments(
         dq.push(")");
     }
     if use_court {
-        dq.push(" AND court = ");
-        dq.push_bind(effective_court);
+        if let Some(c) = court {
+            dq.push(" AND court = ");
+            dq.push_bind(c);
+        }
     }
     if let Some(j) = judge {
         dq.push(" AND judge_name IS NOT NULL AND ");
@@ -491,6 +496,15 @@ pub async fn list_judgments(
         dq.push(" ORDER BY ts_rank(search_vector, websearch_to_tsquery('english', ");
         dq.push_bind(query.unwrap().trim());
         dq.push(")) DESC, date DESC NULLS LAST");
+    } else if use_court && court.is_none() {
+        dq.push(
+            " ORDER BY CASE court \
+               WHEN 'Supreme Court'  THEN 1 \
+               WHEN 'Court of Appeal' THEN 2 \
+               WHEN 'Parish Court'   THEN 3 \
+               ELSE 4 \
+             END, date DESC NULLS LAST, created_at DESC",
+        );
     } else {
         dq.push(" ORDER BY date DESC NULLS LAST, created_at DESC");
     }
@@ -1238,9 +1252,17 @@ pub async fn list_court_sittings(
     if has_fts {
         dq.push(" ORDER BY ts_rank(search_vector, websearch_to_tsquery('english', ");
         dq.push_bind(query.unwrap().trim());
-        dq.push(")) DESC, event_date DESC NULLS LAST");
+        dq.push(")) DESC, event_date ASC NULLS LAST");
+    } else if court.is_none() {
+        dq.push(
+            " ORDER BY CASE \
+               WHEN court_division ILIKE '%Appeal%'  THEN 2 \
+               WHEN court_division ILIKE '%Parish%'  THEN 3 \
+               ELSE 1 \
+             END, event_date ASC, event_time NULLS LAST",
+        );
     } else {
-        dq.push(" ORDER BY event_date, event_time NULLS LAST");
+        dq.push(" ORDER BY event_date ASC, event_time NULLS LAST");
     }
     dq.push(" LIMIT ");
     dq.push_bind(limit);
@@ -2251,6 +2273,49 @@ pub async fn list_parish_cases(
     Ok((rows, total))
 }
 
+/// Count court_sittings rows for `court` (using the same filter as list_court_sittings)
+/// where event_date >= today.  Used to detect when no upcoming sittings exist for a court.
+pub async fn count_upcoming_sittings_for_court(pool: &PgPool, court: &str) -> sqlx::Result<i64> {
+    let filter = sitting_court_filter(court);
+    let sql = format!(
+        "SELECT COUNT(*) FROM court_sittings WHERE event_date >= CURRENT_DATE AND {filter}"
+    );
+    sqlx::query_scalar(&sql).fetch_one(pool).await
+}
+
+/// Returns parish_court_cases where week_of >= `week_from`, optionally filtered by parish.
+pub async fn list_parish_cases_from_week(
+    pool: &PgPool,
+    week_from: NaiveDate,
+    parish: Option<&str>,
+    limit: i64,
+) -> sqlx::Result<(Vec<ParishCourtCase>, i64)> {
+    use sqlx::QueryBuilder;
+
+    let mut cq: QueryBuilder<sqlx::Postgres> =
+        QueryBuilder::new("SELECT COUNT(*) FROM parish_court_cases WHERE week_of >= ");
+    cq.push_bind(week_from);
+    if let Some(p) = parish {
+        cq.push(" AND parish = ");
+        cq.push_bind(p);
+    }
+    let total: i64 = cq.build_query_scalar().fetch_one(pool).await?;
+
+    let mut dq: QueryBuilder<sqlx::Postgres> = QueryBuilder::new(format!(
+        "SELECT {PC} FROM parish_court_cases WHERE week_of >= "
+    ));
+    dq.push_bind(week_from);
+    if let Some(p) = parish {
+        dq.push(" AND parish = ");
+        dq.push_bind(p);
+    }
+    dq.push(" ORDER BY week_of ASC, parish, id LIMIT ");
+    dq.push_bind(limit);
+
+    let rows = dq.build_query_as::<ParishCourtCase>().fetch_all(pool).await?;
+    Ok((rows, total))
+}
+
 pub async fn parish_summary(pool: &PgPool) -> sqlx::Result<Vec<ParishSummary>> {
     sqlx::query_as::<_, ParishSummary>(
         "SELECT parish AS name, COUNT(*) AS total_cases
@@ -2378,14 +2443,51 @@ pub async fn get_preview_judgments(pool: &PgPool) -> sqlx::Result<Vec<Judgment>>
 }
 
 pub async fn get_preview_sittings(pool: &PgPool) -> sqlx::Result<Vec<CourtSitting>> {
-    sqlx::query_as::<_, CourtSitting>(
-        "SELECT id, case_number, title, judge_name, court_division, event_type, \
-         event_date, event_time, lawyers, pdf_source_url, created_at \
-         FROM court_sittings WHERE event_date >= CURRENT_DATE \
-         ORDER BY event_date ASC, id ASC LIMIT 3",
+    // Prefer upcoming court sittings; fill any remaining slots from parish court cases.
+    let cs: Vec<CourtSitting> = sqlx::query_as(
+        &format!(
+            "SELECT {S} FROM court_sittings \
+             WHERE event_date >= CURRENT_DATE ORDER BY event_date ASC, id ASC LIMIT 3"
+        ),
     )
     .fetch_all(pool)
-    .await
+    .await?;
+
+    if cs.len() >= 3 {
+        return Ok(cs);
+    }
+
+    let remaining = (3 - cs.len() as i64).max(0);
+    let parish_rows = sqlx::query(
+        "SELECT id, parish, status, week_of, pdf_source_url, accused_name, created_at \
+         FROM parish_court_cases \
+         WHERE week_of >= date_trunc('week', CURRENT_DATE) \
+         ORDER BY week_of ASC, id ASC LIMIT $1",
+    )
+    .bind(remaining)
+    .fetch_all(pool)
+    .await?;
+
+    let mut result = cs;
+    for row in parish_rows {
+        use sqlx::Row;
+        let created_at: Option<NaiveDateTime> = row.try_get("created_at").ok();
+        result.push(CourtSitting {
+            id:             row.get("id"),
+            case_number:    None,
+            title:          Some(format!("{} Parish Court", row.get::<String, _>("parish"))),
+            judge_name:     None,
+            court_division: Some("Parish Court".to_string()),
+            event_type:     row.get("status"),
+            event_date:     row.get("week_of"),
+            event_time:     None,
+            lawyers:        row.get("accused_name"),
+            pdf_source_url: row.get("pdf_source_url"),
+            created_at:     created_at.unwrap_or_else(|| chrono::Utc::now().naive_utc()),
+            snippet:        None,
+        });
+    }
+    Ok(result)
 }
 
 // ── Promos ────────────────────────────────────────────────────────────────────

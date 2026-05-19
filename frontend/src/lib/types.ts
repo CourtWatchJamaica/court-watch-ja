@@ -84,6 +84,8 @@ export interface CourtSitting {
   pdf_source_url: string | null;
   created_at: string;
   snippet?: string | null;
+  /** Frontend-only: marks rows adapted from parish_court_cases. */
+  _source?: "parish";
 }
 
 export interface UserCase {

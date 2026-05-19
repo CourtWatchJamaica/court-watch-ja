@@ -9,7 +9,7 @@ import CaseCard from "@/components/CaseCard";
 import SittingCard from "@/components/SittingCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiClient } from "@/lib/api";
-import { Judgment, CourtSitting } from "@/lib/types";
+import { Judgment, CourtSitting, ParishCourtCase } from "@/lib/types";
 import { useTracking } from "@/lib/tracking-context";
 import { SLUG_TO_COURT, COURT_TO_SLUG, type Court } from "@/lib/court-context";
 import {
@@ -26,10 +26,6 @@ import {
 } from "lucide-react";
 
 const LIMIT = 20;
-
-const TODAY = typeof window !== "undefined"
-  ? new Date().toLocaleDateString("en-CA", { timeZone: "America/Jamaica" })
-  : "";
 
 type Tab = "judgments" | "sittings";
 
@@ -75,6 +71,45 @@ function countActiveFilters(f: Filters): number {
     (f.caseNumber ? 1 : 0) +
     f.tags.length
   );
+}
+
+// ── Parish case helpers ──────────────────────────────────────────────────────
+
+function getWeekMonday(): string {
+  const str = new Date().toLocaleDateString("en-CA", { timeZone: "America/Jamaica" });
+  const [y, m, d] = str.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  const day = date.getUTCDay();
+  date.setUTCDate(date.getUTCDate() + (day === 0 ? -6 : 1 - day));
+  return date.toISOString().split("T")[0];
+}
+
+function adaptParishCase(c: ParishCourtCase): CourtSitting {
+  return {
+    id: c.id,
+    case_number: null,
+    title: c.accused_name
+      ? `${c.accused_name} — ${c.parish} Parish Court`
+      : `${c.parish} Parish Court`,
+    judge_name: null,
+    court_division: "Parish Court",
+    event_type: c.status ?? null,
+    event_date: c.week_of ?? null,
+    event_time: null,
+    lawyers: null,
+    pdf_source_url: c.pdf_source_url ?? null,
+    created_at: c.created_at,
+    snippet: c.offence ?? null,
+    _source: "parish",
+  };
+}
+
+function sortByEventDate(items: CourtSitting[]): CourtSitting[] {
+  return [...items].sort((a, b) => {
+    const da = a.event_date ?? "9999-99-99";
+    const db = b.event_date ?? "9999-99-99";
+    return da < db ? -1 : da > db ? 1 : 0;
+  });
 }
 
 // ── Tab toggle ──────────────────────────────────────────────────────────────
@@ -524,19 +559,47 @@ export default function CasesPage() {
     async (q: string, page: number, append: boolean, f: Filters) => {
       append ? setLoadingMore(true) : (setLoading(true), setSittingsPage(page));
       try {
-        const today = TODAY || new Date().toLocaleDateString("en-CA", { timeZone: "America/Jamaica" });
-        const res = await apiClient.getCourtSittings({
-          q: q || undefined,
-          court: f.court || undefined,
-          judge: f.judge || undefined,
-          case_number: f.caseNumber || undefined,
-          date_from: f.dateFrom || (q ? undefined : today),
-          date_to: f.dateTo || undefined,
-          page,
-          limit: LIMIT,
-        });
-        setSittingsTotal(res.total ?? res.sittings.length);
-        setSittings((prev) => append ? [...prev, ...res.sittings] : res.sittings);
+        const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "America/Jamaica" });
+        const weekMonday = getWeekMonday();
+        const isParishOnly = f.court === "Parish Court";
+        const includeParish = !f.court || isParishOnly;
+
+        let merged: CourtSitting[] = [];
+        let total = 0;
+
+        if (!isParishOnly) {
+          const res = await apiClient.getCourtSittings({
+            q: q || undefined,
+            court: f.court || undefined,
+            judge: f.judge || undefined,
+            case_number: f.caseNumber || undefined,
+            date_from: f.dateFrom || todayStr,
+            date_to: f.dateTo || undefined,
+            page,
+            limit: LIMIT,
+          });
+          merged = res.sittings;
+          total = res.total ?? res.sittings.length;
+        }
+
+        if (includeParish && !append) {
+          const parishRes = await apiClient.getParishCases({
+            q: q || undefined,
+            date_from: f.dateFrom || weekMonday,
+            limit: 200,
+          });
+          const adapted = parishRes.cases.map(adaptParishCase);
+          if (isParishOnly) {
+            merged = adapted;
+            total = parishRes.total ?? adapted.length;
+          } else {
+            merged = sortByEventDate([...merged, ...adapted]);
+            total += parishRes.total ?? adapted.length;
+          }
+        }
+
+        setSittingsTotal(total);
+        setSittings((prev) => append ? [...prev, ...merged] : merged);
       } catch (err) {
         console.error("Failed to fetch sittings:", err);
       } finally {
@@ -777,11 +840,19 @@ export default function CasesPage() {
                 ) : sittings.length > 0 ? (
                   sittings.map((s) => (
                     <SittingCard
-                      key={s.id}
+                      key={`${s._source ?? "cs"}-${s.id}`}
                       sitting={s}
-                      onClick={() => router.push(`/cases/sittings/${s.id}`)}
-                      isTracked={isTracked(s.id, "sitting")}
-                      onTrack={(id) => isTracked(id, "sitting") ? untrack(id) : track(id, "sitting")}
+                      onClick={() =>
+                        s._source === "parish"
+                          ? router.push(`/parish-court/${s.id}`)
+                          : router.push(`/cases/sittings/${s.id}`)
+                      }
+                      isTracked={s._source === "parish" ? false : isTracked(s.id, "sitting")}
+                      onTrack={
+                        s._source === "parish"
+                          ? undefined
+                          : (id) => isTracked(id, "sitting") ? untrack(id) : track(id, "sitting")
+                      }
                     />
                   ))
                 ) : (

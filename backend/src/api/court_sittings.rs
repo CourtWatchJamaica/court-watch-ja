@@ -2,7 +2,7 @@ use axum::{
     extract::{Path, Query, State},
     Json,
 };
-use chrono::NaiveDate;
+use chrono::{NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::{api::errors::AppError, db::{models::CourtSitting, queries}, AppState};
@@ -49,7 +49,10 @@ pub async fn list_sittings(
     let court = params.court.as_deref();
     let judge = params.judge.as_deref();
     let case_number = params.case_number.as_deref();
-    let date_from = parse_date_opt(params.date_from.as_deref())?;
+    // Default to today so the endpoint returns upcoming sittings by default.
+    // Callers can pass an explicit past date to browse historical sittings.
+    let date_from = parse_date_opt(params.date_from.as_deref())?
+        .or_else(|| Some(Utc::now().date_naive()));
     let date_to = parse_date_opt(params.date_to.as_deref())?;
 
     let (sittings, total) = queries::list_court_sittings(

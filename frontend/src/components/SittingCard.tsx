@@ -29,12 +29,25 @@ function formatSittingDate(date: string): string {
 }
 
 export default function SittingCard({ sitting, onClick, isTracked, onTrack }: SittingCardProps) {
+  const isParish = sitting._source === "parish";
+  const accentHex = isParish ? "#CD7F32" : "#FED100";
+  const accentRgb = isParish ? "205,127,50" : "254,209,0";
+
   return (
     <Card
-      className="group relative bg-[#0d0d1a] border-l-2 border-l-[#FED100]/50 border-t-white/[0.06] border-r-white/[0.06] border-b-white/[0.06] cursor-pointer overflow-hidden transition-all duration-300 hover:border-l-[#FED100] hover:bg-[#FED100]/[0.03] hover:shadow-[0_4px_24px_rgba(254,209,0,0.12)]"
+      className={[
+        "group relative bg-[#0d0d1a] border-l-2 border-t-white/[0.06] border-r-white/[0.06] border-b-white/[0.06] cursor-pointer overflow-hidden transition-all duration-300",
+        isParish
+          ? "border-l-[#CD7F32]/50 hover:border-l-[#CD7F32] hover:bg-[#CD7F32]/[0.03]"
+          : "border-l-[#FED100]/50 hover:border-l-[#FED100] hover:bg-[#FED100]/[0.03]",
+      ].join(" ")}
+      style={{ ["--hover-shadow" as string]: `0 4px 24px rgba(${accentRgb},0.12)` }}
       onClick={onClick}
     >
-      <div className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-br from-[#FED100]/[0.04] via-transparent to-transparent" />
+      <div
+        className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-br via-transparent to-transparent"
+        style={{ backgroundImage: `linear-gradient(to bottom right, ${accentHex}0a, transparent, transparent)` }}
+      />
 
       <CardHeader className="pb-2 pt-4 px-4">
         <div className="flex items-start justify-between gap-3">
@@ -43,14 +56,24 @@ export default function SittingCard({ sitting, onClick, isTracked, onTrack }: Si
               {sitting.title || sitting.case_number || "Untitled Sitting"}
             </h3>
             {sitting.case_number && sitting.title && (
-              <p className="mt-1 text-[10px] font-mono text-[#FED100]/50 break-all whitespace-normal">
+              <p
+                className="mt-1 text-[10px] font-mono break-all whitespace-normal"
+                style={{ color: `${accentHex}80` }}
+              >
                 {sitting.case_number}
               </p>
             )}
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
             {sitting.event_type && (
-              <Badge className="bg-[#FED100]/10 text-[#FED100] border border-[#FED100]/25 text-[10px] font-medium px-1.5 py-0 h-5 rounded-md whitespace-nowrap">
+              <Badge
+                className="text-[10px] font-medium px-1.5 py-0 h-5 rounded-md whitespace-nowrap border"
+                style={{
+                  backgroundColor: `${accentHex}1a`,
+                  color: accentHex,
+                  borderColor: `${accentHex}40`,
+                }}
+              >
                 {sitting.event_type}
               </Badge>
             )}
@@ -75,7 +98,10 @@ export default function SittingCard({ sitting, onClick, isTracked, onTrack }: Si
                 </button>
               )
             )}
-            <ArrowUpRight className="h-3.5 w-3.5 text-white/20 group-hover:text-[#FED100]/60 transition-colors shrink-0" />
+            <ArrowUpRight
+              className="h-3.5 w-3.5 text-white/20 transition-colors shrink-0 group-hover:opacity-60"
+              style={{ ["--tw-text-opacity" as string]: "1" }}
+            />
           </div>
         </div>
       </CardHeader>
@@ -121,7 +147,10 @@ export default function SittingCard({ sitting, onClick, isTracked, onTrack }: Si
         )}
       </CardContent>
 
-      <div className="absolute bottom-0 left-0 h-[1.5px] w-0 group-hover:w-full transition-all duration-500 ease-out bg-gradient-to-r from-[#FED100] via-[#FED100]/60 to-transparent" />
+      <div
+        className="absolute bottom-0 left-0 h-[1.5px] w-0 group-hover:w-full transition-all duration-500 ease-out"
+        style={{ backgroundImage: `linear-gradient(to right, ${accentHex}, ${accentHex}99, transparent)` }}
+      />
     </Card>
   );
 }
