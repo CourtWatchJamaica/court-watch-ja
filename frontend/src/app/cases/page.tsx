@@ -418,21 +418,29 @@ function SkeletonCard() {
 function EmptyState({
   tab,
   hasQuery,
+  caseNumberSearch,
   onClear,
 }: {
   tab: Tab;
   hasQuery: boolean;
+  caseNumberSearch?: boolean;
   onClear: () => void;
 }) {
   if (hasQuery) {
+    const headline = caseNumberSearch && tab === "sittings"
+      ? "Case not found in Supreme Court or Court of Appeal records"
+      : "No results found";
+    const sub = caseNumberSearch && tab === "sittings"
+      ? "This case number does not appear in our Supreme Court or Court of Appeal listings. Parish Court cases are tracked separately."
+      : "Try different keywords or adjust your filters.";
     return (
       <div className="col-span-full flex flex-col items-center justify-center rounded-2xl border border-border bg-card py-20 text-center px-8">
         <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/50 ring-1 ring-border">
           <SearchX className="h-7 w-7 text-muted-foreground/40" />
         </div>
-        <p className="text-sm font-semibold text-muted-foreground">No results found</p>
-        <p className="mt-1.5 text-xs text-muted-foreground/60 max-w-[220px] leading-relaxed">
-          Try different keywords or adjust your filters.
+        <p className="text-sm font-semibold text-muted-foreground">{headline}</p>
+        <p className="mt-1.5 text-xs text-muted-foreground/60 max-w-[280px] leading-relaxed">
+          {sub}
         </p>
         <button
           onClick={onClear}
@@ -566,7 +574,10 @@ export default function CasesPage() {
         const todayStr = new Date().toLocaleDateString("en-CA");
         const weekMonday = getWeekMonday();
         const isParishOnly = f.court === "Parish Court";
-        const includeParish = !f.court || isParishOnly;
+        // Never fall back to parish data when the user is searching by case number —
+        // our parish court scraper doesn't capture case numbers, so a parish match
+        // would be misleading and the user should see a clear "not found" message.
+        const includeParish = (!f.court || isParishOnly) && !f.caseNumber;
 
         let merged: CourtSitting[] = [];
         let total = 0;
@@ -864,7 +875,12 @@ export default function CasesPage() {
                     />
                   ))
                 ) : (
-                  <EmptyState tab="sittings" hasQuery={hasQuery} onClear={handleClearAll} />
+                  <EmptyState
+                    tab="sittings"
+                    hasQuery={hasQuery}
+                    caseNumberSearch={!!filters.caseNumber}
+                    onClear={handleClearAll}
+                  />
                 )}
               </div>
 
