@@ -16,6 +16,15 @@ impl Config {
     pub fn from_env() -> anyhow::Result<Self> {
         dotenvy::dotenv().ok();
 
+        let resend_api_key = env::var("RESEND_API_KEY").ok();
+        if resend_api_key.is_none() {
+            tracing::warn!("[Config] RESEND_API_KEY is not set — transactional emails will be DISABLED");
+        }
+        let resend_domain = env::var("RESEND_DOMAIN").ok();
+        if resend_domain.as_deref().map(|d| d.trim().is_empty()).unwrap_or(true) {
+            tracing::warn!("[Config] RESEND_DOMAIN is not set — emails will fall back to @resend.dev (dev-only sender, won't reach real users)");
+        }
+
         let judgment_cutoff_date =
             env::var("JUDGMENT_CUTOFF_DATE").unwrap_or_else(|_| "2026-01-01".to_string());
         let cutoff = NaiveDate::parse_from_str(&judgment_cutoff_date, "%Y-%m-%d")
@@ -35,7 +44,7 @@ impl Config {
             scraper_state_path: env::var("SCRAPER_STATE_PATH")
                 .unwrap_or_else(|_| "./scraper_state.json".to_string()),
             pdf_dir: env::var("PDF_DIR").unwrap_or_else(|_| "./pdfs".to_string()),
-            resend_api_key: env::var("RESEND_API_KEY").ok(),
+            resend_api_key,
         })
     }
 }

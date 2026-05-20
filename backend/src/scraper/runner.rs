@@ -16,7 +16,7 @@ use crate::{config::Config, db::queries};
 pub async fn start(pool: PgPool, config: Arc<Config>) -> anyhow::Result<()> {
     let sched = JobScheduler::new().await?;
 
-    // ── Mon / Wed / Fri at 06:00 UTC ──────────────────────────────────────
+    // ── Mon / Wed / Fri at 06:00 UTC — full scrape (judgments + court lists) ─
     {
         let pool = pool.clone();
         let config = config.clone();
@@ -31,6 +31,29 @@ pub async fn start(pool: PgPool, config: Arc<Config>) -> anyhow::Result<()> {
                 }
             })
         })?;
+
+        sched.add(job).await?;
+    }
+
+    // ── Court-lists-only refresh at 10:00, 14:00, 18:00 UTC Mon–Fri ──────────
+    // Catches addenda and amended lists published after the 06:00 full run.
+    {
+        let pool = pool.clone();
+        let config = config.clone();
+
+        let job = Job::new_async(
+            "0 0 10,14,18 * * Mon,Tue,Wed,Thu,Fri",
+            move |_uuid, _lock| {
+                let pool = pool.clone();
+                let config = config.clone();
+                Box::pin(async move {
+                    info!("=== Court-lists refresh starting ===");
+                    if let Err(e) = run_court_lists(&pool, &config).await {
+                        error!("Court-lists refresh failed: {e}");
+                    }
+                })
+            },
+        )?;
 
         sched.add(job).await?;
     }
@@ -51,7 +74,46 @@ pub async fn start(pool: PgPool, config: Arc<Config>) -> anyhow::Result<()> {
     }
 
     sched.start().await?;
-    info!("Cron scheduler started — judgments+courts scraped Mon/Wed/Fri 06:00 UTC, news daily 08:00 UTC");
+    info!(
+        "Cron scheduler started — full scrape Mon/Wed/Fri 06:00 UTC, \
+         court-lists refresh Mon–Fri 10:00/14:00/18:00 UTC, news daily 08:00 UTC"
+    );
+    Ok(())
+}
+
+/// Court-lists-only refresh — runs every 4 h on weekdays to catch addenda
+/// published after the main morning scrape.
+async fn run_court_lists(pool: &PgPool, config: &Config) -> anyhow::Result<()> {
+    let client = super::http_client()?;
+    let mut state = ScraperState::load_from_db(pool, &config.scraper_state_path).await;
+
+    let (sc_evicted, coa_evicted) = evict_stale_court_list_pdfs(pool, &mut state).await;
+    if sc_evicted + coa_evicted > 0 {
+        state.save_to_db(pool).await.ok();
+    }
+
+    if let Err(e) = court_lists::run(pool, &mut state, &client, &config.pdf_dir).await {
+        error!("Court-lists refresh (SC) error: {e}");
+    }
+    if let Err(e) = appeal_court_lists::run(pool, &mut state, &client, &config.pdf_dir).await {
+        error!("Court-lists refresh (CoA) error: {e}");
+    }
+
+    state.save_to_db(pool).await.ok();
+
+    {
+        let pool_n = pool.clone();
+        let client_n = client.clone();
+        let brevo_key = config.resend_api_key.clone();
+        tokio::spawn(async move {
+            crate::db::queries::check_notifications(&pool_n).await;
+            if let Some(ref key) = brevo_key {
+                dispatch_notification_emails(&pool_n, &client_n, key).await;
+            }
+        });
+    }
+
+    info!("=== Court-lists refresh complete ===");
     Ok(())
 }
 

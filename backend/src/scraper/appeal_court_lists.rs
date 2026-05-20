@@ -14,8 +14,8 @@ use tracing::{info, warn};
 
 use super::{
     court_lists::{
-        date_from_text, date_from_url, extract_pdf_links, extract_text_safe, normalize_ocr_text,
-        sanitize_filename,
+        compute_pdf_hash, date_from_text, date_from_url, extract_pdf_links, extract_text_safe,
+        normalize_ocr_text, sanitize_filename,
     },
     pdf as pdf_parser,
     ScraperState,
@@ -85,6 +85,7 @@ pub async fn run(
     let mut total_new_sittings: usize = 0;
     let mut processed_count: usize = 0;
     let mut skipped_count: usize = 0;
+    let today = chrono::Utc::now().date_naive();
 
     for link in pdf_links {
         let absolute_url = if link.starts_with("http") {
@@ -93,21 +94,50 @@ pub async fn run(
             format!("{BASE_URL}{link}")
         };
 
-        if state.appeal_pdf_already_processed(&absolute_url) {
-            info!("[CoA Hearings] Skipping already-processed PDF: {absolute_url}");
-            skipped_count += 1;
-            continue;
+        let already_processed = state.appeal_pdf_already_processed(&absolute_url);
+
+        // Fast-path: skip old PDFs (>14 days) that were already processed.
+        if already_processed {
+            let is_recent = date_from_url(&absolute_url)
+                .map(|d| (today - d).num_days() <= 14)
+                .unwrap_or(true);
+            if !is_recent {
+                info!("[CoA Hearings] Skipping already-processed old PDF: {absolute_url}");
+                skipped_count += 1;
+                continue;
+            }
         }
 
-        match process_one_pdf(pool, client, pdf_dir, &absolute_url).await {
+        let bytes = match pdf_utils::download_pdf(client, &absolute_url).await {
+            Ok(b) => b,
+            Err(e) => {
+                warn!("[CoA Hearings] Skipping {absolute_url}: {e}");
+                continue;
+            }
+        };
+
+        // Hash-based change detection for already-processed recent PDFs.
+        let current_hash = compute_pdf_hash(&bytes);
+        if already_processed {
+            if state.get_pdf_hash(&absolute_url) == Some(current_hash.as_str()) {
+                info!("[CoA Hearings] Skipping unchanged PDF: {absolute_url}");
+                skipped_count += 1;
+                continue;
+            }
+            info!("[CoA Hearings] PDF content changed — re-processing: {absolute_url}");
+            state.processed_appeal_pdf_urls.retain(|u| u != &absolute_url);
+        }
+
+        match process_pdf_bytes(pool, pdf_dir, &absolute_url, bytes).await {
             Ok(inserted) => {
                 processed_count += 1;
+                state.set_pdf_hash(absolute_url.clone(), current_hash);
                 if inserted > 0 {
                     total_new_sittings += inserted;
                     state.mark_appeal_pdf_processed(absolute_url);
                 } else {
                     info!(
-                        "[CoA Hearings] 0 new sittings from {absolute_url} — not marking as processed"
+                        "[CoA Hearings] 0 new sittings from {absolute_url} — hash recorded, not marking as processed"
                     );
                 }
             }
@@ -198,16 +228,13 @@ fn absolutize(link: String) -> String {
     }
 }
 
-async fn process_one_pdf(
+async fn process_pdf_bytes(
     pool: &PgPool,
-    client: &reqwest::Client,
     pdf_dir: &str,
     absolute_url: &str,
+    bytes: Vec<u8>,
 ) -> anyhow::Result<usize> {
     let filename = sanitize_filename(absolute_url);
-    info!("[CoA Hearings] Downloading: {filename}");
-
-    let bytes = pdf_utils::download_pdf(client, absolute_url).await?;
 
     let save_path = Path::new(pdf_dir).join(&filename);
     tokio::fs::create_dir_all(pdf_dir).await.ok();

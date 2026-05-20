@@ -1935,14 +1935,17 @@ pub async fn check_notifications(pool: &PgPool) {
 /// Find an existing user by email or create a new one for an OAuth sign-in.
 /// OAuth users are assigned an unguessable password hash so they can never
 /// log in via the password flow.
+/// Returns `(user, is_new)`. `is_new` is `true` only when the account was
+/// created by this call — callers use it to gate one-time actions like a
+/// welcome email.
 pub async fn find_or_create_oauth_user(
     pool: &PgPool,
     email: &str,
     display_name: Option<&str>,
-) -> sqlx::Result<User> {
+) -> sqlx::Result<(User, bool)> {
     // Fast path: existing user
     if let Some(u) = find_user_by_email(pool, email).await? {
-        return Ok(u);
+        return Ok((u, false));
     }
 
     // Create; ON CONFLICT DO NOTHING guards against a race.
@@ -1958,13 +1961,14 @@ pub async fn find_or_create_oauth_user(
     .await?;
 
     if let Some(u) = maybe {
-        return Ok(u);
+        return Ok((u, true));
     }
 
     // ON CONFLICT fired — another request beat us; just fetch.
-    find_user_by_email(pool, email)
+    let u = find_user_by_email(pool, email)
         .await?
-        .ok_or(sqlx::Error::RowNotFound)
+        .ok_or(sqlx::Error::RowNotFound)?;
+    Ok((u, false))
 }
 
 // ── Email verification ─────────────────────────────────────────────────────

@@ -45,8 +45,14 @@ pub fn parse_court_list_text(text: &str, pdf_date: Option<NaiveDate>) -> Vec<Sit
     )
     .unwrap();
 
-    // Civil case number: 2024/HCV/00123
+    // Civil case number (slash format): 2024/HCV/00123
     let re_case_civ = Regex::new(r"\b(\d{4})/([A-Z]+)/(\d+[A-Z]?)\b").unwrap();
+
+    // Legacy civil case number (year-first, no slashes): 2016HCV05029
+    //   Used for pre-2019 HCV/FD/CD/M cases and all Master's court matters.
+    //   Pattern: 4-digit year, 1-4 uppercase division letters, 4-6 digit serial.
+    //   normalize_ocr_text() collapses any OCR spaces before we reach this check.
+    let re_case_legacy = Regex::new(r"(?-i)\b(\d{4})([A-Z]{1,4})(\d{4,6})\b").unwrap();
 
     // Day-of-week date header: "MONDAY 27TH APRIL 2026" or "WEDNESDAY 29TH APRIL 2026"
     let re_day_header = Regex::new(
@@ -172,7 +178,7 @@ pub fn parse_court_list_text(text: &str, pdf_date: Option<NaiveDate>) -> Vec<Sit
             continue;
         }
 
-        // ── Civil case number (more specific — checked first) ─────────────────
+        // ── Civil case number — slash format (checked first) ──────────────────
         if let Some(case_num) = try_extract_civil(line, &re_case_civ) {
             if skip_next_case {
                 skip_next_case = false;
@@ -184,7 +190,20 @@ pub fn parse_court_list_text(text: &str, pdf_date: Option<NaiveDate>) -> Vec<Sit
             continue;
         }
 
-        // ── Commercial case number ────────────────────────────────────────────
+        // ── Legacy civil case number — year-first, no slashes ─────────────────
+        // Handles pre-2019 HCV/FD/CD/M cases: 2016HCV05029, 2012M02155, etc.
+        if let Some(case_num) = try_extract_legacy_civil(line, &re_case_legacy) {
+            if skip_next_case {
+                skip_next_case = false;
+                continue;
+            }
+            flush(&mut current, &mut entries, &current_judge);
+            current = new_entry(case_num, current_date, current_time, &current_judge, &current_section, &current_division);
+            skip_next_case = false;
+            continue;
+        }
+
+        // ── Commercial case number — SU-prefix format ─────────────────────────
         if let Some(case_num) = try_extract_commercial(line, &re_case_com) {
             if skip_next_case {
                 skip_next_case = false;
@@ -312,6 +331,26 @@ fn try_parse_time(line: &str, re: &Regex) -> Option<NaiveTime> {
 fn try_extract_civil(line: &str, re: &Regex) -> Option<String> {
     let cap = re.captures(line)?;
     Some(format!("{}/{}/{}", &cap[1], cap[2].to_uppercase(), &cap[3]))
+}
+
+/// Matches year-first no-slash case numbers: 2016HCV05029, 2012M02155, 2014FD00234.
+/// Returns the case number as-is (no slashes added) to match how the SC website
+/// stores and displays pre-2019 cases.
+fn try_extract_legacy_civil(line: &str, re: &Regex) -> Option<String> {
+    let cap = re.captures(line)?;
+    let year: u32 = cap[1].parse().ok()?;
+    if year < 2000 || year > 2035 {
+        return None;
+    }
+    let div = cap[2].to_uppercase();
+    // Exclude month name abbreviations (e.g. "2026MAY18" is a date, not a case number).
+    if matches!(
+        div.as_str(),
+        "JAN" | "FEB" | "MAR" | "APR" | "MAY" | "JUN" | "JUL" | "AUG" | "SEP" | "OCT" | "NOV" | "DEC"
+    ) {
+        return None;
+    }
+    Some(format!("{year}{div}{}", &cap[3]))
 }
 
 fn try_extract_commercial(line: &str, re: &Regex) -> Option<String> {
@@ -489,6 +528,16 @@ fn clean_judge_name(raw: &str) -> String {
             return format!("Hon. Justice {name}");
         }
     }
+    // Masters of the Supreme Court — different title, not "Justice"
+    let master_prefixes = [
+        "MASTER MISS ", "MASTER MRS. ", "MASTER MR. ", "MASTER MS. ", "MASTER ",
+    ];
+    for p in &master_prefixes {
+        if upper.starts_with(p) {
+            let name = normalize_name_case(raw[p.len()..].trim());
+            return format!("Master {name}");
+        }
+    }
     format!("Hon. Justice {}", normalize_name_case(raw.trim()))
 }
 
@@ -538,4 +587,79 @@ fn line_is_directive(line: &str) -> bool {
         || lower.starts_with("date")
         || lower.starts_with("court")
         || line.len() < 4
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn legacy_civil_case_numbers_are_parsed() {
+        // Minimal PDF excerpt matching real Civil Division format
+        let text = "ACTION MATTERS\n\
+                    CIVIL: COURT NO. 14\n\
+                    COR: THE HONOURABLE MRS. JUSTICE A. PETTIGREW-COLLINS\n\
+                    CLERK: MISS T. GRIZZLE\n\
+                    MONDAY, 18TH MAY, 2026\n\
+                    2016HCV05029\n\
+                    Ethiopian Zion Optic Church Vs Golden Grove Sugar Company Ltd & Anor\n\
+                    Event: Defendant's application to set aside claim (Part heard)\n\
+                    Wright Legal: DunnCox: Carol Davis\n\
+                    COR: MASTER MISS R. HARRIS\n\
+                    CLERK: MR. R. L. SMITH\n";
+
+        let entries = parse_court_list_text(text, None);
+        let case = entries.iter().find(|e| {
+            e.case_number.as_deref() == Some("2016HCV05029")
+        });
+        assert!(case.is_some(), "2016HCV05029 should be parsed but was not found");
+        let e = case.unwrap();
+        assert!(e.title.as_deref().map(|t| t.contains("Ethiopian")).unwrap_or(false),
+                "title should contain 'Ethiopian'");
+    }
+
+    #[test]
+    fn masters_case_number_is_parsed() {
+        let text = "ACTION MATTERS\n\
+                    MONDAY, 18TH MAY, 2026\n\
+                    COR: MASTER MISS R. HARRIS\n\
+                    2012M02155\n\
+                    Smith Vs Jones\n\
+                    Event: Case management conference\n";
+
+        let entries = parse_court_list_text(text, None);
+        let case = entries.iter().find(|e| e.case_number.as_deref() == Some("2012M02155"));
+        assert!(case.is_some(), "2012M02155 (Master's case) should be parsed");
+    }
+
+    #[test]
+    fn master_judge_title_normalised() {
+        assert_eq!(clean_judge_name("MASTER MISS R. HARRIS"), "Master R. Harris");
+        assert_eq!(clean_judge_name("MASTER MR. B. SCOTT"), "Master B. Scott");
+    }
+
+    #[test]
+    fn legacy_regex_does_not_match_month_names() {
+        // "2026MAY18" should NOT be treated as a case number
+        let re = Regex::new(r"(?-i)\b(\d{4})([A-Z]{1,4})(\d{4,6})\b").unwrap();
+        let text = "18TH MAY 2026";
+        // The regex might find sub-matches in non-line-isolated text; the real
+        // filter is in try_extract_legacy_civil() which excludes month names.
+        let result = try_extract_legacy_civil(text, &re);
+        assert!(result.is_none(), "month name 'MAY' should be excluded");
+    }
+
+    #[test]
+    fn su_prefix_cases_still_parsed() {
+        let text = "ACTION MATTERS\n\
+                    MONDAY, 18TH MAY, 2026\n\
+                    COR: THE HONOURABLE MRS. JUSTICE S. WINT-BLAIR\n\
+                    SU2022CV03927\n\
+                    Myrlene Sinclair Vs Sophia Burke\n\
+                    Event: Trial in court (3 days)\n";
+
+        let entries = parse_court_list_text(text, None);
+        let case = entries.iter().find(|e| e.case_number.as_deref() == Some("SU2022CV03927"));
+        assert!(case.is_some(), "SU2022CV03927 should still be parsed");
+    }
 }

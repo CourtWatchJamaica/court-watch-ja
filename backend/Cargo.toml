@@ -26,3 +26,4 @@ regex           = "1"
 roxmltree       = "0.20"
 printpdf        = "0.5"
 uuid            = { version = "1", features = ["v4"] }
+sha2            = "0.10"

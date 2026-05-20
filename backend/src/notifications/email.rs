@@ -1,4 +1,4 @@
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 
 pub enum EmailSender {
     Auth,    // auth@{RESEND_DOMAIN}    — "CourtWatch JA Authentication"
@@ -40,6 +40,42 @@ impl EmailSender {
     }
 }
 
+pub async fn send_welcome_email(
+    client: &reqwest::Client,
+    api_key: &str,
+    to: &str,
+    display_name: Option<&str>,
+) -> anyhow::Result<()> {
+    let name = display_name.unwrap_or("there");
+    let app_url = std::env::var("APP_URL")
+        .unwrap_or_else(|_| "https://courtwatchjamaica.com".into());
+    let app_url = app_url.trim_end_matches('/');
+
+    let html = format!(
+        r#"<p>Hi {name},</p>
+<p>Welcome to <strong>CourtWatch JA</strong> — Jamaica's most comprehensive court tracker.</p>
+<p>You can now:</p>
+<ul>
+  <li>Search Supreme Court and Court of Appeal judgments</li>
+  <li>Browse upcoming court sittings and cause lists</li>
+  <li>Track cases and receive email alerts when they're updated</li>
+</ul>
+<p><a href="{app_url}">Go to your dashboard →</a></p>
+<p>If you have any questions, reply to this email or contact us at <a href="mailto:courtwatchjamaica@protonmail.com">courtwatchjamaica@protonmail.com</a>.</p>
+<p>— The CourtWatch JA team</p>"#
+    );
+
+    send_email(
+        client,
+        api_key,
+        EmailSender::Auth,
+        to,
+        "Welcome to CourtWatch JA!",
+        &html,
+    )
+    .await
+}
+
 pub async fn send_email(
     client: &reqwest::Client,
     api_key: &str,
@@ -73,7 +109,8 @@ pub async fn send_email(
     } else {
         let status = res.status();
         let body = res.text().await.unwrap_or_default();
-        warn!("[Email] Resend {status} for {to}: {body}");
+        error!("[Email] Resend rejected '{subject}' to {to} — HTTP {status}: {body}");
+        anyhow::bail!("Resend API error {status}: {body}");
     }
     Ok(())
 }

@@ -149,7 +149,7 @@ pub async fn signup(
                 )
                 .await
             {
-                tracing::warn!("[Signup] Verification email failed: {e}");
+                tracing::error!("[Signup] Verification email FAILED for {to}: {e}");
             }
         });
     }
@@ -247,7 +247,7 @@ pub async fn oauth_login(
         return Err(AppError::BadRequest("Email is required".into()));
     }
 
-    let user = queries::find_or_create_oauth_user(
+    let (user, is_new) = queries::find_or_create_oauth_user(
         &state.db,
         &body.email,
         body.name.as_deref(),
@@ -256,6 +256,27 @@ pub async fn oauth_login(
     .map_err(AppError::Sqlx)?;
 
     let _ = queries::create_welcome_notification(&state.db, user.id).await;
+
+    if is_new {
+        if let Some(ref api_key) = state.config.resend_api_key {
+            let client = reqwest::Client::new();
+            let key = api_key.clone();
+            let to = user.email.clone();
+            let name = user.display_name.clone();
+            tokio::spawn(async move {
+                if let Err(e) = crate::notifications::email::send_welcome_email(
+                    &client,
+                    &key,
+                    &to,
+                    name.as_deref(),
+                )
+                .await
+                {
+                    tracing::error!("[OAuth] Welcome email FAILED for {to}: {e}");
+                }
+            });
+        }
+    }
 
     let token = jwt::encode_token(user.id, &user.email, &user.role, &state.config.jwt_secret)?;
     Ok(Json(AuthResponse { token }))
@@ -339,7 +360,7 @@ pub async fn request_password_change(
             )
             .await
             {
-                tracing::warn!("[PasswordChange] Email failed: {e}");
+                tracing::error!("[PasswordChange] Email FAILED for {email}: {e}");
             }
         });
     }

@@ -69,8 +69,7 @@ function computeStarSizes(judges: Judge[]): Map<number, number> {
 const starRadius = (size: number) => 0.5 * size;
 
 // Minimum centre-to-centre distance that avoids visual overlap.
-const minClearance = (ra: number, rb: number) =>
-  Math.max(0.7, ra + rb + 0.25);
+const minClearance = (ra: number, rb: number) => Math.max(0.7, ra + rb + 0.25);
 
 /* ── Random constellation positions (scatter view) ── */
 
@@ -213,7 +212,7 @@ function computeGalacticPositions(
     const singleR = Math.max(
       baseR,
       prevEdgeR + maxR + 0.25, // inter-ring gap: clear previous tier
-      minRingRadius(N, maxR),  // intra-ring gap: stars fit around the circle
+      minRingRadius(N, maxR), // intra-ring gap: stars fit around the circle
     );
 
     // If a single ring would balloon past 2.5× the anchor, split into two sub-rings.
@@ -384,7 +383,7 @@ function ConstellationEdge({
     const mat = new THREE.LineBasicMaterial({
       color: "#FED100",
       transparent: true,
-      opacity: 0.20,
+      opacity: 0.2,
     });
     return new THREE.Line(geo, mat);
   }, [posA, posB]);
@@ -751,7 +750,9 @@ function JudgeInfoCard({
     >
       <div
         className="h-[2px] w-full shrink-0"
-        style={{ background: `linear-gradient(to right, ${color}, transparent)` }}
+        style={{
+          background: `linear-gradient(to right, ${color}, transparent)`,
+        }}
       />
 
       <div className="p-4 shrink-0">
@@ -1139,7 +1140,9 @@ function ViewToggle({
     <button
       onClick={onToggle}
       aria-pressed={isGalactic}
-      aria-label={isGalactic ? "Switch to Scatter View" : "Switch to Galactic View"}
+      aria-label={
+        isGalactic ? "Switch to Scatter View" : "Switch to Galactic View"
+      }
       className={[
         "flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2.5 text-[13px] font-medium",
         "transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#009B3A]/50",
@@ -1200,9 +1203,7 @@ interface Props {
 export default function JudicialConstellation({ judges, connections }: Props) {
   const filteredJudges = useMemo(
     () =>
-      judges.filter(
-        (j) => !(j.court ?? "").toLowerCase().includes("parish"),
-      ),
+      judges.filter((j) => !(j.court ?? "").toLowerCase().includes("parish")),
     [judges],
   );
 

@@ -2,6 +2,7 @@ pub mod appeal_court;
 pub mod news;
 pub mod appeal_court_lists;
 pub mod court_lists;
+pub mod discovery;
 pub mod judgment_detail;
 pub mod judgments;
 pub mod judges;
@@ -74,6 +75,16 @@ pub struct ScraperState {
     #[serde(default)]
     pub processed_parish_case_pdf_urls: Vec<String>,
 
+    /// SHA-256 hashes of court-list PDFs keyed by URL.
+    /// Used to detect when a court publishes an updated PDF at the same URL (common
+    /// for weekly lists that are amended in-place after the initial publication).
+    #[serde(default)]
+    pub pdf_content_hashes: HashMap<String, String>,
+
+    /// Number of consecutive scraper runs that returned 0 PDF links from the index page.
+    /// Triggers an alert email/log when it reaches 2+ so admins know the site may have changed.
+    #[serde(default)]
+    pub consecutive_zero_pdf_runs: u32,
 }
 
 impl ScraperState {
@@ -170,6 +181,20 @@ impl ScraperState {
 
     pub fn parish_case_pdf_already_processed(&self, url: &str) -> bool {
         self.processed_parish_case_pdf_urls.iter().any(|u| u == url)
+    }
+
+    // ── PDF content-hash helpers ─────────────────────────────────────────────
+
+    pub fn get_pdf_hash(&self, url: &str) -> Option<&str> {
+        self.pdf_content_hashes.get(url).map(|s| s.as_str())
+    }
+
+    pub fn set_pdf_hash(&mut self, url: String, hash: String) {
+        self.pdf_content_hashes.insert(url, hash);
+    }
+
+    pub fn clear_pdf_hash(&mut self, url: &str) {
+        self.pdf_content_hashes.remove(url);
     }
 
     // ── PDF failure helpers ───────────────────────────────────────────────────

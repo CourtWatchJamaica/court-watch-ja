@@ -5,11 +5,12 @@
 use chrono::NaiveDate;
 use regex::Regex;
 use scraper::{Html, Selector};
+use sha2::{Digest, Sha256};
 use sqlx::PgPool;
 use std::path::Path;
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 
-use super::{pdf as pdf_parser, ScraperState};
+use super::{discovery, pdf as pdf_parser, ScraperState};
 use crate::{db::queries, utils::pdf as pdf_utils};
 
 const COURT_LISTS_URL: &str = "https://supremecourt.gov.jm/content/court-lists";
@@ -36,6 +37,9 @@ pub async fn run(
     };
     if !stale.is_empty() {
         info!("Removing {} stale processed-URL entries (0 sittings in DB)", stale.len());
+        for url in &stale {
+            state.clear_pdf_hash(url);
+        }
         state.processed_pdf_urls.retain(|u| !stale.contains(u));
     }
 
@@ -48,10 +52,31 @@ pub async fn run(
         .text()
         .await?;
 
-    let pdf_links = extract_pdf_links(&html);
-    info!("Found {} PDF links on court-lists page", pdf_links.len());
+    let outcome = discovery::discover_pdf_links(&html, client).await;
+    let pdf_links = outcome.links;
+    info!(
+        "Found {} PDF link(s) on court-lists page (layer {}, confidence: {})",
+        pdf_links.len(),
+        outcome.layer,
+        outcome.confidence
+    );
+
+    if pdf_links.is_empty() {
+        state.consecutive_zero_pdf_runs += 1;
+        if state.consecutive_zero_pdf_runs >= 2 {
+            error!(
+                "[ALERT] Supreme Court court-lists scraper found 0 PDF links for {} consecutive \
+                 run(s) — website structure may have changed. Snippet: {}",
+                state.consecutive_zero_pdf_runs,
+                outcome.html_snippet.as_deref().unwrap_or("(none)")
+            );
+        }
+        return Ok(());
+    }
+    state.consecutive_zero_pdf_runs = 0;
 
     let mut total_new_cases: usize = 0;
+    let today = chrono::Utc::now().date_naive();
 
     for link in pdf_links {
         let absolute_url = if link.starts_with("http") {
@@ -60,19 +85,50 @@ pub async fn run(
             format!("{BASE_URL}{link}")
         };
 
-        if state.pdf_already_processed(&absolute_url) {
-            info!("Skipping already-processed PDF: {absolute_url}");
-            continue;
+        let already_processed = state.pdf_already_processed(&absolute_url);
+
+        // Fast-path: skip old PDFs (>14 days) that were already processed.
+        // Recent PDFs are always re-downloaded to detect in-place updates.
+        if already_processed {
+            let is_recent = date_from_url(&absolute_url)
+                .map(|d| (today - d).num_days() <= 14)
+                .unwrap_or(true); // treat no-date URLs as recent (safer)
+            if !is_recent {
+                info!("Skipping already-processed old PDF: {absolute_url}");
+                continue;
+            }
         }
 
-        match process_one_pdf(pool, client, pdf_dir, &absolute_url).await {
+        let bytes = match pdf_utils::download_pdf(client, &absolute_url).await {
+            Ok(b) => b,
+            Err(e) => {
+                warn!("Skipping {absolute_url}: {e}");
+                continue;
+            }
+        };
+
+        // Hash-based change detection for already-processed recent PDFs.
+        // The court often publishes addenda by updating the same URL in-place.
+        let current_hash = compute_pdf_hash(&bytes);
+        if already_processed {
+            if state.get_pdf_hash(&absolute_url) == Some(current_hash.as_str()) {
+                info!("Skipping unchanged PDF: {absolute_url}");
+                continue;
+            }
+            info!("PDF content changed — re-processing: {absolute_url}");
+            state.processed_pdf_urls.retain(|u| u != &absolute_url);
+        }
+
+        match process_pdf_bytes(pool, pdf_dir, &absolute_url, bytes).await {
             Ok(inserted) => {
                 total_new_cases += inserted;
+                // Always store the hash so future runs can detect changes.
+                state.set_pdf_hash(absolute_url.clone(), current_hash);
                 if inserted > 0 {
                     info!("Inserted {inserted} new sittings from {absolute_url}");
                     state.mark_pdf_processed(absolute_url);
                 } else {
-                    info!("0 new sittings from {absolute_url} — not marking as processed");
+                    info!("0 new sittings from {absolute_url} — hash recorded, not marking as processed");
                 }
             }
             Err(e) => {
@@ -85,15 +141,19 @@ pub async fn run(
     Ok(())
 }
 
-async fn process_one_pdf(
+/// Compute a SHA-256 fingerprint of PDF bytes for change detection.
+pub fn compute_pdf_hash(bytes: &[u8]) -> String {
+    let mut h = Sha256::new();
+    h.update(bytes);
+    format!("{:x}", h.finalize())
+}
+
+async fn process_pdf_bytes(
     pool: &PgPool,
-    client: &reqwest::Client,
     pdf_dir: &str,
     absolute_url: &str,
+    bytes: Vec<u8>,
 ) -> anyhow::Result<usize> {
-    info!("Downloading court-list PDF: {absolute_url}");
-    let bytes = pdf_utils::download_pdf(client, absolute_url).await?;
-
     let filename = sanitize_filename(absolute_url);
     let save_path = Path::new(pdf_dir).join(&filename);
     tokio::fs::create_dir_all(pdf_dir).await.ok();
@@ -108,12 +168,9 @@ async fn process_one_pdf(
         return Ok(0);
     }
 
-    // Debug: log first 2000 characters so we can see what OCR/pdf-extract produces
-    // and tune the parser accordingly.
     let preview: String = raw_text.chars().take(2000).collect();
     info!("=== OCR TEXT PREVIEW [{absolute_url}] ===\n{preview}\n=== END PREVIEW ===");
 
-    // Normalise common OCR artefacts before handing to the parser.
     let text = normalize_ocr_text(&raw_text);
 
     let event_date = date_from_url(absolute_url).or_else(|| date_from_text(&text));
@@ -179,6 +236,13 @@ pub fn normalize_ocr_text(text: &str) -> String {
         format!("{}/{}/{}", &caps[1], &caps[2], &caps[3])
     });
 
+    // Collapse OCR-spaced legacy case numbers: "2016 HCV 05029" → "2016HCV05029"
+    let re_spaced_legacy =
+        Regex::new(r"\b(\d{4})\s{1,3}([A-Z]{2,4})\s{1,3}(\d{4,6})\b").unwrap();
+    let pass2 = re_spaced_legacy.replace_all(&pass2, |caps: &regex::Captures| {
+        format!("{}{}{}", &caps[1], &caps[2], &caps[3])
+    });
+
     // Replace curly / smart quotes with straight ones.
     let pass3 = pass2
         .replace('\u{2018}', "'")
@@ -221,8 +285,16 @@ pub fn extract_pdf_links(html: &str) -> Vec<String> {
 
     for a in doc.select(&sel) {
         if let Some(href) = a.value().attr("href") {
-            let lower = href.to_lowercase();
-            if lower.ends_with(".pdf") || lower.contains("court-list") {
+            let lower_href = href.to_lowercase();
+            let link_text = a.text().collect::<String>().to_lowercase();
+            // Match by URL pattern OR by link text (catches addenda and amended lists
+            // even when the filename doesn't contain "addendum").
+            if lower_href.ends_with(".pdf")
+                || lower_href.contains("court-list")
+                || link_text.contains("addendum")
+                || link_text.contains("amended")
+                || link_text.contains("court list")
+            {
                 links.push(href.to_string());
             }
         }
