@@ -643,18 +643,96 @@ async fn dispatch_notification_emails(
 
     info!("[Email] dispatching {} notification email(s)", rows.len());
 
+    let app_url = std::env::var("APP_URL")
+        .unwrap_or_else(|_| "https://courtwatchjamaica.com".into());
+    let app_url = app_url.trim_end_matches('/');
+
     for row in rows {
+        let case_ref = row.case_number.as_deref().unwrap_or("your tracked case");
+
         let (subject, html) = match row.notification_type.as_str() {
-            "case_available" | "case_listed" | "sitting_reminder_1d" | "sitting_reminder_morning" => {
-                let subj = row.title.clone().unwrap_or_else(|| "CourtWatch JA update".into());
-                let msg = row.message.as_deref().unwrap_or("").to_owned();
+            "case_available" => {
+                let title = row.title.as_deref().unwrap_or("Case Available");
+                let subj = format!("CourtWatch JA: Judgment available — {case_ref}");
                 let body = format!(
-                    "<p>{msg}</p><p><a href=\"https://courtwatch.jm/cases\">View on CourtWatch JA</a></p>"
+                    r#"<p>Good news — a judgment for a case you are tracking is now available on CourtWatch JA.</p>
+<table style="border-collapse:collapse;margin:16px 0">
+  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Case</td><td style="padding:4px 0;font-weight:600">{case_ref}</td></tr>
+  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Title</td><td style="padding:4px 0">{title}</td></tr>
+</table>
+<p>{}</p>
+<p style="margin-top:24px"><a href="{app_url}/cases" style="background:#1d4ed8;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600">View Judgment →</a></p>"#,
+                    row.message.as_deref().unwrap_or("The judgment has been published. Click below to read the full decision.")
+                );
+                (subj, body)
+            }
+            "case_listed" => {
+                let event_type = row.event_type.as_deref().unwrap_or("hearing");
+                let court = row.court_division.as_deref().unwrap_or("the Supreme Court");
+                let date_str = row.event_date
+                    .map(|d| d.format("%A, %d %B %Y").to_string())
+                    .unwrap_or_else(|| "an upcoming date".into());
+                let subj = format!("CourtWatch JA: {case_ref} has been listed");
+                let body = format!(
+                    r#"<p>A case you are tracking has been listed for a {event_type}.</p>
+<table style="border-collapse:collapse;margin:16px 0">
+  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Case</td><td style="padding:4px 0;font-weight:600">{case_ref}</td></tr>
+  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Event</td><td style="padding:4px 0">{event_type}</td></tr>
+  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Court</td><td style="padding:4px 0">{court}</td></tr>
+  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="padding:4px 0">{date_str}</td></tr>
+</table>
+<p style="margin-top:24px"><a href="{app_url}/cases" style="background:#1d4ed8;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600">View on CourtWatch JA →</a></p>"#
+                );
+                (subj, body)
+            }
+            "sitting_reminder_1d" => {
+                let event_type = row.event_type.as_deref().unwrap_or("hearing");
+                let court = row.court_division.as_deref().unwrap_or("the Supreme Court");
+                let date_str = row.event_date
+                    .map(|d| d.format("%A, %d %B %Y").to_string())
+                    .unwrap_or_else(|| "tomorrow".into());
+                let subj = format!("CourtWatch JA: Reminder — {case_ref} is tomorrow");
+                let body = format!(
+                    r#"<p>This is a reminder that a case you are tracking is scheduled for tomorrow.</p>
+<table style="border-collapse:collapse;margin:16px 0">
+  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Case</td><td style="padding:4px 0;font-weight:600">{case_ref}</td></tr>
+  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Event</td><td style="padding:4px 0">{event_type}</td></tr>
+  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Court</td><td style="padding:4px 0">{court}</td></tr>
+  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="padding:4px 0">{date_str}</td></tr>
+</table>
+<p style="margin-top:24px"><a href="{app_url}/cases" style="background:#1d4ed8;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600">View on CourtWatch JA →</a></p>"#
+                );
+                (subj, body)
+            }
+            "sitting_reminder_morning" => {
+                let event_type = row.event_type.as_deref().unwrap_or("hearing");
+                let court = row.court_division.as_deref().unwrap_or("the Supreme Court");
+                let date_str = row.event_date
+                    .map(|d| d.format("%A, %d %B %Y").to_string())
+                    .unwrap_or_else(|| "today".into());
+                let subj = format!("CourtWatch JA: {case_ref} is today");
+                let body = format!(
+                    r#"<p>A case you are tracking is scheduled for today.</p>
+<table style="border-collapse:collapse;margin:16px 0">
+  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Case</td><td style="padding:4px 0;font-weight:600">{case_ref}</td></tr>
+  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Event</td><td style="padding:4px 0">{event_type}</td></tr>
+  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Court</td><td style="padding:4px 0">{court}</td></tr>
+  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="padding:4px 0">{date_str}</td></tr>
+</table>
+<p style="margin-top:24px"><a href="{app_url}/cases" style="background:#1d4ed8;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600">View on CourtWatch JA →</a></p>"#
                 );
                 (subj, body)
             }
             _ => continue,
         };
+
+        // Guard: never send a blank email.
+        let stripped = html.replace(|c: char| c.is_whitespace(), "");
+        if stripped.is_empty() {
+            error!("[Email] html body is empty for {} / {} — skipping", row.email, row.notification_type);
+            continue;
+        }
+
         if let Err(e) = email::send_email(client, api_key, email::EmailSender::Alerts, &row.email, &subject, &html).await {
             warn!("[Email] send failed for {}: {e}", row.email);
         }

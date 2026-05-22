@@ -2088,6 +2088,11 @@ pub struct PendingEmailRow {
     pub notification_type: String,
     pub title: Option<String>,
     pub message: Option<String>,
+    /// Resolved from court_sittings or judgments depending on notification type.
+    pub case_number: Option<String>,
+    pub event_date: Option<chrono::NaiveDate>,
+    pub event_type: Option<String>,
+    pub court_division: Option<String>,
 }
 
 /// Returns notifications inserted in the last 15 minutes that should trigger
@@ -2100,9 +2105,19 @@ pub async fn recent_notifications_for_email(
         r#"SELECT u.email,
                   n.type        AS notification_type,
                   n.title,
-                  n.message
+                  n.message,
+                  COALESCE(cs.case_number, j.case_number) AS case_number,
+                  cs.event_date,
+                  cs.event_type,
+                  cs.court_division
            FROM   notifications n
            JOIN   users u ON u.id = n.user_id
+           LEFT JOIN court_sittings cs
+                  ON cs.id = n.case_id
+                 AND n.type IN ('case_listed', 'sitting_reminder_1d', 'sitting_reminder_morning')
+           LEFT JOIN judgments j
+                  ON j.id = n.case_id
+                 AND n.type IN ('case_available')
            WHERE  n.sent_at > NOW() - INTERVAL '15 minutes'
              AND  n.type IN (
                     'case_available',
