@@ -222,6 +222,84 @@ pub struct CaseLookupSittingRow {
     pub court_division: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+pub struct AdminLogRow {
+    pub id: i32,
+    pub admin_user_id: i32,
+    pub admin_email: String,
+    pub action: String,
+    pub target_type: Option<String>,
+    pub target_id: Option<i32>,
+    pub details: Option<serde_json::Value>,
+    pub ip_address: Option<String>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+pub struct AdminUserRow {
+    pub id: i32,
+    pub email: String,
+    pub display_name: Option<String>,
+    pub role: String,
+    pub created_at: NaiveDateTime,
+    pub email_verified: bool,
+    pub case_count: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct AdminUserDetail {
+    pub id: i32,
+    pub email: String,
+    pub display_name: Option<String>,
+    pub role: String,
+    pub created_at: NaiveDateTime,
+    pub email_verified: bool,
+    pub tracked_cases: Vec<TrackedCaseSummary>,
+    pub recent_notifications: Vec<RecentNotifSummary>,
+}
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+pub struct TrackedCaseSummary {
+    pub id: i32,
+    pub case_number: Option<String>,
+    pub case_type: String,
+    pub created_at: NaiveDateTime,
+}
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+pub struct RecentNotifSummary {
+    pub id: i32,
+    #[sqlx(rename = "type")]
+    #[serde(rename = "type")]
+    pub notification_type: String,
+    pub sent_at: NaiveDateTime,
+    pub title: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+pub struct WeeklyCount {
+    pub week: String,
+    pub count: i64,
+}
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+pub struct DailyCount {
+    pub day: String,
+    pub count: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct AdminDashboardStats {
+    pub user_count: i64,
+    pub active_trackers: i64,
+    pub emails_sent_this_month: i64,
+    pub upcoming_sittings: i64,
+    pub pending_notifications: i64,
+    pub last_scrape_at: Option<String>,
+    pub judgment_count: i64,
+    pub sittings_count: i64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct LegalNews {
     pub id: i32,

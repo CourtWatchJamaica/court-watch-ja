@@ -99,7 +99,10 @@ pub fn router(state: AppState) -> Router {
     // Layers run outermost-first: require_auth decodes JWT & inserts Claims,
     // then require_admin checks the role.
     let admin_routes = Router::new()
-        .route("/api/admin/users", get(admin::list_users))
+        .route("/api/admin/users", get(admin::list_users_filtered))
+        .route("/api/admin/users/:id/detail", get(admin::get_user_detail))
+        .route("/api/admin/stats", get(admin::get_admin_stats))
+        .route("/api/admin/logs/audit", get(admin::get_admin_logs))
         .route("/api/admin/config", get(admin::get_config))
         .route("/api/admin/config/:key", put(admin::set_config))
         .route("/api/admin/scraper/state", get(admin::get_scraper_state))

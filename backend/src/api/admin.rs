@@ -2,6 +2,7 @@ use std::sync::atomic::Ordering;
 
 use axum::{
     extract::{Path, Query, State},
+    http::HeaderMap,
     Extension, Json,
 };
 use chrono::{NaiveDate, NaiveTime};
@@ -9,6 +10,13 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::{api::errors::AppError, db::queries, scraper::ScraperState, AppState};
+
+fn get_client_ip(headers: &HeaderMap) -> Option<String> {
+    headers
+        .get("x-forwarded-for")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.split(',').next().unwrap_or(s).trim().to_string())
+}
 
 // ── Shared helpers ─────────────────────────────────────────────────────────
 
@@ -75,16 +83,32 @@ pub async fn delete_user(
     State(state): State<AppState>,
     Extension(caller_id): Extension<i32>,
     Path(user_id): Path<i32>,
+    headers: HeaderMap,
 ) -> Result<Json<Value>, AppError> {
     if caller_id == user_id {
         return Err(AppError::BadRequest(
             "Cannot delete your own account".into(),
         ));
     }
+    // Capture email before deletion for the log
+    let target_email: Option<String> = sqlx::query_scalar("SELECT email FROM users WHERE id = $1")
+        .bind(user_id)
+        .fetch_optional(&state.db)
+        .await?;
     let deleted = queries::admin_delete_user(&state.db, user_id).await?;
     if !deleted {
         return Err(AppError::NotFound);
     }
+    let _ = queries::log_admin_action(
+        &state.db,
+        caller_id,
+        "USER_DELETE",
+        Some("user"),
+        Some(user_id),
+        Some(json!({ "email": target_email })),
+        get_client_ip(&headers).as_deref(),
+    )
+    .await;
     Ok(Json(json!({ "deleted": true })))
 }
 
@@ -285,12 +309,24 @@ pub async fn update_judgment(
 
 pub async fn delete_judgment(
     State(state): State<AppState>,
+    Extension(caller_id): Extension<i32>,
     Path(id): Path<i32>,
+    headers: HeaderMap,
 ) -> Result<Json<Value>, AppError> {
     let deleted = queries::admin_delete_judgment(&state.db, id).await?;
     if !deleted {
         return Err(AppError::NotFound);
     }
+    let _ = queries::log_admin_action(
+        &state.db,
+        caller_id,
+        "JUDGMENT_DELETE",
+        Some("judgment"),
+        Some(id),
+        None,
+        get_client_ip(&headers).as_deref(),
+    )
+    .await;
     Ok(Json(json!({ "deleted": true })))
 }
 
@@ -355,12 +391,24 @@ pub async fn update_sitting(
 
 pub async fn delete_sitting(
     State(state): State<AppState>,
+    Extension(caller_id): Extension<i32>,
     Path(id): Path<i32>,
+    headers: HeaderMap,
 ) -> Result<Json<Value>, AppError> {
     let deleted = queries::admin_delete_sitting(&state.db, id).await?;
     if !deleted {
         return Err(AppError::NotFound);
     }
+    let _ = queries::log_admin_action(
+        &state.db,
+        caller_id,
+        "SITTING_DELETE",
+        Some("sitting"),
+        Some(id),
+        None,
+        get_client_ip(&headers).as_deref(),
+    )
+    .await;
     Ok(Json(json!({ "deleted": true })))
 }
 
@@ -369,6 +417,34 @@ pub async fn delete_sitting(
 pub async fn get_activity_log(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
     let rows = queries::admin_recent_activity(&state.db, 100).await?;
     Ok(Json(json!({ "activity": rows })))
+}
+
+#[derive(Deserialize, Default)]
+pub struct LogFilterParams {
+    #[serde(default = "default_page")]
+    pub page: i64,
+    #[serde(default = "default_limit")]
+    pub limit: i64,
+    pub from: Option<String>,
+    pub to: Option<String>,
+    pub admin_user_id: Option<i32>,
+    pub action: Option<String>,
+}
+
+pub async fn get_admin_logs(
+    State(state): State<AppState>,
+    Query(params): Query<LogFilterParams>,
+) -> Result<Json<Value>, AppError> {
+    let filter = queries::AdminLogFilter {
+        page: params.page,
+        limit: params.limit.min(200),
+        from: params.from.as_deref(),
+        to: params.to.as_deref(),
+        admin_user_id: params.admin_user_id,
+        action: params.action.as_deref(),
+    };
+    let (logs, total) = queries::admin_get_logs(&state.db, filter).await?;
+    Ok(Json(json!({ "logs": logs, "total": total, "page": params.page, "limit": params.limit.min(200) })))
 }
 
 // ── Scraper: Skip PDF permanently ─────────────────────────────────────────
@@ -525,6 +601,66 @@ pub async fn toggle_maintenance(
     state.maintenance_mode.store(body.enabled, Ordering::SeqCst);
     tracing::info!("[Admin] Maintenance mode → {}", body.enabled);
     Ok(Json(json!({ "maintenance_mode": body.enabled })))
+}
+
+// ── Dashboard Stats ────────────────────────────────────────────────────────
+
+pub async fn get_admin_stats(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
+    let stats = queries::admin_get_dashboard_stats(&state.db).await?;
+    let weeks = queries::admin_users_per_week(&state.db).await?;
+    let days = queries::admin_emails_per_day(&state.db).await?;
+    Ok(Json(json!({
+        "user_count": stats.user_count,
+        "active_trackers": stats.active_trackers,
+        "emails_sent_this_month": stats.emails_sent_this_month,
+        "upcoming_sittings": stats.upcoming_sittings,
+        "pending_notifications": stats.pending_notifications,
+        "last_scrape_at": stats.last_scrape_at,
+        "judgment_count": stats.judgment_count,
+        "sittings_count": stats.sittings_count,
+        "users_per_week": weeks,
+        "emails_per_day": days,
+    })))
+}
+
+// ── Users: filtered + paginated ────────────────────────────────────────────
+
+#[derive(Deserialize, Default)]
+pub struct UserFilterParams {
+    pub q: Option<String>,
+    pub role: Option<String>,
+    #[serde(default = "default_page")]
+    pub page: i64,
+    #[serde(default = "default_limit_20")]
+    pub limit: i64,
+}
+fn default_limit_20() -> i64 {
+    20
+}
+
+pub async fn list_users_filtered(
+    State(state): State<AppState>,
+    Query(params): Query<UserFilterParams>,
+) -> Result<Json<Value>, AppError> {
+    let (users, total) = queries::admin_list_users_filtered(
+        &state.db,
+        params.q.as_deref(),
+        params.role.as_deref(),
+        params.page,
+        params.limit.min(100),
+    )
+    .await?;
+    Ok(Json(json!({ "users": users, "total": total, "page": params.page, "limit": params.limit.min(100) })))
+}
+
+pub async fn get_user_detail(
+    State(state): State<AppState>,
+    Path(user_id): Path<i32>,
+) -> Result<Json<Value>, AppError> {
+    let detail = queries::admin_get_user_detail(&state.db, user_id)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    Ok(Json(json!({ "user": detail })))
 }
 
 // ── Upload PDF (stub — OCR hookup pending) ─────────────────────────────────

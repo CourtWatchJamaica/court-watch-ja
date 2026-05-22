@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import type { Promo } from "@/lib/types";
-import ConfirmModal from "@/components/ConfirmModal";
+import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 
 const inputCls =
   "w-full rounded-xl border border-white/[0.1] bg-black/30 px-4 py-3 text-sm text-white placeholder-white/20 focus:outline-none focus:border-[#009B3A]/50 focus:bg-black/50 transition-colors";
@@ -426,16 +426,12 @@ export default function AdminPromosPage() {
         )}
       </div>
 
-      {deleteTarget && (
-        <ConfirmModal
-          title="Delete Promo"
-          message={`Delete "${deleteTarget.title}"? This cannot be undone.`}
-          confirmLabel={deleting ? "Deleting…" : "Delete"}
-          confirmClassName="bg-red-500 hover:bg-red-500/85 text-white"
-          onConfirm={handleDelete}
-          onCancel={() => setDeleteTarget(null)}
-        />
-      )}
+      <DeleteConfirmModal
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        resourceName={deleteTarget?.title ?? ""}
+      />
     </div>
   );
 }

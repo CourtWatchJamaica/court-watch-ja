@@ -2,10 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { apiClient } from "@/lib/api";
-import { ScraperStatus, SystemConfigEntry } from "@/lib/types";
+import { AdminDashboardStats, SystemConfigEntry } from "@/lib/types";
 import {
   Users,
-  Database,
   Cpu,
   Settings,
   RefreshCw,
@@ -16,8 +15,23 @@ import {
   Wrench,
   Loader2,
   AlertTriangle,
+  UserCheck,
+  Mail,
+  CalendarDays,
+  BookOpen,
+  Gavel,
 } from "lucide-react";
 import Link from "next/link";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+} from "recharts";
+import { ScraperStatus } from "@/lib/types";
 
 function getRoleFromToken(): string | null {
   try {
@@ -28,14 +42,6 @@ function getRoleFromToken(): string | null {
   } catch {
     return null;
   }
-}
-
-interface OverviewStats {
-  userCount: number;
-  judgmentCount: number;
-  sittingCount: number;
-  pendingNotifications: number;
-  lastScrapeAt: string | null;
 }
 
 function StatTile({
@@ -65,24 +71,36 @@ function StatTile({
       </div>
     </div>
   );
-
   if (href) {
     return (
-      <Link
-        href={href}
-        className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a] hover:border-white/[0.12] transition-colors"
-      >
+      <Link href={href} className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a] hover:border-white/[0.12] transition-colors">
         {inner}
       </Link>
     );
   }
-  return (
-    <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a]">{inner}</div>
-  );
+  return <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a]">{inner}</div>;
+}
+
+const CHART_TOOLTIP_STYLE = {
+  backgroundColor: "#0d0d1a",
+  border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: 10,
+  color: "#fff",
+  fontSize: 11,
+};
+
+function WeekLabel(s: string) {
+  const d = new Date(s);
+  return d.toLocaleDateString("en-JM", { month: "short", day: "numeric" });
+}
+
+function DayLabel(s: string) {
+  const d = new Date(s);
+  return d.toLocaleDateString("en-JM", { month: "short", day: "numeric" });
 }
 
 export default function AdminOverviewPage() {
-  const [stats, setStats] = useState<OverviewStats | null>(null);
+  const [stats, setStats] = useState<AdminDashboardStats | null>(null);
   const [scraper, setScraper] = useState<ScraperStatus | null>(null);
   const [config, setConfig] = useState<SystemConfigEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,22 +112,12 @@ export default function AdminOverviewPage() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [usersRes, judgmentsRes, sittingsRes, configRes, scraperRes, statsRes] =
-        await Promise.all([
-          apiClient.adminListUsers(),
-          apiClient.adminListJudgments(1, 1),
-          apiClient.adminListSittings(1, 1),
-          apiClient.adminGetConfig(),
-          apiClient.adminGetScraperState(),
-          apiClient.adminGetStats(),
-        ]);
-      setStats({
-        userCount: usersRes.users.length,
-        judgmentCount: judgmentsRes.total,
-        sittingCount: sittingsRes.total,
-        pendingNotifications: statsRes.pending_notifications,
-        lastScrapeAt: statsRes.last_scrape_at,
-      });
+      const [statsRes, configRes, scraperRes] = await Promise.all([
+        apiClient.adminGetStats(),
+        apiClient.adminGetConfig(),
+        apiClient.adminGetScraperState(),
+      ]);
+      setStats(statsRes);
       setConfig(configRes.config);
       setScraper(scraperRes);
     } catch (err) {
@@ -146,33 +154,29 @@ export default function AdminOverviewPage() {
     }
   };
 
-  const formatScrapeTime = (iso: string | null) => {
-    if (!iso) return "Never";
-    const d = new Date(iso);
-    const now = new Date();
-    const diffMs = now.getTime() - d.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins}m ago`;
-    const diffHrs = Math.floor(diffMins / 60);
-    if (diffHrs < 24) return `${diffHrs}h ago`;
-    return d.toLocaleDateString("en-JM", { month: "short", day: "numeric" });
-  };
-
   const backupEntry = config.find((e) => e.key === "backup_last_date");
   const backupDate = backupEntry?.value ?? null;
   const backupStale = (() => {
     if (!backupDate) return true;
-    const d = new Date(backupDate);
-    return (Date.now() - d.getTime()) / 86400000 > 7;
+    return (Date.now() - new Date(backupDate).getTime()) / 86400000 > 7;
   })();
   const formatBackupAge = (iso: string) => {
-    const d = new Date(iso);
-    const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+    const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
     if (days === 0) return "today";
     if (days === 1) return "1 day ago";
     return `${days} days ago`;
   };
+
+  const usersPerWeek = (stats?.users_per_week ?? []).map((d) => ({
+    ...d,
+    label: WeekLabel(d.week),
+    count: Number(d.count),
+  }));
+  const emailsPerDay = (stats?.emails_per_day ?? []).map((d) => ({
+    ...d,
+    label: DayLabel(d.day),
+    count: Number(d.count),
+  }));
 
   return (
     <div className="p-6 md:p-8 max-w-5xl">
@@ -187,7 +191,7 @@ export default function AdminOverviewPage() {
         <p className="mt-1 text-sm text-white/40">System status at a glance.</p>
       </div>
 
-      {/* Database backup reminder */}
+      {/* Backup reminder */}
       {!loading && isSuperAdmin && backupStale && (
         <div className="mb-6 flex items-center gap-3 rounded-2xl border border-amber-400/20 bg-amber-400/[0.06] p-4">
           <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" />
@@ -207,62 +211,79 @@ export default function AdminOverviewPage() {
         </div>
       )}
 
-      {/* Stats row */}
+      {/* Metric cards */}
       {loading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-8">
-          {[1, 2, 3, 4, 5].map((i) => (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+          {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
             <div key={i} className="h-[72px] animate-pulse rounded-2xl border border-white/[0.06] bg-[#0d0d1a]" />
           ))}
         </div>
       ) : stats ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-8">
-          <StatTile
-            label="Users"
-            value={stats.userCount}
-            icon={Users}
-            href="/admin/users"
-            accent="bg-blue-500/20"
-          />
-          <StatTile
-            label="Judgments"
-            value={stats.judgmentCount.toLocaleString()}
-            icon={Database}
-            href="/admin/data"
-            accent="bg-[#009B3A]/20"
-          />
-          <StatTile
-            label="Sittings"
-            value={stats.sittingCount.toLocaleString()}
-            icon={TrendingUp}
-            href="/admin/data"
-            accent="bg-[#FED100]/15"
-          />
-          <StatTile
-            label="Last Scrape"
-            value={formatScrapeTime(stats.lastScrapeAt)}
-            icon={Clock}
-            href="/admin/scraper"
-            accent="bg-purple-500/20"
-            sub={
-              stats.lastScrapeAt
-                ? new Date(stats.lastScrapeAt).toLocaleTimeString("en-JM", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })
-                : undefined
-            }
-          />
-          <StatTile
-            label="Pending Notifs"
-            value={stats.pendingNotifications}
-            icon={Bell}
-            accent={stats.pendingNotifications > 0 ? "bg-amber-400/20" : "bg-white/[0.06]"}
-          />
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+          <StatTile label="Total Users" value={stats.user_count.toLocaleString()} icon={Users} href="/admin/users" accent="bg-blue-500/20" />
+          <StatTile label="Judgments" value={stats.judgment_count.toLocaleString()} icon={BookOpen} href="/admin/data" accent="bg-[#009B3A]/20" />
+          <StatTile label="Sittings" value={stats.sittings_count.toLocaleString()} icon={Gavel} href="/admin/data" accent="bg-cyan-500/20" />
+          <StatTile label="Last Scrape" value={scraper?.last_sc_scraped ? new Date(scraper.last_sc_scraped).toLocaleDateString("en-JM", { month: "short", day: "numeric" }) : "—"} icon={Cpu} href="/admin/scraper" accent="bg-[#FED100]/15" />
+          <StatTile label="Active Trackers" value={stats.active_trackers.toLocaleString()} icon={UserCheck} accent="bg-indigo-500/20" />
+          <StatTile label="Emails This Month" value={stats.emails_sent_this_month.toLocaleString()} icon={Mail} accent="bg-purple-500/20" />
+          <StatTile label="Upcoming Sittings" value={stats.upcoming_sittings.toLocaleString()} icon={CalendarDays} href="/admin/data" accent="bg-[#FED100]/15" />
+          <StatTile label="Unread Notifs" value={stats.pending_notifications.toLocaleString()} icon={Bell} accent={stats.pending_notifications > 0 ? "bg-amber-400/20" : "bg-white/[0.06]"} />
         </div>
       ) : null}
 
+      {/* Charts row */}
+      <div className="grid md:grid-cols-2 gap-5 mb-6">
+        {/* New users per week */}
+        <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a] p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-blue-400" />
+            <h2 className="text-sm font-semibold text-white">New Users / Week</h2>
+            <span className="ml-auto text-[10px] text-white/25">last 8 weeks</span>
+          </div>
+          {loading ? (
+            <div className="h-36 animate-pulse rounded-xl bg-white/[0.03]" />
+          ) : usersPerWeek.length === 0 ? (
+            <div className="h-36 flex items-center justify-center text-xs text-white/20">No data yet</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={140}>
+              <BarChart data={usersPerWeek} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                <XAxis dataKey="label" tick={{ fontSize: 9, fill: "rgba(255,255,255,0.3)" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 9, fill: "rgba(255,255,255,0.3)" }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <Tooltip contentStyle={CHART_TOOLTIP_STYLE} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
+                <Bar dataKey="count" name="New users" fill="#3b82f6" radius={[3, 3, 0, 0]} maxBarSize={28} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
+        {/* Emails per day */}
+        <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a] p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <Mail className="h-4 w-4 text-purple-400" />
+            <h2 className="text-sm font-semibold text-white">Emails Sent / Day</h2>
+            <span className="ml-auto text-[10px] text-white/25">last 14 days</span>
+          </div>
+          {loading ? (
+            <div className="h-36 animate-pulse rounded-xl bg-white/[0.03]" />
+          ) : emailsPerDay.length === 0 ? (
+            <div className="h-36 flex items-center justify-center text-xs text-white/20">No data yet</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={140}>
+              <BarChart data={emailsPerDay} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                <XAxis dataKey="label" tick={{ fontSize: 9, fill: "rgba(255,255,255,0.3)" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 9, fill: "rgba(255,255,255,0.3)" }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <Tooltip contentStyle={CHART_TOOLTIP_STYLE} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
+                <Bar dataKey="count" name="Emails" fill="#a855f7" radius={[3, 3, 0, 0]} maxBarSize={20} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </div>
+
+      {/* Bottom row: scraper + config */}
       <div className="grid md:grid-cols-2 gap-6">
-        {/* Scraper status */}
         <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a] p-5">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -302,7 +323,6 @@ export default function AdminOverviewPage() {
           )}
         </div>
 
-        {/* Config quick-view */}
         <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a] p-5">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -327,7 +347,7 @@ export default function AdminOverviewPage() {
         </div>
       </div>
 
-      {/* Maintenance mode — super_admin only */}
+      {/* Maintenance mode */}
       {isSuperAdmin && (
         <div className="mt-6 rounded-2xl border border-white/[0.07] bg-[#0d0d1a] p-5">
           <div className="flex items-center justify-between gap-4">
@@ -353,19 +373,21 @@ export default function AdminOverviewPage() {
                   : "bg-[#FED100]/15 border border-[#FED100]/30 text-[#FED100] hover:bg-[#FED100]/25"
               }`}
             >
-              {togglingMaintenance ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : maintenance ? (
-                "Disable"
-              ) : (
-                "Enable"
-              )}
+              {togglingMaintenance ? <Loader2 className="h-4 w-4 animate-spin" /> : maintenance ? "Disable" : "Enable"}
             </button>
           </div>
         </div>
       )}
 
-      <div className="mt-4 flex justify-end">
+      {/* Quick nav to logs */}
+      <div className="mt-6 flex items-center justify-between">
+        <Link
+          href="/admin/logs"
+          className="flex items-center gap-1.5 text-xs text-white/30 hover:text-white/60 transition-colors"
+        >
+          <Clock className="h-3 w-3" />
+          View Admin Logs →
+        </Link>
         <button
           onClick={fetchAll}
           className="min-h-[44px] flex items-center gap-1.5 px-2 text-xs text-white/30 hover:text-white/60 transition-colors"

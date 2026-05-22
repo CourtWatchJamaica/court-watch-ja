@@ -15,7 +15,7 @@ import {
   Plus,
   Search,
 } from "lucide-react";
-import ConfirmModal from "@/components/ConfirmModal";
+import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 
 type Tab = "judgments" | "sittings";
 const PAGE_SIZE = 50;
@@ -441,15 +441,12 @@ function JudgmentsTab() {
           onCreated={(j) => { setJudgments((prev) => [j, ...prev]); setTotal((t) => t + 1); }}
         />
       )}
-      {confirmDelete && (
-        <ConfirmModal
-          title="Delete judgment?"
-          message={`"${confirmDelete.label}" will be permanently removed.`}
-          confirmLabel="Delete Judgment"
-          onConfirm={() => handleDelete(confirmDelete.id)}
-          onCancel={() => setConfirmDelete(null)}
-        />
-      )}
+      <DeleteConfirmModal
+        isOpen={!!confirmDelete}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={() => handleDelete(confirmDelete!.id)}
+        resourceName={confirmDelete?.label ?? ""}
+      />
       {error && (
         <div className="mb-3 rounded-xl bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-400">{error}</div>
       )}
@@ -619,15 +616,12 @@ function SittingsTab() {
           onCreated={(s) => { setSittings((prev) => [s, ...prev]); setTotal((t) => t + 1); }}
         />
       )}
-      {confirmDelete && (
-        <ConfirmModal
-          title="Delete sitting?"
-          message={`"${confirmDelete.label}" will be permanently removed.`}
-          confirmLabel="Delete Sitting"
-          onConfirm={() => handleDelete(confirmDelete.id)}
-          onCancel={() => setConfirmDelete(null)}
-        />
-      )}
+      <DeleteConfirmModal
+        isOpen={!!confirmDelete}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={() => handleDelete(confirmDelete!.id)}
+        resourceName={confirmDelete?.label ?? ""}
+      />
       {error && (
         <div className="mb-3 rounded-xl bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-400">{error}</div>
       )}

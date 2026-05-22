@@ -1,6 +1,10 @@
 import {
   ActivityLogRow,
+  AdminDashboardStats,
+  AdminLog,
   AdminUser,
+  AdminUserDetail,
+  AdminUserRow,
   CaseLookupResult,
   CourtSitting,
   DocketDetail,
@@ -325,6 +329,24 @@ export const apiClient = {
     return request("/admin/users");
   },
 
+  async adminListUsersFiltered(opts?: {
+    q?: string;
+    role?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{ users: AdminUserRow[]; total: number; page: number; limit: number }> {
+    const params = new URLSearchParams();
+    if (opts?.q) params.set("q", opts.q);
+    if (opts?.role) params.set("role", opts.role);
+    if (opts?.page) params.set("page", String(opts.page));
+    if (opts?.limit) params.set("limit", String(opts.limit));
+    return request(`/admin/users?${params}`);
+  },
+
+  async adminGetUserDetail(userId: number): Promise<{ user: AdminUserDetail }> {
+    return request(`/admin/users/${userId}/detail`);
+  },
+
   async adminSetUserRole(
     userId: number,
     role: "user" | "admin" | "super_admin",
@@ -379,9 +401,6 @@ export const apiClient = {
   },
 
   // ── Admin: Data — Judgments ──────────────────────────────────────────────
-  async adminGetStats(): Promise<{ pending_notifications: number; last_scrape_at: string | null }> {
-    return request("/admin/stats");
-  },
 
   async getMaintenanceStatus(): Promise<{ maintenance_mode: boolean }> {
     return request("/maintenance/status");
@@ -450,6 +469,28 @@ export const apiClient = {
   // ── Admin: Logs ──────────────────────────────────────────────────────────
   async adminGetActivityLog(): Promise<{ activity: ActivityLogRow[] }> {
     return request("/admin/logs");
+  },
+
+  async adminGetStats(): Promise<AdminDashboardStats> {
+    return request("/admin/stats");
+  },
+
+  async adminGetAuditLogs(opts?: {
+    page?: number;
+    limit?: number;
+    from?: string;
+    to?: string;
+    admin_user_id?: number;
+    action?: string;
+  }): Promise<{ logs: AdminLog[]; total: number; page: number; limit: number }> {
+    const params = new URLSearchParams();
+    if (opts?.page) params.set("page", String(opts.page));
+    if (opts?.limit) params.set("limit", String(opts.limit));
+    if (opts?.from) params.set("from", opts.from);
+    if (opts?.to) params.set("to", opts.to);
+    if (opts?.admin_user_id) params.set("admin_user_id", String(opts.admin_user_id));
+    if (opts?.action) params.set("action", opts.action);
+    return request(`/admin/logs/audit?${params}`);
   },
 
   // ── Admin: Create Data ───────────────────────────────────────────────────

@@ -15,6 +15,76 @@ export interface AdminUser {
   created_at: string;
 }
 
+export interface AdminUserRow {
+  id: number;
+  email: string;
+  display_name: string | null;
+  role: "user" | "admin" | "super_admin";
+  created_at: string;
+  email_verified: boolean;
+  case_count: number;
+}
+
+export interface TrackedCaseSummary {
+  id: number;
+  case_number: string | null;
+  case_type: string;
+  created_at: string;
+}
+
+export interface RecentNotifSummary {
+  id: number;
+  type: string;
+  sent_at: string;
+  title: string | null;
+}
+
+export interface AdminUserDetail {
+  id: number;
+  email: string;
+  display_name: string | null;
+  role: string;
+  created_at: string;
+  email_verified: boolean;
+  tracked_cases: TrackedCaseSummary[];
+  recent_notifications: RecentNotifSummary[];
+}
+
+export interface AdminLog {
+  id: number;
+  admin_user_id: number;
+  admin_email: string;
+  action: string;
+  target_type: string | null;
+  target_id: number | null;
+  details: Record<string, unknown> | null;
+  ip_address: string | null;
+  created_at: string;
+}
+
+export interface WeeklyCount {
+  week: string;
+  count: number;
+}
+
+export interface DailyCount {
+  day: string;
+  count: number;
+}
+
+export interface AdminDashboardStats {
+  user_count: number;
+  active_trackers: number;
+  emails_sent_this_month: number;
+  upcoming_sittings: number;
+  pending_notifications: number;
+  last_scrape_at: string | null;
+  judgment_count: number;
+  sittings_count: number;
+  users_per_week: WeeklyCount[];
+  emails_per_day: DailyCount[];
+}
+
 export interface SystemConfigEntry {
   key: string;
   value: string;

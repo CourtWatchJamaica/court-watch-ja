@@ -2788,3 +2788,251 @@ pub async fn admin_delete_promo(pool: &PgPool, id: i32) -> sqlx::Result<bool> {
 pub fn parse_promo_dt(s: &str) -> Option<NaiveDateTime> {
     parse_dt(s)
 }
+
+// ── Admin Logs ─────────────────────────────────────────────────────────────
+
+pub async fn log_admin_action(
+    pool: &PgPool,
+    admin_user_id: i32,
+    action: &str,
+    target_type: Option<&str>,
+    target_id: Option<i32>,
+    details: Option<serde_json::Value>,
+    ip_address: Option<&str>,
+) -> sqlx::Result<()> {
+    sqlx::query(
+        "INSERT INTO admin_logs (admin_user_id, action, target_type, target_id, details, ip_address)
+         VALUES ($1, $2, $3, $4, $5, $6)",
+    )
+    .bind(admin_user_id)
+    .bind(action)
+    .bind(target_type)
+    .bind(target_id)
+    .bind(details)
+    .bind(ip_address)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+pub struct AdminLogFilter<'a> {
+    pub page: i64,
+    pub limit: i64,
+    pub from: Option<&'a str>,
+    pub to: Option<&'a str>,
+    pub admin_user_id: Option<i32>,
+    pub action: Option<&'a str>,
+}
+
+pub async fn admin_get_logs(
+    pool: &PgPool,
+    f: AdminLogFilter<'_>,
+) -> sqlx::Result<(Vec<AdminLogRow>, i64)> {
+    let offset = (f.page - 1) * f.limit;
+    let from_dt = f.from.and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok().map(|d| d.with_timezone(&chrono::Utc)));
+    let to_dt = f.to.and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok().map(|d| d.with_timezone(&chrono::Utc)));
+
+    let rows = sqlx::query_as::<_, AdminLogRow>(
+        "SELECT al.id, al.admin_user_id, u.email AS admin_email,
+                al.action, al.target_type, al.target_id, al.details, al.ip_address, al.created_at
+         FROM admin_logs al
+         JOIN users u ON u.id = al.admin_user_id
+         WHERE ($1::TIMESTAMPTZ IS NULL OR al.created_at >= $1)
+           AND ($2::TIMESTAMPTZ IS NULL OR al.created_at <= $2)
+           AND ($3::INTEGER  IS NULL OR al.admin_user_id = $3)
+           AND ($4::TEXT     IS NULL OR al.action = $4)
+         ORDER BY al.created_at DESC
+         LIMIT $5 OFFSET $6",
+    )
+    .bind(from_dt)
+    .bind(to_dt)
+    .bind(f.admin_user_id)
+    .bind(f.action)
+    .bind(f.limit)
+    .bind(offset)
+    .fetch_all(pool)
+    .await?;
+
+    let total: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM admin_logs al
+         WHERE ($1::TIMESTAMPTZ IS NULL OR al.created_at >= $1)
+           AND ($2::TIMESTAMPTZ IS NULL OR al.created_at <= $2)
+           AND ($3::INTEGER  IS NULL OR al.admin_user_id = $3)
+           AND ($4::TEXT     IS NULL OR al.action = $4)",
+    )
+    .bind(from_dt)
+    .bind(to_dt)
+    .bind(f.admin_user_id)
+    .bind(f.action)
+    .fetch_one(pool)
+    .await?;
+
+    Ok((rows, total))
+}
+
+// ── Admin: Dashboard Stats ─────────────────────────────────────────────────
+
+pub async fn admin_get_dashboard_stats(pool: &PgPool) -> sqlx::Result<AdminDashboardStats> {
+    let user_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
+        .fetch_one(pool)
+        .await?;
+
+    let active_trackers: i64 = sqlx::query_scalar(
+        "SELECT COUNT(DISTINCT user_id) FROM user_cases",
+    )
+    .fetch_one(pool)
+    .await?;
+
+    let emails_sent_this_month: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM notifications WHERE sent_at >= date_trunc('month', NOW())",
+    )
+    .fetch_one(pool)
+    .await?;
+
+    let today = chrono::Utc::now().date_naive();
+    let upcoming_sittings: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM court_sittings WHERE event_date >= $1",
+    )
+    .bind(today)
+    .fetch_one(pool)
+    .await?;
+
+    let pending_notifications: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM notifications WHERE read_at IS NULL AND archived_at IS NULL",
+    )
+    .fetch_one(pool)
+    .await?;
+
+    let judgment_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM judgments")
+        .fetch_one(pool)
+        .await?;
+
+    let sittings_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM court_sittings")
+        .fetch_one(pool)
+        .await?;
+
+    Ok(AdminDashboardStats {
+        user_count,
+        active_trackers,
+        emails_sent_this_month,
+        upcoming_sittings,
+        pending_notifications,
+        last_scrape_at: None,
+        judgment_count,
+        sittings_count,
+    })
+}
+
+pub async fn admin_users_per_week(pool: &PgPool) -> sqlx::Result<Vec<WeeklyCount>> {
+    sqlx::query_as::<_, WeeklyCount>(
+        "SELECT to_char(date_trunc('week', created_at), 'YYYY-MM-DD') AS week,
+                COUNT(*) AS count
+         FROM users
+         WHERE created_at >= NOW() - INTERVAL '8 weeks'
+         GROUP BY 1
+         ORDER BY 1 ASC",
+    )
+    .fetch_all(pool)
+    .await
+}
+
+pub async fn admin_emails_per_day(pool: &PgPool) -> sqlx::Result<Vec<DailyCount>> {
+    sqlx::query_as::<_, DailyCount>(
+        "SELECT to_char(date_trunc('day', sent_at), 'YYYY-MM-DD') AS day,
+                COUNT(*) AS count
+         FROM notifications
+         WHERE sent_at >= NOW() - INTERVAL '14 days'
+         GROUP BY 1
+         ORDER BY 1 ASC",
+    )
+    .fetch_all(pool)
+    .await
+}
+
+// ── Admin: Users (filtered + paginated) ────────────────────────────────────
+
+pub async fn admin_list_users_filtered(
+    pool: &PgPool,
+    q: Option<&str>,
+    role: Option<&str>,
+    page: i64,
+    limit: i64,
+) -> sqlx::Result<(Vec<AdminUserRow>, i64)> {
+    let offset = (page - 1) * limit;
+    let search = q.map(|s| format!("%{}%", s.to_lowercase()));
+
+    let rows = sqlx::query_as::<_, AdminUserRow>(
+        "SELECT u.id, u.email, u.display_name, u.role, u.created_at, u.email_verified,
+                COUNT(uc.id) AS case_count
+         FROM users u
+         LEFT JOIN user_cases uc ON uc.user_id = u.id
+         WHERE ($1::TEXT IS NULL OR LOWER(u.email) LIKE $1 OR LOWER(COALESCE(u.display_name,'')) LIKE $1)
+           AND ($2::TEXT IS NULL OR u.role = $2)
+         GROUP BY u.id
+         ORDER BY u.created_at DESC
+         LIMIT $3 OFFSET $4",
+    )
+    .bind(&search)
+    .bind(role)
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(pool)
+    .await?;
+
+    let total: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM users u
+         WHERE ($1::TEXT IS NULL OR LOWER(u.email) LIKE $1 OR LOWER(COALESCE(u.display_name,'')) LIKE $1)
+           AND ($2::TEXT IS NULL OR u.role = $2)",
+    )
+    .bind(&search)
+    .bind(role)
+    .fetch_one(pool)
+    .await?;
+
+    Ok((rows, total))
+}
+
+pub async fn admin_get_user_detail(
+    pool: &PgPool,
+    user_id: i32,
+) -> sqlx::Result<Option<AdminUserDetail>> {
+    let user = sqlx::query_as::<_, User>(
+        "SELECT id, email, password_hash, role, display_name, created_at, email_verified
+         FROM users WHERE id = $1",
+    )
+    .bind(user_id)
+    .fetch_optional(pool)
+    .await?;
+
+    let user = match user {
+        Some(u) => u,
+        None => return Ok(None),
+    };
+
+    let tracked_cases = sqlx::query_as::<_, TrackedCaseSummary>(
+        "SELECT id, case_number, case_type, created_at FROM user_cases
+         WHERE user_id = $1 ORDER BY created_at DESC",
+    )
+    .bind(user_id)
+    .fetch_all(pool)
+    .await?;
+
+    let recent_notifications = sqlx::query_as::<_, RecentNotifSummary>(
+        "SELECT id, type, sent_at, title FROM notifications
+         WHERE user_id = $1 ORDER BY sent_at DESC LIMIT 5",
+    )
+    .bind(user_id)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(Some(AdminUserDetail {
+        id: user.id,
+        email: user.email,
+        display_name: user.display_name,
+        role: user.role,
+        created_at: user.created_at,
+        email_verified: user.email_verified,
+        tracked_cases,
+        recent_notifications,
+    }))
+}
