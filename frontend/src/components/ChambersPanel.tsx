@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import {
   X, Calendar, DollarSign, FileText, Scale,
   ChevronDown, RotateCcw, ExternalLink, AlertCircle, CheckCircle, Clock,
+  Copy, CopyCheck,
 } from "lucide-react";
 import { useChambers } from "@/lib/chambers-context";
 import { useTracking } from "@/lib/tracking-context";
@@ -369,6 +370,7 @@ function DeadlineCalculator({ sittingIds }: { sittingIds: Set<number> }) {
   const [customDays, setCustomDays] = useState(14);
   const [trackedSittings, setTrackedSittings] = useState<CourtSitting[]>([]);
   const [showTracked, setShowTracked] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (sittingIds.size === 0) return;
@@ -389,6 +391,20 @@ function DeadlineCalculator({ sittingIds }: { sittingIds: Set<number> }) {
 
   const handleClear = () => {
     setRefDate(""); setTaskId("list_docs"); setCustomDays(14); setShowTracked(false);
+  };
+
+  const handleCopyDeadline = () => {
+    if (!result) return;
+    const text = [
+      `Task: ${task.label}`,
+      result.steps[0],
+      `Deadline: ${result.deadlineDate.toLocaleDateString("en-JM", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}`,
+      `Working days: ${result.isPast ? `${Math.abs(result.workingDaysFromToday)} days ago (PASSED)` : `${result.workingDaysFromToday} days remaining`}`,
+    ].join("\n");
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   };
 
   const cardCls = result?.isPast
@@ -502,6 +518,19 @@ function DeadlineCalculator({ sittingIds }: { sittingIds: Set<number> }) {
             </span>
           </div>
 
+          <button
+            onClick={handleCopyDeadline}
+            className={cn(
+              "flex items-center gap-1.5 text-[10px] font-medium transition-all duration-150 self-start",
+              copied
+                ? "text-[#009B3A]"
+                : "text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/55",
+            )}
+          >
+            {copied ? <CopyCheck className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+            {copied ? "Copied!" : "Copy result"}
+          </button>
+
           <div className="border-t border-black/[0.06] dark:border-white/10 pt-2.5 space-y-1.5">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-white/30">
               Calculation
@@ -541,6 +570,7 @@ function PAYETool() {
   const [mode, setMode] = useState<"monthly" | "annual">("monthly");
   const [isOver65, setIsOver65] = useState(false);
   const [pension, setPension] = useState("");
+  const [copied, setCopied] = useState(false);
 
   const monthlyGross = useMemo(() => {
     const v = parseFloat(gross.replace(/,/g, "")) || 0;
@@ -559,6 +589,22 @@ function PAYETool() {
 
   const handleClear = () => {
     setGross(""); setPension(""); setMode("monthly"); setIsOver65(false);
+  };
+
+  const handleCopyPAYE = (d: PAYEResult) => {
+    const lines = [
+      `Monthly Take-home: ${fmt(d.netMonthly)}`,
+      `Gross Pay: ${fmt(d.grossMonthly)}`,
+      `NIS (3%): ${fmt(d.nisMonthly)}`,
+      `NHT (2%): ${fmt(d.nhtMonthly)}`,
+      `Education Tax (2.25%): ${fmt(d.edTaxMonthly)}`,
+      `PAYE: ${fmt(d.payeMonthly)}`,
+      ...(d.pensionMonthly > 0 ? [`Pension: ${fmt(d.pensionMonthly)}`] : []),
+    ].join("\n");
+    navigator.clipboard.writeText(lines).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   };
 
   return (
@@ -651,6 +697,18 @@ function PAYETool() {
                 ({fmt(data.netMonthly * 12)} / year)
               </p>
             )}
+            <button
+              onClick={() => handleCopyPAYE(data)}
+              className={cn(
+                "mt-2 inline-flex items-center gap-1.5 text-[10px] font-medium transition-all duration-150",
+                copied
+                  ? "text-[#009B3A]"
+                  : "text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/55",
+              )}
+            >
+              {copied ? <CopyCheck className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+              {copied ? "Copied!" : "Copy breakdown"}
+            </button>
           </div>
 
           <DonutChart data={data} />
@@ -795,8 +853,18 @@ function CourtFeesTool() {
 /* ── Panel Content ── */
 
 function PanelContent({ onClose }: { onClose: () => void }) {
-  const [activeTool, setActiveTool] = useState<Tool>("deadline");
+  const [activeTool, setActiveTool] = useState<Tool>(() => {
+    if (typeof window !== "undefined") {
+      const s = localStorage.getItem("chambers_tab") as Tool | null;
+      if (s === "deadline" || s === "paye" || s === "fees") return s;
+    }
+    return "deadline";
+  });
   const { sittingIds } = useTracking();
+
+  useEffect(() => {
+    localStorage.setItem("chambers_tab", activeTool);
+  }, [activeTool]);
 
   const tabs: { id: Tool; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
     { id: "deadline", label: "Deadlines", icon: Calendar },
@@ -826,22 +894,24 @@ function PanelContent({ onClose }: { onClose: () => void }) {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-0.5 border-b border-gray-200/60 dark:border-white/[0.06] px-3 pt-3 pb-0 shrink-0">
-        {tabs.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            onClick={() => setActiveTool(id)}
-            className={cn(
-              "flex items-center gap-1.5 rounded-t-lg px-3 py-2 text-[11px] font-semibold transition-all duration-150 border-b-2",
-              activeTool === id
-                ? "border-[#009B3A] text-[#009B3A] bg-[#009B3A]/[0.06]"
-                : "border-transparent text-gray-400 dark:text-white/40 hover:text-gray-600 dark:hover:text-white/60 hover:bg-gray-50 dark:hover:bg-white/[0.04]",
-            )}
-          >
-            <Icon className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">{label}</span>
-          </button>
-        ))}
+      <div className="shrink-0 px-4 pt-3 pb-3 border-b border-gray-100 dark:border-white/[0.06]">
+        <div className="flex gap-1 rounded-xl bg-gray-100 dark:bg-white/[0.05] p-1">
+          {tabs.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => setActiveTool(id)}
+              className={cn(
+                "flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 px-1.5 text-[11px] font-semibold transition-all duration-150",
+                activeTool === id
+                  ? "bg-white dark:bg-white/[0.1] text-gray-900 dark:text-white shadow-sm ring-1 ring-black/[0.04] dark:ring-white/[0.08]"
+                  : "text-gray-400 dark:text-white/40 hover:text-gray-600 dark:hover:text-white/60",
+              )}
+            >
+              <Icon className="h-3.5 w-3.5 shrink-0" />
+              <span>{label}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Scrollable content */}
@@ -860,6 +930,17 @@ export default function ChambersPanel() {
   const { isOpen, openChambers, closeChambers } = useChambers();
   const touchStartY = useRef(0);
   const [dragY, setDragY] = useState(0);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        isOpen ? closeChambers() : openChambers();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [isOpen, openChambers, closeChambers]);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     touchStartY.current = e.touches[0].clientY;
@@ -880,6 +961,7 @@ export default function ChambersPanel() {
       {/* Desktop: floating trigger */}
       <button
         onClick={openChambers}
+        title="Open Chambers (⌘K)"
         className={cn(
           "hidden md:flex fixed bottom-[4.5rem] right-4 z-40 items-center gap-2 rounded-full border border-[#009B3A]/30 bg-white dark:bg-[#0d0d1a] px-4 py-2.5 text-[12px] font-semibold text-[#009B3A] shadow-lg shadow-[#009B3A]/10 transition-all duration-200 hover:bg-[#009B3A]/10 hover:border-[#009B3A]/60",
           isOpen && "opacity-0 pointer-events-none",
@@ -887,6 +969,9 @@ export default function ChambersPanel() {
       >
         <Scale className="h-3.5 w-3.5" />
         Chambers
+        <kbd className="ml-0.5 inline-flex items-center rounded border border-[#009B3A]/25 bg-[#009B3A]/[0.06] px-1.5 py-0.5 font-mono text-[9px] font-medium text-[#009B3A]/55">
+          ⌘K
+        </kbd>
       </button>
 
       {/* Desktop: backdrop */}
@@ -899,9 +984,9 @@ export default function ChambersPanel() {
         className={cn(
           "hidden md:flex fixed right-0 top-0 z-[60] h-full w-[380px] flex-col",
           "bg-white dark:bg-[#0d0d1a]",
-          "border-l border-gray-200/80 dark:border-white/[0.07]",
-          "shadow-[-8px_0_48px_rgba(0,0,0,0.1)] dark:shadow-[-8px_0_48px_rgba(0,0,0,0.4)]",
-          "transition-transform duration-300 ease-in-out",
+          "border-l border-gray-200/60 dark:border-white/[0.07]",
+          "shadow-[-12px_0_60px_rgba(0,0,0,0.12)] dark:shadow-[-12px_0_60px_rgba(0,0,0,0.5)]",
+          "transition-transform duration-300 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)]",
           isOpen ? "translate-x-0" : "translate-x-full",
         )}
       >
@@ -916,24 +1001,24 @@ export default function ChambersPanel() {
       {/* Mobile: bottom sheet with swipe-to-dismiss */}
       <div
         className={cn(
-          "md:hidden fixed bottom-0 inset-x-0 z-[68] flex flex-col rounded-t-2xl",
+          "md:hidden fixed bottom-0 inset-x-0 z-[68] flex flex-col rounded-t-[20px]",
           "bg-white dark:bg-[#0d0d1a]",
           "border-t border-gray-200/80 dark:border-white/[0.08]",
-          "shadow-[0_-8px_48px_rgba(0,0,0,0.12)] dark:shadow-[0_-8px_48px_rgba(0,0,0,0.5)]",
-          "max-h-[85vh]",
+          "shadow-[0_-12px_60px_rgba(0,0,0,0.15)] dark:shadow-[0_-12px_60px_rgba(0,0,0,0.6)]",
+          "max-h-[90vh] overflow-hidden",
         )}
         style={{
           paddingBottom: "env(safe-area-inset-bottom, 0px)",
           transform: isOpen
             ? dragY > 0 ? `translateY(${dragY}px)` : "translateY(0)"
             : "translateY(100%)",
-          transition: dragY > 0 ? "none" : "transform 0.3s ease-in-out",
+          transition: dragY > 0 ? "none" : "transform 0.32s cubic-bezier(0.32, 0.72, 0, 1)",
         }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        <div className="mx-auto mt-2.5 mb-1 h-1 w-10 rounded-full bg-gray-300 dark:bg-white/[0.12]" />
+        <div className="mx-auto mt-3 mb-1 h-1 w-10 rounded-full bg-gray-200 dark:bg-white/[0.14] shrink-0" />
         <PanelContent onClose={closeChambers} />
       </div>
     </>
