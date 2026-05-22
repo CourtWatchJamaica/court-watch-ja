@@ -2,6 +2,7 @@ pub mod admin;
 pub mod auth;
 pub mod court_sittings;
 pub mod court_stats;
+pub mod docket;
 pub mod errors;
 pub mod judge_connections;
 pub mod judgments;
@@ -72,6 +73,8 @@ pub fn router(state: AppState) -> Router {
         .route("/api/judges/autocomplete", get(judges::autocomplete_judges))
         .route("/api/judges/:id", get(judges::get_judge))
         .route("/api/judge-connections", get(judge_connections::list_judge_connections))
+        .route("/api/docket", get(docket::get_docket_list))
+        .route("/api/docket/*case_number", get(docket::get_docket_detail))
         .route("/api/user/cases", get(tracking::get_user_cases))
         .route("/api/user/cases", post(tracking::add_user_case))
         .route("/api/user/cases/:case_id", delete(tracking::remove_user_case))

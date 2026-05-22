@@ -194,6 +194,17 @@ pub struct Promo {
 // ── Case-lookup projections (used only by the /case-lookup handler) ──────────
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+pub struct DocketListItem {
+    pub user_case_id: i32,
+    pub case_number: String,
+    pub next_event_date: Option<NaiveDate>,
+    pub next_event_type: Option<String>,
+    pub next_court_division: Option<String>,
+    pub unread_count: i64,
+    pub tracked_at: NaiveDateTime,
+}
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
 pub struct CaseLookupJudgmentRow {
     pub id: i32,
     pub case_number: String,

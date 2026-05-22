@@ -36,6 +36,7 @@ const DESKTOP_LINKS = [
   { href: "/", label: "Dashboard" },
   { href: "/cases", label: "Cases" },
   { href: "/judges", label: "Judges" },
+  { href: "/docket", label: "My Docket" },
 ];
 
 
@@ -311,6 +312,15 @@ export default function Navbar() {
                       <span className="text-xs text-white/50">Theme</span>
                       <ThemeToggle />
                     </div>
+                    {/* My Docket */}
+                    <Link
+                      href="/docket"
+                      onClick={() => setMoreOpen(false)}
+                      className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-white/60 hover:text-white hover:bg-white/[0.05] transition-colors"
+                    >
+                      <Briefcase className="h-4 w-4" />
+                      My Docket
+                    </Link>
                     {/* Settings */}
                     <Link
                       href="/settings"

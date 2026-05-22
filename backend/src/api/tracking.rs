@@ -59,10 +59,24 @@ pub async fn add_user_case(
             Err(e) => return Err(AppError::Sqlx(e)),
         }
     } else if let Some(ref num) = body.case_number {
-        if num.trim().is_empty() {
+        let num = num.trim();
+        if num.is_empty() {
             return Err(AppError::BadRequest("case_number cannot be empty".into()));
         }
-        match queries::add_user_case_by_number(&state.db, user_id, num.trim(), case_type).await {
+
+        // Reject if the case number is not in our records.
+        if !queries::case_number_exists(&state.db, num).await? {
+            return Err(AppError::BadRequest(
+                "Case not found in Supreme Court or Court of Appeal records.".into(),
+            ));
+        }
+
+        // Reject if the user is already tracking this case.
+        if queries::user_tracks_case_number(&state.db, user_id, num).await? {
+            return Err(AppError::Conflict("You are already tracking this case.".into()));
+        }
+
+        match queries::add_user_case_by_number(&state.db, user_id, num, case_type).await {
             Ok(_) | Err(sqlx::Error::RowNotFound) => {}
             Err(e) => return Err(AppError::Sqlx(e)),
         }

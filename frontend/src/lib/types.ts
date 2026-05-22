@@ -110,6 +110,23 @@ export interface JudgeConnection {
   judge_b_id: number;
 }
 
+export interface DocketListItem {
+  user_case_id: number;
+  case_number: string;
+  next_event_date: string | null;
+  next_event_type: string | null;
+  next_court_division: string | null;
+  unread_count: number;
+  tracked_at: string;
+}
+
+export interface DocketDetail {
+  case_number: string;
+  user_case_id: number;
+  judgment: Judgment | null;
+  sittings: CourtSitting[];
+}
+
 export interface Notification {
   id: number;
   user_id: number;

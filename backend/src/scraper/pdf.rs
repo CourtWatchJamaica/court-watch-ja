@@ -380,6 +380,9 @@ fn is_noise(line: &str) -> bool {
     // Document / page header boilerplate
     if upper.contains("SUPREME COURT OF JUDICATURE") { return true; }
     if upper.contains("COURT OF APPEAL") && upper.contains("JAMAICA") { return true; }
+    // Per-page footer printed at the bottom of every page in Criminal/Gun Court PDFs:
+    // "Supreme Court Listing for the week 18th,MAY 2026"
+    if upper.starts_with("SUPREME COURT LISTING") { return true; }
     if upper.starts_with("LIST OF SITTINGS") { return true; }
     if upper.starts_with("CAUSE LIST") || upper.starts_with("COURT LIST") { return true; }
     if upper == "IN OPEN COURT" || upper == "IN CHAMBERS" { return true; }
@@ -497,6 +500,10 @@ fn clean_judge_name(raw: &str) -> String {
     let prefixes = [
         "THE HONOURABLE MRS. JUSTICE ",
         "THE HONOURABLE MR. JUSTICE ",
+        // No-dot variants found in Criminal/Gun Court PDFs
+        "THE HONOURABLE MRS JUSTICE ",
+        "THE HONOURABLE MR JUSTICE ",
+        "THE HONOURABLE MS JUSTICE ",
         "THE HONOURABLE MISS JUSTICE ",
         "THE HONOURABLE MS. JUSTICE ",
         "THE HONOURABLE JUSTICE ",

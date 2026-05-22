@@ -266,10 +266,8 @@ async fn process_pdf_bytes(
             continue;
         }
 
-        if let (Some(ref cn), Some(event_date), Some(ref et)) =
-            (&entry.case_number, entry.event_date, &entry.event_type)
-        {
-            match queries::sitting_exists(pool, cn, event_date, et).await {
+        if let (Some(ref cn), Some(event_date)) = (&entry.case_number, entry.event_date) {
+            match queries::sitting_exists(pool, cn, event_date, entry.event_type.as_deref()).await {
                 Ok(true) => continue,
                 Ok(false) => {}
                 Err(e) => warn!("[CoA Hearings] DB check failed: {e}"),
@@ -290,7 +288,8 @@ async fn process_pdf_bytes(
         )
         .await
         {
-            Ok(_) => inserted += 1,
+            Ok(Some(_)) => inserted += 1,
+            Ok(None) => {}
             Err(e) => warn!("[CoA Hearings] Failed to upsert sitting: {e}"),
         }
     }

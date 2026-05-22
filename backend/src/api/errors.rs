@@ -13,6 +13,8 @@ pub enum AppError {
     #[error("{0}")]
     BadRequest(String),
     #[error("{0}")]
+    Conflict(String),
+    #[error("{0}")]
     Internal(String),
     #[error("Too many requests")]
     TooManyRequests,
@@ -53,8 +55,9 @@ impl IntoResponse for AppError {
             Self::Unauthorized => (StatusCode::UNAUTHORIZED, self.to_string()),
             Self::Forbidden => (StatusCode::FORBIDDEN, self.to_string()),
             Self::BadRequest(m) => (StatusCode::BAD_REQUEST, m.clone()),
+            Self::Conflict(m) => (StatusCode::CONFLICT, m.clone()),
             Self::Internal(m) => (StatusCode::INTERNAL_SERVER_ERROR, m.clone()),
-            Self::TooManyRequests | Self::EmailNotVerified => unreachable!(),
+            Self::TooManyRequests | Self::EmailNotVerified => unreachable!("handled above"),
             Self::Sqlx(e) => {
                 tracing::error!("Database error: {:?}", e);
                 (StatusCode::INTERNAL_SERVER_ERROR, "Database error".into())

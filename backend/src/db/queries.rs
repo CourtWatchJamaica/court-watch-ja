@@ -1020,6 +1020,37 @@ pub async fn add_user_case_by_number(
     .await
 }
 
+/// Returns `true` if the case_number exists in either `court_sittings` or
+/// `judgments`.  Used to reject free-text tracking requests for unknown cases.
+pub async fn case_number_exists(pool: &PgPool, case_number: &str) -> sqlx::Result<bool> {
+    sqlx::query_scalar(
+        r#"SELECT EXISTS (
+               SELECT 1 FROM court_sittings WHERE case_number = $1
+               UNION
+               SELECT 1 FROM judgments       WHERE case_number = $1
+           )"#,
+    )
+    .bind(case_number)
+    .fetch_one(pool)
+    .await
+}
+
+/// Returns `true` if the user already has a `user_cases` row for this
+/// case_number (tracked by case_number directly).
+pub async fn user_tracks_case_number(
+    pool: &PgPool,
+    user_id: i32,
+    case_number: &str,
+) -> sqlx::Result<bool> {
+    sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM user_cases WHERE user_id = $1 AND case_number = $2)",
+    )
+    .bind(user_id)
+    .bind(case_number)
+    .fetch_one(pool)
+    .await
+}
+
 /// Delete by the tracked-case's ID (used by the tracking context for ID-based entries).
 pub async fn remove_user_case(
     pool: &PgPool,
@@ -1310,6 +1341,8 @@ pub async fn get_today_sittings(pool: &PgPool) -> sqlx::Result<Vec<CourtSitting>
     sqlx::query_as::<_, CourtSitting>(&sql).fetch_all(pool).await
 }
 
+/// Insert a sitting, skipping silently if the natural-key unique index fires.
+/// Returns `Some(row)` on a real insert, `None` if already present.
 pub async fn upsert_court_sitting(
     pool: &PgPool,
     case_number: Option<&str>,
@@ -1321,7 +1354,7 @@ pub async fn upsert_court_sitting(
     event_time: Option<NaiveTime>,
     lawyers: Option<&str>,
     pdf_source_url: Option<&str>,
-) -> sqlx::Result<CourtSitting> {
+) -> sqlx::Result<Option<CourtSitting>> {
     let sql = format!(
         "INSERT INTO court_sittings
            (case_number, title, judge_name, court_division, event_type,
@@ -1340,26 +1373,31 @@ pub async fn upsert_court_sitting(
         .bind(event_time)
         .bind(lawyers)
         .bind(pdf_source_url)
-        .fetch_one(pool)
+        .fetch_optional(pool)
         .await
 }
 
+/// Returns `true` if a sitting with the same natural key already exists.
+/// Uses `IS NOT DISTINCT FROM` so NULL event_type / event_time match correctly.
 pub async fn sitting_exists(
     pool: &PgPool,
     case_number: &str,
     event_date: NaiveDate,
-    event_type: &str,
+    event_type: Option<&str>,
 ) -> sqlx::Result<bool> {
-    let count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM court_sittings
-         WHERE case_number = $1 AND event_date = $2 AND event_type = $3",
+    sqlx::query_scalar(
+        "SELECT EXISTS (
+             SELECT 1 FROM court_sittings
+             WHERE case_number = $1
+               AND event_date  = $2
+               AND event_type  IS NOT DISTINCT FROM $3
+         )",
     )
     .bind(case_number)
     .bind(event_date)
     .bind(event_type)
     .fetch_one(pool)
-    .await?;
-    Ok(count > 0)
+    .await
 }
 
 // ── Catch-up helpers ───────────────────────────────────────────────────────
@@ -2106,6 +2144,105 @@ pub async fn mark_email_verified(pool: &PgPool, user_id: i32) -> sqlx::Result<()
         .execute(pool)
         .await?;
     Ok(())
+}
+
+// ── Docket ─────────────────────────────────────────────────────────────────
+
+/// Returns all cases a user is tracking, enriched with next-sitting metadata
+/// and unread notification count.  No new tables — purely derived from
+/// user_cases + court_sittings + judgments + notifications.
+pub async fn get_docket_list(pool: &PgPool, user_id: i32) -> sqlx::Result<Vec<DocketListItem>> {
+    sqlx::query_as::<_, DocketListItem>(
+        r#"SELECT
+               uc.id                                                          AS user_case_id,
+               COALESCE(uc.case_number, j.case_number, cs_src.case_number)   AS case_number,
+               uc.created_at                                                  AS tracked_at,
+               ns.event_date                                                  AS next_event_date,
+               ns.event_type                                                  AS next_event_type,
+               ns.court_division                                              AS next_court_division,
+               COALESCE(unread.cnt, 0)::BIGINT                                AS unread_count
+           FROM user_cases uc
+           LEFT JOIN judgments j
+                  ON j.id = uc.case_id
+                 AND uc.case_type = 'judgment'
+                 AND uc.case_number IS NULL
+           LEFT JOIN court_sittings cs_src
+                  ON cs_src.id = uc.case_id
+                 AND uc.case_type = 'sitting'
+                 AND uc.case_number IS NULL
+           LEFT JOIN LATERAL (
+               SELECT event_date, event_type, court_division
+               FROM court_sittings
+               WHERE case_number = COALESCE(uc.case_number, j.case_number, cs_src.case_number)
+                 AND event_date >= CURRENT_DATE
+               ORDER BY event_date ASC
+               LIMIT 1
+           ) ns ON TRUE
+           LEFT JOIN LATERAL (
+               SELECT COUNT(*)::BIGINT AS cnt
+               FROM notifications n
+               LEFT JOIN court_sittings cs2
+                      ON cs2.id = n.case_id
+                     AND n.type IN ('sitting_changed','case_listed','sitting_reminder_1d','sitting_reminder_morning')
+               LEFT JOIN judgments j2
+                      ON j2.id = n.case_id
+                     AND n.type IN ('new_judgment','case_available')
+               WHERE n.user_id = $1
+                 AND n.read_at IS NULL
+                 AND n.archived_at IS NULL
+                 AND COALESCE(cs2.case_number, j2.case_number)
+                       = COALESCE(uc.case_number, j.case_number, cs_src.case_number)
+           ) unread ON TRUE
+           WHERE uc.user_id = $1
+             AND COALESCE(uc.case_number, j.case_number, cs_src.case_number) IS NOT NULL
+           ORDER BY uc.created_at DESC"#,
+    )
+    .bind(user_id)
+    .fetch_all(pool)
+    .await
+}
+
+/// Returns the `user_cases.id` for a given user + resolved case_number, or
+/// `None` if the user is not tracking that case.  Used as a permission gate.
+pub async fn get_user_case_id_for_case(
+    pool: &PgPool,
+    user_id: i32,
+    case_number: &str,
+) -> sqlx::Result<Option<i32>> {
+    sqlx::query_scalar(
+        r#"SELECT uc.id
+           FROM user_cases uc
+           LEFT JOIN judgments j
+                  ON j.id = uc.case_id
+                 AND uc.case_type = 'judgment'
+                 AND uc.case_number IS NULL
+           LEFT JOIN court_sittings cs
+                  ON cs.id = uc.case_id
+                 AND uc.case_type = 'sitting'
+                 AND uc.case_number IS NULL
+           WHERE uc.user_id = $1
+             AND COALESCE(uc.case_number, j.case_number, cs.case_number) = $2
+           LIMIT 1"#,
+    )
+    .bind(user_id)
+    .bind(case_number)
+    .fetch_optional(pool)
+    .await
+}
+
+/// Returns all court sittings for a given case_number, chronologically.
+pub async fn get_sittings_for_case(
+    pool: &PgPool,
+    case_number: &str,
+) -> sqlx::Result<Vec<CourtSitting>> {
+    let sql = format!(
+        "SELECT {S} FROM court_sittings WHERE case_number = $1 \
+         ORDER BY event_date ASC NULLS LAST, event_time ASC NULLS LAST"
+    );
+    sqlx::query_as::<_, CourtSitting>(&sql)
+        .bind(case_number)
+        .fetch_all(pool)
+        .await
 }
 
 // ── Email notification dispatch ────────────────────────────────────────────

@@ -3,6 +3,8 @@ import {
   AdminUser,
   CaseLookupResult,
   CourtSitting,
+  DocketDetail,
+  DocketListItem,
   Judge,
   JudgeConnection,
   Judgment,
@@ -263,6 +265,14 @@ export const apiClient = {
 
   async removeUserCaseByRow(rowId: number): Promise<{ success: boolean }> {
     return request(`/user/cases/row/${rowId}`, { method: "DELETE" });
+  },
+
+  async getDocketList(): Promise<DocketListItem[]> {
+    return request("/docket");
+  },
+
+  async getDocketDetail(caseNumber: string): Promise<DocketDetail> {
+    return request(`/docket/${caseNumber}`);
   },
 
   async updateCaseSettings(
