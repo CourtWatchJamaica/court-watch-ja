@@ -83,6 +83,7 @@ pub fn router(state: AppState) -> Router {
         .route("/api/notifications/unread-count", get(notifications::get_unread_count))
         .route("/api/notifications/mark-read", post(notifications::mark_all_read))
         .route("/api/notifications/:id/mark-read", post(notifications::mark_one_read))
+        .route("/api/notifications/:id", delete(notifications::archive_notification))
         .route("/api/user/preferences", put(notifications::update_preferences))
         .route("/api/court-sittings", get(court_sittings::list_sittings))
         .route("/api/court-sittings/today", get(court_sittings::today_sittings))

@@ -1086,12 +1086,40 @@ pub async fn upsert_user_case_settings(
 
 pub async fn get_notifications(pool: &PgPool, user_id: i32) -> sqlx::Result<Vec<Notification>> {
     sqlx::query_as::<_, Notification>(
-        r#"SELECT id, user_id, case_id, "type", sent_at, read_at, title, message, link, severity
-           FROM notifications WHERE user_id = $1 ORDER BY sent_at DESC LIMIT 100"#,
+        r#"SELECT n.id, n.user_id, n.case_id, n."type", n.sent_at, n.read_at,
+                  n.archived_at, n.title, n.message, n.link, n.severity,
+                  COALESCE(cs.case_number, j.case_number) AS case_number
+           FROM notifications n
+           LEFT JOIN court_sittings cs
+                  ON cs.id = n.case_id
+                 AND n.type IN ('sitting_changed','case_listed','sitting_reminder_1d','sitting_reminder_morning')
+           LEFT JOIN judgments j
+                  ON j.id = n.case_id
+                 AND n.type IN ('new_judgment','case_available')
+           WHERE n.user_id = $1
+             AND n.archived_at IS NULL
+           ORDER BY n.sent_at DESC
+           LIMIT 100"#,
     )
     .bind(user_id)
     .fetch_all(pool)
     .await
+}
+
+pub async fn archive_notification(
+    pool: &PgPool,
+    notification_id: i32,
+    user_id: i32,
+) -> sqlx::Result<bool> {
+    let result = sqlx::query(
+        "UPDATE notifications SET archived_at = NOW()
+         WHERE id = $1 AND user_id = $2 AND archived_at IS NULL",
+    )
+    .bind(notification_id)
+    .bind(user_id)
+    .execute(pool)
+    .await?;
+    Ok(result.rows_affected() > 0)
 }
 
 pub async fn create_welcome_notification(pool: &PgPool, user_id: i32) -> sqlx::Result<()> {
@@ -1113,7 +1141,7 @@ pub async fn create_welcome_notification(pool: &PgPool, user_id: i32) -> sqlx::R
 
 pub async fn get_unread_notification_count(pool: &PgPool, user_id: i32) -> sqlx::Result<i64> {
     sqlx::query_scalar(
-        "SELECT COUNT(*) FROM notifications WHERE user_id = $1 AND read_at IS NULL",
+        "SELECT COUNT(*) FROM notifications WHERE user_id = $1 AND read_at IS NULL AND archived_at IS NULL",
     )
     .bind(user_id)
     .fetch_one(pool)

@@ -105,6 +105,8 @@ pub struct Notification {
     pub sent_at: NaiveDateTime,
     pub read_at: Option<NaiveDateTime>,
     #[sqlx(default)]
+    pub archived_at: Option<NaiveDateTime>,
+    #[sqlx(default)]
     pub title: Option<String>,
     #[sqlx(default)]
     pub message: Option<String>,
@@ -112,6 +114,10 @@ pub struct Notification {
     pub link: Option<String>,
     #[sqlx(default)]
     pub severity: Option<String>,
+    /// Resolved via JOIN with court_sittings or judgments — present only when
+    /// fetched through get_notifications.
+    #[sqlx(default)]
+    pub case_number: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]

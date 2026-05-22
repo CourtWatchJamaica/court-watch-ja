@@ -54,6 +54,15 @@ pub async fn mark_one_read(
     Ok(Json(json!({ "marked": marked })))
 }
 
+pub async fn archive_notification(
+    State(state): State<AppState>,
+    Extension(user_id): Extension<i32>,
+    Path(id): Path<i32>,
+) -> Result<Json<Value>, AppError> {
+    let archived = queries::archive_notification(&state.db, id, user_id).await?;
+    Ok(Json(json!({ "archived": archived })))
+}
+
 pub async fn update_preferences(
     Extension(_user_id): Extension<i32>,
     Json(_body): Json<PreferencesRequest>,

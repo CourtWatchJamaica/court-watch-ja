@@ -296,6 +296,10 @@ export const apiClient = {
     return request(`/notifications/${id}/mark-read`, { method: "POST" });
   },
 
+  async archiveNotification(id: number): Promise<{ archived: boolean }> {
+    return request(`/notifications/${id}`, { method: "DELETE" });
+  },
+
   async updatePreferences(
     email_notifications: boolean,
     push_notifications: boolean,

@@ -117,6 +117,8 @@ export interface Notification {
   type: string;
   sent_at: string;
   read_at: string | null;
+  archived_at?: string | null;
+  case_number?: string | null;
   title?: string | null;
   message?: string | null;
   link?: string | null;
