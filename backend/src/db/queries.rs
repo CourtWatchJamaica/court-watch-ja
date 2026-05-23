@@ -2138,6 +2138,48 @@ pub async fn update_user_password(
     Ok(())
 }
 
+// ── Password reset (unauthenticated) ──────────────────────────────────────
+
+pub async fn create_password_reset_token(
+    pool: &PgPool,
+    user_id: i32,
+    token: &str,
+    expires_at: chrono::NaiveDateTime,
+) -> sqlx::Result<()> {
+    sqlx::query(
+        "DELETE FROM verification_tokens WHERE user_id = $1 AND token_type = 'password_reset'",
+    )
+    .bind(user_id)
+    .execute(pool)
+    .await?;
+
+    sqlx::query(
+        "INSERT INTO verification_tokens (token, user_id, expires_at, token_type)
+         VALUES ($1, $2, $3, 'password_reset')",
+    )
+    .bind(token)
+    .bind(user_id)
+    .bind(expires_at)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// Atomically consumes a password-reset token, returning the user_id on success.
+pub async fn consume_password_reset_token(
+    pool: &PgPool,
+    token: &str,
+) -> sqlx::Result<Option<i32>> {
+    sqlx::query_scalar(
+        "DELETE FROM verification_tokens
+         WHERE token = $1 AND token_type = 'password_reset' AND expires_at > NOW()
+         RETURNING user_id",
+    )
+    .bind(token)
+    .fetch_optional(pool)
+    .await
+}
+
 pub async fn mark_email_verified(pool: &PgPool, user_id: i32) -> sqlx::Result<()> {
     sqlx::query("UPDATE users SET email_verified = TRUE WHERE id = $1")
         .bind(user_id)

@@ -149,6 +149,20 @@ export const apiClient = {
     });
   },
 
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    return request("/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    });
+  },
+
+  async resetPassword(token: string, new_password: string): Promise<{ message: string }> {
+    return request("/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify({ token, new_password }),
+    });
+  },
+
   // ── Judgments ───────────────────────────────────────────────────────────
   async getJudgments(opts?: {
     q?: string;

@@ -391,6 +391,113 @@ pub async fn confirm_password_change(
     }))
 }
 
+// ── Forgot-password / reset ────────────────────────────────────────────────────
+
+#[derive(Deserialize)]
+pub struct ForgotPasswordRequest {
+    pub email: String,
+}
+
+#[derive(Deserialize)]
+pub struct ResetPasswordRequest {
+    pub token: String,
+    pub new_password: String,
+}
+
+pub async fn forgot_password(
+    State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    Json(body): Json<ForgotPasswordRequest>,
+) -> Result<Json<SignupResponse>, AppError> {
+    // Separate rate-limit bucket from login/signup
+    check_rate_limit(&state, &format!("fp:{}", client_ip(&headers, &addr)))?;
+
+    if body.email.is_empty() {
+        return Err(AppError::BadRequest("Email is required".into()));
+    }
+
+    // Always return success to prevent email enumeration.
+    if let Ok(Some(user)) = queries::find_user_by_email(&state.db, &body.email).await {
+        let raw_token = Uuid::new_v4().to_string();
+        let expires_at = chrono::Utc::now().naive_utc() + chrono::Duration::hours(1);
+
+        if queries::create_password_reset_token(&state.db, user.id, &raw_token, expires_at)
+            .await
+            .is_ok()
+        {
+            if let Some(ref api_key) = state.config.resend_api_key {
+                let client = reqwest::Client::new();
+                let key = api_key.clone();
+                let email = user.email.clone();
+                let token = raw_token.clone();
+                tokio::spawn(async move {
+                    let app_url = std::env::var("APP_URL")
+                        .unwrap_or_else(|_| "https://courtwatchjamaica.com".into());
+                    let app_url = app_url.trim_end_matches('/');
+                    let reset_url = format!("{app_url}/reset-password?token={token}");
+                    let subject = "Reset your CourtWatch JA password";
+                    let html = format!(
+                        r#"<p>We received a request to reset the password for your CourtWatch JA account.</p>
+<p>Click the link below to set a new password. This link expires in <strong>1 hour</strong>.</p>
+<p><a href="{reset_url}">Reset Password</a></p>
+<p>If you did not request this, you can safely ignore this email — your password will not be changed.</p>"#
+                    );
+                    if let Err(e) = crate::notifications::email::send_email(
+                        &client,
+                        &key,
+                        crate::notifications::email::EmailSender::Auth,
+                        &email,
+                        subject,
+                        &html,
+                    )
+                    .await
+                    {
+                        tracing::error!("[ForgotPassword] Email FAILED for {email}: {e}");
+                    }
+                });
+            }
+        }
+    }
+
+    Ok(Json(SignupResponse {
+        message:
+            "If an account with that email exists, you will receive a password reset link shortly."
+                .into(),
+    }))
+}
+
+pub async fn reset_password(
+    State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    Json(body): Json<ResetPasswordRequest>,
+) -> Result<Json<SignupResponse>, AppError> {
+    check_rate_limit(&state, &client_ip(&headers, &addr))?;
+
+    if body.token.is_empty() {
+        return Err(AppError::BadRequest("Token is required".into()));
+    }
+    if body.new_password.len() < 8 {
+        return Err(AppError::BadRequest(
+            "Password must be at least 8 characters".into(),
+        ));
+    }
+
+    let user_id = queries::consume_password_reset_token(&state.db, &body.token)
+        .await?
+        .ok_or_else(|| AppError::BadRequest("Invalid or expired reset link".into()))?;
+
+    let hash = bcrypt::hash(&body.new_password, bcrypt::DEFAULT_COST)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    queries::update_user_password(&state.db, user_id, &hash).await?;
+
+    Ok(Json(SignupResponse {
+        message: "Password reset successfully. You can now sign in with your new password.".into(),
+    }))
+}
+
 // ── Self-service account deletion ─────────────────────────────────────────────
 
 pub async fn delete_own_account(

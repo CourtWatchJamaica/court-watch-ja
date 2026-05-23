@@ -50,6 +50,8 @@ pub fn router(state: AppState) -> Router {
         .route("/api/auth/oauth", post(auth::oauth_login))
         .route("/api/auth/verify-email", get(auth::verify_email))
         .route("/api/auth/confirm-password-change", post(auth::confirm_password_change))
+        .route("/api/auth/forgot-password", post(auth::forgot_password))
+        .route("/api/auth/reset-password", post(auth::reset_password))
         .route("/api/maintenance/status", get(maintenance::status))
         .route("/api/parish-cases", get(parish_cases::list_parish_cases))
         .route("/api/parish-cases/:id", get(parish_cases::get_parish_case_by_id))

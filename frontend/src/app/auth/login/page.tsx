@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { apiClient, ApiError } from "@/lib/api";
@@ -17,6 +17,13 @@ export default function LoginPage() {
   const [unverified, setUnverified] = useState(false);
   const [resent, setResent] = useState(false);
   const [resending, setResending] = useState(false);
+  const [passwordReset, setPasswordReset] = useState(false);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("reset") === "1") {
+      setPasswordReset(true);
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -147,6 +154,12 @@ export default function LoginPage() {
           )}
 
 
+          {passwordReset && (
+            <div className="rounded-xl bg-green-500/10 border border-green-500/20 px-4 py-3 text-sm text-green-400 mb-5">
+              Password reset successfully. Sign in with your new password.
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40 mb-1.5">
@@ -164,9 +177,17 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40 mb-1.5">
-                Password
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40">
+                  Password
+                </label>
+                <Link
+                  href="/forgot-password"
+                  className="text-[11px] text-white/35 hover:text-[#009B3A] transition-colors"
+                >
+                  Forgot password?
+                </Link>
+              </div>
               <input
                 type="password"
                 className={inputCls}
