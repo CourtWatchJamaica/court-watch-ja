@@ -30,7 +30,12 @@ const TYPE_META: Record<string, NotifMeta> = {
   sitting_reminder_morning: { label: "Hearing Today",    bg: "bg-red-500/15",   text: "text-red-600 dark:text-red-400",          icon: Calendar      },
   announcement:             { label: "Announcement",     bg: "bg-[#FED100]/15", text: "text-amber-600 dark:text-[#FED100]",     icon: Megaphone     },
   welcome:                  { label: "Welcome",          bg: "bg-[#009B3A]/15", text: "text-[#009B3A]",                        icon: PartyPopper   },
+  service_alert:            { label: "Service Alert",    bg: "bg-amber-400/15", text: "text-amber-600 dark:text-amber-400",      icon: AlertTriangle },
 };
+
+function typeToLabel(t: string): string {
+  return t.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 const SEVERITY_META: Record<string, Omit<NotifMeta, "label">> = {
   info:     { bg: "bg-blue-500/15",  text: "text-blue-600 dark:text-blue-400",   icon: Info          },
@@ -45,7 +50,7 @@ function getNotifMeta(notif: Notification): NotifMeta {
     const s = SEVERITY_META[notif.severity];
     return { label: notif.severity.charAt(0).toUpperCase() + notif.severity.slice(1), ...s };
   }
-  return { label: notif.type, bg: "bg-muted", text: "text-muted-foreground", icon: Bell };
+  return { label: typeToLabel(notif.type), bg: "bg-muted", text: "text-muted-foreground", icon: Bell };
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -70,7 +75,7 @@ function fallbackTitle(n: Notification): string {
     case "sitting_changed":          return `Sitting schedule changed — Case #${n.case_id}`;
     case "sitting_reminder_1d":      return "Upcoming hearing tomorrow";
     case "sitting_reminder_morning": return "Hearing scheduled for today";
-    default:                         return n.type;
+    default:                         return typeToLabel(n.type);
   }
 }
 
@@ -134,11 +139,11 @@ function TimelineItem({
           </span>
           <span className="text-[10px] text-muted-foreground/50">{formatRelative(notif.sent_at)}</span>
         </div>
-        <p className={`text-sm leading-snug ${isUnread ? "font-medium text-foreground" : "text-foreground/65"}`}>
+        <p className={`text-sm leading-snug whitespace-normal ${isUnread ? "font-medium text-foreground" : "text-foreground/65"}`}>
           {notif.title ?? fallbackTitle(notif)}
         </p>
         {notif.message && (
-          <p className={`mt-0.5 text-xs leading-relaxed line-clamp-2 ${isUnread ? "text-muted-foreground" : "text-muted-foreground/60"}`}>
+          <p className={`mt-0.5 text-xs leading-relaxed whitespace-normal ${isUnread ? "text-muted-foreground" : "text-muted-foreground/60"}`}>
             {notif.message}
           </p>
         )}
@@ -267,11 +272,11 @@ function SystemRow({
           </span>
           <span className="text-[10px] text-muted-foreground/50">{formatRelative(notif.sent_at)}</span>
         </div>
-        <p className={`text-sm leading-snug ${isUnread ? "font-medium text-foreground" : "text-foreground/65"}`}>
-          {notif.title ?? notif.type}
+        <p className={`text-sm leading-snug whitespace-normal ${isUnread ? "font-medium text-foreground" : "text-foreground/65"}`}>
+          {notif.title ?? fallbackTitle(notif)}
         </p>
         {notif.message && (
-          <p className={`mt-0.5 text-xs leading-relaxed line-clamp-2 ${isUnread ? "text-muted-foreground" : "text-muted-foreground/60"}`}>
+          <p className={`mt-0.5 text-xs leading-relaxed whitespace-normal ${isUnread ? "text-muted-foreground" : "text-muted-foreground/60"}`}>
             {notif.message}
           </p>
         )}
