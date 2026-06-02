@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Syne, Space_Grotesk, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import { cn } from "@/lib/utils";
@@ -8,14 +8,24 @@ import ScrollToTop from "@/components/ScrollToTop";
 import ChambersPanel from "@/components/ChambersPanel";
 import MaintenanceGate from "@/components/MaintenanceGate";
 
-const geistSans = Geist({
+const syne = Syne({
   subsets: ["latin"],
-  variable: "--font-sans",
+  weight: ["400", "600", "700", "800"],
+  variable: "--font-syne",
+  display: "swap",
+});
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  variable: "--font-space-grotesk",
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
   subsets: ["latin"],
   variable: "--font-geist-mono",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -64,7 +74,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn(geistSans.variable, geistMono.variable)}
+      className={cn(syne.variable, spaceGrotesk.variable, geistMono.variable)}
     >
       <body className="min-h-screen bg-background font-sans antialiased">
         <Script

@@ -32,12 +32,12 @@ interface DocketSectionProps {
 const TODAY = new Date().toISOString().split("T")[0];
 
 function getStatusColor(nextSitting: CourtSitting | null): string {
-  if (!nextSitting?.event_date) return "bg-white/20";
+  if (!nextSitting?.event_date) return "bg-foreground/20";
   const date = new Date(`${nextSitting.event_date}T00:00:00`);
   const diffDays = (date.getTime() - Date.now()) / 86_400_000;
   if (diffDays <= 1) return "bg-red-500";
   if (diffDays <= 7) return "bg-amber-400";
-  return "bg-[#009B3A]";
+  return "bg-primary";
 }
 
 function getCountdown(date: string | null): string | null {
@@ -53,13 +53,13 @@ function getCountdown(date: string | null): string | null {
 }
 
 function getCountdownColor(date: string | null): string {
-  if (!date) return "bg-white/[0.07] text-white/35";
+  if (!date) return "bg-foreground/[0.07] text-foreground/35";
   const diffDays = Math.ceil(
     (new Date(`${date}T00:00:00`).getTime() - Date.now()) / 86_400_000,
   );
   if (diffDays <= 1) return "bg-red-500/15 text-red-400";
   if (diffDays <= 7) return "bg-amber-400/15 text-amber-400";
-  return "bg-[#009B3A]/12 text-[#009B3A]";
+  return "bg-primary/[0.12] text-primary";
 }
 
 /* ── Notification Settings Modal ── */
@@ -143,23 +143,23 @@ function NotifModal({
       {/* Card */}
       <div
         ref={modalRef}
-        className="relative z-10 w-[90vw] max-w-[380px] rounded-2xl border border-white/[0.1] bg-[#0d0d1a]/95 shadow-2xl backdrop-blur-xl ring-1 ring-inset ring-white/[0.04]"
+        className="relative z-10 w-[90vw] max-w-[380px] rounded-2xl border border-border bg-card/95 shadow-2xl backdrop-blur-xl ring-1 ring-inset ring-foreground/[0.04]"
       >
         {/* Header */}
-        <div className="flex items-start justify-between border-b border-white/[0.06] px-5 py-4">
+        <div className="flex items-start justify-between border-b border-border px-5 py-4">
           <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#FED100]">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-accent">
               Notifications
             </p>
             {caseLabel && (
-              <p className="mt-0.5 max-w-[260px] truncate font-mono text-[11px] text-white/35">
+              <p className="mt-0.5 max-w-[260px] truncate font-mono text-[11px] text-foreground/35">
                 {caseLabel}
               </p>
             )}
           </div>
           <button
             onClick={onClose}
-            className="ml-3 shrink-0 rounded-lg p-1.5 text-white/30 transition-colors hover:bg-white/[0.06] hover:text-white/70"
+            className="ml-3 shrink-0 rounded-lg p-1.5 text-foreground/30 transition-colors hover:bg-foreground/[0.06] hover:text-foreground/70"
             aria-label="Close"
           >
             <X className="h-4 w-4" />
@@ -173,14 +173,14 @@ function NotifModal({
               key={key}
               type="button"
               onClick={() => toggle(key)}
-              className="flex w-full items-center gap-3.5 rounded-xl px-3 py-3 text-left transition-colors hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#FED100]/40"
+              className="flex w-full items-center gap-3.5 rounded-xl px-3 py-3 text-left transition-colors hover:bg-foreground/[0.04] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40"
             >
               {/* Pill toggle */}
               <div
                 aria-checked={settings[key]}
                 role="switch"
                 className={`relative h-5 w-9 shrink-0 rounded-full transition-colors duration-200 ${
-                  settings[key] ? "bg-[#FED100]" : "bg-white/[0.12]"
+                  settings[key] ? "bg-accent" : "bg-foreground/[0.12]"
                 }`}
               >
                 <div
@@ -191,29 +191,29 @@ function NotifModal({
               </div>
               <div className="min-w-0 flex-1">
                 <p className={`text-[13px] font-medium leading-snug transition-colors ${
-                  settings[key] ? "text-white/90" : "text-white/40"
+                  settings[key] ? "text-foreground/90" : "text-foreground/40"
                 }`}>
                   {label}
                 </p>
-                <p className="mt-0.5 text-[11px] text-white/25">{sub}</p>
+                <p className="mt-0.5 text-[11px] text-foreground/25">{sub}</p>
               </div>
             </button>
           ))}
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between border-t border-white/[0.06] px-5 py-3">
+        <div className="flex items-center justify-between border-t border-border px-5 py-3">
           <div className="flex h-4 items-center gap-1.5">
             {saving && (
               <>
-                <Loader2 className="h-3 w-3 animate-spin text-white/30" />
-                <span className="text-[10px] text-white/30">Saving…</span>
+                <Loader2 className="h-3 w-3 animate-spin text-foreground/30" />
+                <span className="text-[10px] text-foreground/30">Saving…</span>
               </>
             )}
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg bg-white/[0.06] px-3 py-1.5 text-[11px] font-medium text-white/50 transition-colors hover:bg-white/[0.1] hover:text-white/80"
+            className="rounded-lg bg-foreground/[0.06] px-3 py-1.5 text-[11px] font-medium text-foreground/50 transition-colors hover:bg-foreground/10 hover:text-foreground/80"
           >
             Done
           </button>
@@ -244,7 +244,7 @@ function DocketCard({
         ? `/cases/${userCase.case_id}`
         : null;
 
-  const statusColor = isPending ? "bg-[#FED100]/40" : getStatusColor(item.nextSitting);
+  const statusColor = isPending ? "bg-accent/40" : getStatusColor(item.nextSitting);
   const countdown = getCountdown(item.nextSitting?.event_date ?? null);
   const countdownColor = getCountdownColor(item.nextSitting?.event_date ?? null);
 
@@ -309,7 +309,7 @@ function DocketCard({
 
       {/* Card */}
       <div
-        className="group relative flex rounded-xl border border-white/[0.07] bg-[#0d0d1a] transition-all duration-200 hover:border-white/[0.12] hover:bg-[#0d0d1a]/80 overflow-hidden cursor-pointer"
+        className="group relative flex rounded-xl border border-border bg-card transition-all duration-200 hover:border-foreground/[0.12] hover:bg-card/80 overflow-hidden cursor-pointer"
         style={{
           transform: `translateX(${offsetX}px)`,
           transition: startXRef.current === null ? "transform 0.25s ease-out" : "none",
@@ -329,9 +329,9 @@ function DocketCard({
         <div className="flex-1 px-4 py-3 min-w-0">
           {/* Top row */}
           <div className="flex items-center gap-2 mb-1.5">
-            <div className="flex items-center gap-1 rounded-full bg-[#009B3A]/10 border border-[#009B3A]/20 px-2 py-0.5">
-              <Scale className="h-2.5 w-2.5 text-[#009B3A]" />
-              <span className="text-[9px] font-semibold text-[#009B3A] truncate max-w-[80px]">
+            <div className="flex items-center gap-1 rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5">
+              <Scale className="h-2.5 w-2.5 text-primary" />
+              <span className="text-[9px] font-semibold text-primary truncate max-w-[80px]">
                 {court}
               </span>
             </div>
@@ -339,14 +339,14 @@ function DocketCard({
             {/* Notification settings bell */}
             <button
               onClick={(e) => { e.stopPropagation(); setNotifOpen((p) => !p); }}
-              className="flex items-center gap-0.5 rounded px-0.5 transition-colors hover:bg-white/[0.06]"
+              className="flex items-center gap-0.5 rounded px-0.5 transition-colors hover:bg-foreground/[0.06]"
               aria-label="Notification settings"
             >
               <Bell
-                className={`h-3 w-3 ${activeAlerts > 0 ? "text-[#FED100]" : "text-white/20"}`}
+                className={`h-3 w-3 ${activeAlerts > 0 ? "text-accent" : "text-foreground/20"}`}
               />
               {activeAlerts > 0 && (
-                <span className="text-[9px] font-bold text-[#FED100]">
+                <span className="text-[9px] font-bold text-accent">
                   {activeAlerts}
                 </span>
               )}
@@ -361,7 +361,7 @@ function DocketCard({
             )}
 
             {isSitting && (
-              <span className="rounded-full bg-[#FED100]/10 border border-[#FED100]/20 px-1.5 py-0.5 text-[8px] font-semibold text-[#FED100]">
+              <span className="rounded-full bg-accent/10 border border-accent/20 px-1.5 py-0.5 text-[8px] font-semibold text-accent">
                 Sitting
               </span>
             )}
@@ -374,7 +374,7 @@ function DocketCard({
             {/* × button */}
             <button
               onClick={(e) => { e.stopPropagation(); onUntrack(userCase.id); }}
-              className="shrink-0 rounded-md p-0.5 text-white/20 hover:text-white/70 hover:bg-white/[0.06] transition-colors md:opacity-0 md:group-hover:opacity-100"
+              className="shrink-0 rounded-md p-0.5 text-foreground/20 hover:text-foreground/70 hover:bg-foreground/[0.06] transition-colors md:opacity-0 md:group-hover:opacity-100"
               aria-label="Remove"
             >
               <X className="h-3.5 w-3.5" />
@@ -382,25 +382,25 @@ function DocketCard({
           </div>
 
           {/* Title */}
-          <p className="text-[13px] font-semibold text-white/85 leading-snug line-clamp-1 group-hover:text-white transition-colors">
+          <p className="text-[13px] font-semibold text-foreground/85 leading-snug line-clamp-1 group-hover:text-foreground transition-colors">
             {title}
           </p>
 
           {/* Bottom row */}
           <div className="mt-1.5 flex items-center gap-2 flex-wrap">
             {citation && (
-              <span className="font-mono text-[10px] text-white/30">{citation}</span>
+              <span className="font-mono text-[10px] text-foreground/30">{citation}</span>
             )}
             {isPending && userCase.case_number && (
-              <span className="font-mono text-[10px] text-white/30">
+              <span className="font-mono text-[10px] text-foreground/30">
                 {userCase.case_number}
               </span>
             )}
             {hearingDateStr && (
               <>
-                <span className="text-white/15">·</span>
-                <div className="flex items-center gap-1 text-[10px] text-white/35">
-                  <Building2 className="h-2.5 w-2.5 text-white/20" />
+                <span className="text-foreground/[0.15]">·</span>
+                <div className="flex items-center gap-1 text-[10px] text-foreground/35">
+                  <Building2 className="h-2.5 w-2.5 text-foreground/20" />
                   {new Date(`${hearingDateStr}T00:00:00`).toLocaleDateString("en-JM", {
                     month: "short",
                     day: "numeric",
@@ -414,13 +414,13 @@ function DocketCard({
               </>
             )}
             {!hearingDateStr && !isPending && (
-              <span className="text-[10px] text-white/25">No upcoming hearing</span>
+              <span className="text-[10px] text-foreground/25">No upcoming hearing</span>
             )}
             {isPending && (
-              <span className="text-[10px] text-white/25">Watching for court listing…</span>
+              <span className="text-[10px] text-foreground/25">Watching for court listing…</span>
             )}
             {!isPending && (
-              <ArrowRight className="h-3 w-3 text-white/15 group-hover:text-white/40 ml-auto shrink-0 transition-colors" />
+              <ArrowRight className="h-3 w-3 text-foreground/[0.15] group-hover:text-foreground/40 ml-auto shrink-0 transition-colors" />
             )}
           </div>
         </div>
@@ -515,8 +515,8 @@ export function AddByNumberForm({ onRefresh }: { onRefresh: () => void }) {
     : 0;
 
   return (
-    <div className="rounded-xl border border-white/[0.06] bg-[#0d0d1a] px-3 py-2.5">
-      <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-white/30">
+    <div className="rounded-xl border border-border bg-card px-3 py-2.5">
+      <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-foreground/30">
         Track by Case Number
       </p>
       <form onSubmit={handleSubmit} className="flex gap-2">
@@ -527,12 +527,12 @@ export function AddByNumberForm({ onRefresh }: { onRefresh: () => void }) {
           onBlur={() => setTimeout(() => setShowPreview(false), 150)}
           onFocus={() => { if (value.trim().length >= 3 && preview) setShowPreview(true); }}
           placeholder="e.g. HCV/01234/2025"
-          className="flex-1 min-w-0 rounded-lg border border-white/[0.1] bg-black/30 px-3 py-2 text-[12px] text-white placeholder-white/20 focus:outline-none focus:border-[#FED100]/40 focus:ring-1 focus:ring-[#FED100]/20 transition-colors min-h-[44px]"
+          className="flex-1 min-w-0 rounded-lg border border-border bg-foreground/[0.04] px-3 py-2 text-[12px] text-foreground placeholder:text-foreground/20 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 transition-colors min-h-[44px]"
         />
         <button
           type="submit"
           disabled={loading || !value.trim()}
-          className="flex shrink-0 items-center gap-1 rounded-lg bg-[#FED100]/10 border border-[#FED100]/20 px-3 py-2 text-[11px] font-semibold text-[#FED100] hover:bg-[#FED100]/15 disabled:opacity-40 disabled:cursor-not-allowed transition-colors min-h-[44px]"
+          className="flex shrink-0 items-center gap-1 rounded-lg bg-accent/10 border border-accent/20 px-3 py-2 text-[11px] font-semibold text-accent hover:bg-accent/15 disabled:opacity-40 disabled:cursor-not-allowed transition-colors min-h-[44px]"
         >
           {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
           Track
@@ -542,42 +542,42 @@ export function AddByNumberForm({ onRefresh }: { onRefresh: () => void }) {
       {/* Live preview dropdown */}
       {showPreview && value.trim().length >= 3 && (
         <div
-          className="mt-1.5 rounded-xl border border-white/[0.1] bg-[#0d0d1a] overflow-hidden shadow-xl"
+          className="mt-1.5 rounded-xl border border-border bg-card overflow-hidden shadow-xl"
           onMouseDown={(e) => e.preventDefault()}
         >
           {previewLoading ? (
             <div className="flex items-center gap-2 px-3 py-3">
-              <Loader2 className="h-3 w-3 animate-spin text-white/30" />
-              <span className="text-[11px] text-white/30">Searching…</span>
+              <Loader2 className="h-3 w-3 animate-spin text-foreground/30" />
+              <span className="text-[11px] text-foreground/30">Searching…</span>
             </div>
           ) : preview?.found ? (
-            <div className="divide-y divide-white/[0.05]">
+            <div className="divide-y divide-border">
               {preview.judgments.map((j) => (
                 <button
                   key={`j-${j.id}`}
                   type="button"
                   onClick={() => selectPreviewCase(j.case_number)}
-                  className="flex w-full items-start gap-2.5 px-3 py-2.5 text-left hover:bg-white/[0.04] transition-colors"
+                  className="flex w-full items-start gap-2.5 px-3 py-2.5 text-left hover:bg-foreground/[0.04] transition-colors"
                 >
-                  <FileText className="mt-0.5 h-3 w-3 shrink-0 text-[#009B3A]" />
+                  <FileText className="mt-0.5 h-3 w-3 shrink-0 text-primary" />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[11px] font-medium text-white/80">
+                    <p className="truncate text-[11px] font-medium text-foreground/80">
                       {j.title || j.case_number}
                     </p>
                     <div className="mt-0.5 flex items-center gap-2 flex-wrap">
-                      <span className="font-mono text-[10px] text-white/35">{j.case_number}</span>
+                      <span className="font-mono text-[10px] text-foreground/35">{j.case_number}</span>
                       {j.court && (
-                        <span className="text-[10px] text-white/25">{j.court}</span>
+                        <span className="text-[10px] text-foreground/25">{j.court}</span>
                       )}
                       {j.date && (
-                        <span className="flex items-center gap-1 text-[10px] text-white/25">
+                        <span className="flex items-center gap-1 text-[10px] text-foreground/25">
                           <Calendar className="h-2.5 w-2.5" />
                           {new Date(j.date).toLocaleDateString("en-JM", { year: "numeric", month: "short", day: "numeric" })}
                         </span>
                       )}
                     </div>
                   </div>
-                  <span className="shrink-0 rounded-full bg-[#009B3A]/12 px-1.5 py-0.5 text-[9px] font-semibold text-[#009B3A]">
+                  <span className="shrink-0 rounded-full bg-primary/[0.12] px-1.5 py-0.5 text-[9px] font-semibold text-primary">
                     Judgment
                   </span>
                 </button>
@@ -587,29 +587,29 @@ export function AddByNumberForm({ onRefresh }: { onRefresh: () => void }) {
                   key={`s-${s.id}`}
                   type="button"
                   onClick={() => selectPreviewCase(s.case_number ?? value.trim())}
-                  className="flex w-full items-start gap-2.5 px-3 py-2.5 text-left hover:bg-white/[0.04] transition-colors"
+                  className="flex w-full items-start gap-2.5 px-3 py-2.5 text-left hover:bg-foreground/[0.04] transition-colors"
                 >
-                  <Calendar className="mt-0.5 h-3 w-3 shrink-0 text-[#FED100]" />
+                  <Calendar className="mt-0.5 h-3 w-3 shrink-0 text-accent" />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[11px] font-medium text-white/80">
+                    <p className="truncate text-[11px] font-medium text-foreground/80">
                       {s.title || s.case_number || "Untitled Sitting"}
                     </p>
                     <div className="mt-0.5 flex items-center gap-2 flex-wrap">
                       {s.case_number && (
-                        <span className="font-mono text-[10px] text-white/35">{s.case_number}</span>
+                        <span className="font-mono text-[10px] text-foreground/35">{s.case_number}</span>
                       )}
                       {s.court && (
-                        <span className="text-[10px] text-white/25">{s.court}</span>
+                        <span className="text-[10px] text-foreground/25">{s.court}</span>
                       )}
                       {s.event_date && (
-                        <span className="flex items-center gap-1 text-[10px] text-white/25">
+                        <span className="flex items-center gap-1 text-[10px] text-foreground/25">
                           <Calendar className="h-2.5 w-2.5" />
                           {new Date(`${s.event_date}T00:00:00`).toLocaleDateString("en-JM", { year: "numeric", month: "short", day: "numeric" })}
                         </span>
                       )}
                     </div>
                   </div>
-                  <span className="shrink-0 rounded-full bg-[#FED100]/10 px-1.5 py-0.5 text-[9px] font-semibold text-[#FED100]">
+                  <span className="shrink-0 rounded-full bg-accent/10 px-1.5 py-0.5 text-[9px] font-semibold text-accent">
                     Sitting
                   </span>
                 </button>
@@ -617,7 +617,7 @@ export function AddByNumberForm({ onRefresh }: { onRefresh: () => void }) {
             </div>
           ) : (
             <div className="px-3 py-3">
-              <p className="text-[11px] text-white/35">
+              <p className="text-[11px] text-foreground/35">
                 No existing cases match — you can still track this number.
               </p>
             </div>
@@ -630,28 +630,28 @@ export function AddByNumberForm({ onRefresh }: { onRefresh: () => void }) {
       )}
 
       {tracked && !error && (
-        <div className="mt-2.5 flex items-center gap-2 rounded-lg border border-[#009B3A]/20 bg-[#009B3A]/[0.06] px-2.5 py-2">
-          <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#009B3A]" />
-          <span className="flex-1 truncate font-mono text-[11px] text-white/70">
+        <div className="mt-2.5 flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/[0.06] px-2.5 py-2">
+          <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+          <span className="flex-1 truncate font-mono text-[11px] text-foreground/70">
             {tracked.caseNumber}
           </span>
-          <span className="shrink-0 text-[10px] font-medium text-[#009B3A]">
+          <span className="shrink-0 text-[10px] font-medium text-primary">
             Tracking
           </span>
           {tracked.rowId > 0 && (
             <button
               type="button"
               onClick={() => setNotifOpen((p) => !p)}
-              className="flex shrink-0 items-center gap-0.5 rounded px-0.5 transition-colors hover:bg-white/[0.06]"
+              className="flex shrink-0 items-center gap-0.5 rounded px-0.5 transition-colors hover:bg-foreground/[0.06]"
               aria-label="Notification settings"
             >
               <Bell
                 className={`h-3 w-3 transition-colors ${
-                  activeCount > 0 ? "text-[#FED100]" : "text-white/20"
+                  activeCount > 0 ? "text-accent" : "text-foreground/20"
                 }`}
               />
               {activeCount > 0 && (
-                <span className="text-[9px] font-bold text-[#FED100]">{activeCount}</span>
+                <span className="text-[9px] font-bold text-accent">{activeCount}</span>
               )}
             </button>
           )}
@@ -674,10 +674,10 @@ export function AddByNumberForm({ onRefresh }: { onRefresh: () => void }) {
 function DocketEmpty({ onRefresh }: { onRefresh: () => void }) {
   const router = useRouter();
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.05] bg-[#0d0d1a] py-10 text-center px-4">
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card py-10 text-center px-4">
       <svg
         viewBox="0 0 64 64"
-        className="mb-4 h-12 w-12 text-white/10"
+        className="mb-4 h-12 w-12 text-foreground/10"
         fill="none"
         stroke="currentColor"
         strokeWidth="1.5"
@@ -687,16 +687,16 @@ function DocketEmpty({ onRefresh }: { onRefresh: () => void }) {
         <rect x="20" y="40" width="8" height="16" rx="1" />
         <rect x="36" y="40" width="8" height="16" rx="1" />
         <line x1="8" y1="28" x2="56" y2="28" />
-        <circle cx="32" cy="20" r="3" fill="#FED100" stroke="#FED100" strokeOpacity="0.8" />
+        <circle cx="32" cy="20" r="3" fill="var(--accent)" stroke="var(--accent)" strokeOpacity="0.8" />
       </svg>
-      <p className="text-sm font-medium text-white/40 mb-1">Your Docket is empty</p>
-      <p className="text-[12px] text-white/25 mb-4 max-w-[220px] leading-relaxed">
+      <p className="text-sm font-medium text-foreground/40 mb-1">Your Docket is empty</p>
+      <p className="text-[12px] text-foreground/25 mb-4 max-w-[220px] leading-relaxed">
         Add cases you&apos;re following to your Docket. Upcoming hearings and alerts will appear here.
       </p>
       <Button
         size="sm"
         onClick={() => router.push("/cases")}
-        className="h-11 sm:h-8 bg-[#009B3A] px-4 text-xs text-white hover:bg-[#009B3A]/85"
+        className="h-11 sm:h-8 bg-primary px-4 text-xs text-white hover:bg-primary/85"
       >
         Browse Cases
       </Button>
@@ -712,15 +712,15 @@ function DocketSkeleton() {
       {[1, 2, 3].map((i) => (
         <div
           key={i}
-          className="flex rounded-xl border border-white/[0.06] bg-[#0d0d1a] overflow-hidden animate-pulse"
+          className="flex rounded-xl border border-border bg-card overflow-hidden animate-pulse"
         >
-          <div className="w-1 bg-white/[0.06]" />
+          <div className="w-1 bg-foreground/[0.06]" />
           <div className="flex-1 px-4 py-3 space-y-2">
             <div className="flex gap-2">
-              <div className="h-4 w-20 rounded-full bg-white/[0.06]" />
+              <div className="h-4 w-20 rounded-full bg-foreground/[0.06]" />
             </div>
-            <div className="h-3.5 w-3/4 rounded bg-white/[0.06]" />
-            <div className="h-2.5 w-1/2 rounded bg-white/[0.04]" />
+            <div className="h-3.5 w-3/4 rounded bg-foreground/[0.06]" />
+            <div className="h-2.5 w-1/2 rounded bg-foreground/[0.04]" />
           </div>
         </div>
       ))}
@@ -769,12 +769,12 @@ export default function DocketSection({
     <section>
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="h-px w-3 bg-[#FED100]/60" />
-          <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#FED100]">
+          <div className="h-px w-3 bg-accent/60" />
+          <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-accent">
             Your Docket
           </span>
           {!loading && trackedCases.length > 0 && (
-            <Badge className="h-4 px-1.5 text-[9px] bg-[#FED100]/10 text-[#FED100] border border-[#FED100]/20 font-semibold rounded-full">
+            <Badge className="h-4 px-1.5 text-[9px] bg-accent/10 text-accent border border-accent/20 font-semibold rounded-full">
               {trackedCases.length}
             </Badge>
           )}

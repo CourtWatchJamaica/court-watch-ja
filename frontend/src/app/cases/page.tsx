@@ -120,7 +120,7 @@ function sortByEventDate(items: CourtSitting[]): CourtSitting[] {
 
 function TabToggle({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) {
   return (
-    <div className="flex rounded-2xl bg-muted/40 p-1.5 gap-1.5">
+    <div className="flex rounded-2xl bg-foreground/[0.03] border border-border p-1 gap-1">
       {(
         [
           { id: "judgments" as Tab, icon: Scale, label: "Judgments", sub: "Past decisions" },
@@ -131,20 +131,23 @@ function TabToggle({ active, onChange }: { active: Tab; onChange: (t: Tab) => vo
           key={id}
           onClick={() => onChange(id)}
           className={[
-            "flex flex-1 items-center justify-center gap-3 rounded-xl px-5 py-4",
-            "transition-all duration-200 active:scale-[0.97]",
+            "flex flex-1 items-center justify-center gap-3 rounded-xl px-5 py-3.5",
+            "transition-all duration-200 active:scale-[0.98]",
             active === id
-              ? "bg-[#009B3A] text-white shadow-[0_4px_20px_rgba(0,155,58,0.4)]"
-              : "text-muted-foreground hover:text-foreground hover:bg-accent/50",
+              ? "bg-card text-foreground shadow-[0_2px_12px_rgba(0,0,0,0.4)]"
+              : "text-foreground/40 hover:text-foreground/65",
           ].join(" ")}
         >
-          <Icon className="h-5 w-5 shrink-0" strokeWidth={active === id ? 2.2 : 1.8} />
+          <Icon className="h-4.5 w-4.5 shrink-0 h-[18px] w-[18px]" strokeWidth={active === id ? 2.2 : 1.7} />
           <div className="text-left">
-            <p className="text-[15px] font-semibold leading-none">{label}</p>
-            <p className={`mt-1 text-[11px] leading-none ${active === id ? "text-white/65" : "text-muted-foreground/60"}`}>
+            <p className="text-[14px] font-semibold leading-none">{label}</p>
+            <p className={`mt-1 text-[11px] leading-none ${active === id ? "text-foreground/45" : "text-foreground/30"}`}>
               {sub}
             </p>
           </div>
+          {active === id && (
+            <div className="ml-auto h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+          )}
         </button>
       ))}
     </div>
@@ -183,7 +186,7 @@ function JudgeInput({ value, onChange }: { value: string; onChange: (v: string) 
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  const inputCls = "w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder-muted-foreground/50 focus:outline-none focus:border-[#009B3A]/60 transition-colors";
+  const inputCls = "w-full rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-foreground/30 focus:outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/[0.12] transition-all";
 
   return (
     <div ref={wrapRef} className="relative">
@@ -196,12 +199,12 @@ function JudgeInput({ value, onChange }: { value: string; onChange: (v: string) 
         autoComplete="off"
       />
       {open && suggestions.length > 0 && (
-        <ul className="absolute z-50 mt-1 w-full rounded-xl border border-border bg-card shadow-lg overflow-hidden">
+        <ul className="absolute z-50 mt-1.5 w-full rounded-xl border border-border bg-card shadow-2xl overflow-hidden">
           {suggestions.map((name) => (
             <li key={name}>
               <button
                 type="button"
-                className="w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors"
+                className="w-full text-left px-3 py-2.5 text-sm text-foreground/70 hover:bg-foreground/[0.04] hover:text-foreground transition-colors"
                 onMouseDown={(e) => { e.preventDefault(); onChange(name); setOpen(false); setSuggestions([]); }}
               >
                 {name}
@@ -229,8 +232,8 @@ function FilterPanel({
   onChange: (patch: Partial<Filters>) => void;
   onClear: () => void;
 }) {
-  const labelCls = "block text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground mb-1.5";
-  const inputCls = "w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder-muted-foreground/50 focus:outline-none focus:border-[#009B3A]/60 transition-colors";
+  const labelCls = "block text-[10px] font-semibold uppercase tracking-[0.14em] text-foreground/35 mb-1.5";
+  const inputCls = "w-full rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-foreground/30 focus:outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/[0.12] transition-all";
 
   const toggleTag = (tag: string) => {
     const next = filters.tags.includes(tag)
@@ -246,10 +249,9 @@ function FilterPanel({
         open ? "max-h-[600px] opacity-100" : "max-h-0 opacity-0",
       ].join(" ")}
     >
-      <div className="rounded-2xl border border-border bg-card p-5 mt-3 shadow-sm">
+      <div className="rounded-2xl border border-border bg-card p-5 mt-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
-          {/* Date From */}
           <div>
             <label className={labelCls}>Date From</label>
             <input
@@ -260,7 +262,6 @@ function FilterPanel({
             />
           </div>
 
-          {/* Date To */}
           <div>
             <label className={labelCls}>Date To</label>
             <input
@@ -271,13 +272,11 @@ function FilterPanel({
             />
           </div>
 
-          {/* Judge */}
           <div>
             <label className={labelCls}>Judge Name</label>
             <JudgeInput value={filters.judge} onChange={(v) => onChange({ judge: v })} />
           </div>
 
-          {/* Court */}
           <div>
             <label className={labelCls}>Court</label>
             <select
@@ -290,7 +289,6 @@ function FilterPanel({
             </select>
           </div>
 
-          {/* Case Number */}
           <div className="sm:col-span-2 lg:col-span-2">
             <label className={labelCls}>Case Number</label>
             <input
@@ -302,7 +300,6 @@ function FilterPanel({
             />
           </div>
 
-          {/* Category Tags (judgments only) */}
           {activeTab === "judgments" && (
             <div className="sm:col-span-2 lg:col-span-2">
               <label className={labelCls}>Category Tags</label>
@@ -313,10 +310,10 @@ function FilterPanel({
                     type="button"
                     onClick={() => toggleTag(value)}
                     className={[
-                      "rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors",
+                      "rounded-full border px-3 py-1 text-[11px] font-semibold transition-all",
                       filters.tags.includes(value)
-                        ? "border-[#009B3A]/50 bg-[#009B3A]/15 text-[#009B3A]"
-                        : "border-border bg-background text-muted-foreground hover:border-[#009B3A]/30 hover:text-foreground",
+                        ? "border-primary/40 bg-primary/10 text-primary"
+                        : "border-border bg-transparent text-foreground/40 hover:border-primary/25 hover:text-foreground/75",
                     ].join(" ")}
                   >
                     {label}
@@ -331,7 +328,7 @@ function FilterPanel({
           <button
             type="button"
             onClick={onClear}
-            className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+            className="text-xs font-medium text-foreground/35 hover:text-foreground/70 transition-colors"
           >
             Clear all filters
           </button>
@@ -367,17 +364,17 @@ function ActiveChips({
   if (chips.length === 0) return null;
 
   return (
-    <div className="flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pb-0.5 mt-3">
+    <div className="flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pb-0.5 mt-3">
       {chips.map(({ label, onRemove }) => (
         <span
           key={label}
-          className="inline-flex items-center gap-1 shrink-0 rounded-full border border-[#009B3A]/30 bg-[#009B3A]/10 px-2.5 py-1 text-[11px] font-semibold text-[#009B3A]"
+          className="inline-flex items-center gap-1 shrink-0 rounded-full border border-primary/25 bg-primary/[0.07] px-2.5 py-1 text-[11px] font-semibold text-primary"
         >
           {label}
           <button
             type="button"
             onClick={onRemove}
-            className="rounded-full p-0.5 hover:bg-[#009B3A]/20 transition-colors"
+            className="rounded-full p-0.5 hover:bg-primary/20 transition-colors"
             aria-label={`Remove ${label} filter`}
           >
             <X className="h-2.5 w-2.5" />
@@ -387,7 +384,7 @@ function ActiveChips({
       <button
         type="button"
         onClick={onClearAll}
-        className="shrink-0 text-[11px] text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2"
+        className="shrink-0 text-[11px] text-foreground/35 hover:text-foreground/70 transition-colors underline underline-offset-2"
       >
         Clear all
       </button>
@@ -399,15 +396,15 @@ function ActiveChips({
 
 function SkeletonCard() {
   return (
-    <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+    <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
       <div className="flex justify-between items-start gap-3">
-        <Skeleton className="h-3.5 w-2/3 bg-muted" />
-        <Skeleton className="h-5 w-20 rounded-md bg-muted shrink-0" />
+        <Skeleton className="h-3.5 w-2/3 bg-foreground/[0.05]" />
+        <Skeleton className="h-5 w-20 rounded-md bg-foreground/[0.04] shrink-0" />
       </div>
       <div className="space-y-2 pt-1">
-        <Skeleton className="h-2.5 w-1/2 bg-muted/60" />
-        <Skeleton className="h-2.5 w-2/5 bg-muted/60" />
-        <Skeleton className="h-2.5 w-1/3 bg-muted/60" />
+        <Skeleton className="h-2.5 w-1/2 bg-foreground/[0.04]" />
+        <Skeleton className="h-2.5 w-2/5 bg-foreground/[0.03]" />
+        <Skeleton className="h-2.5 w-1/3 bg-foreground/[0.03]" />
       </div>
     </div>
   );
@@ -434,34 +431,44 @@ function EmptyState({
       ? "This case number does not appear in our Supreme Court or Court of Appeal listings. Parish Court cases are tracked separately."
       : "Try different keywords or adjust your filters.";
     return (
-      <div className="col-span-full flex flex-col items-center justify-center rounded-2xl border border-border bg-card py-20 text-center px-8">
-        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/50 ring-1 ring-border">
-          <SearchX className="h-7 w-7 text-muted-foreground/40" />
+      <div className="col-span-full relative overflow-hidden flex flex-col items-center justify-center rounded-2xl border border-border bg-card py-20 text-center px-8">
+        <span className="pointer-events-none select-none absolute inset-0 flex items-center justify-center font-heading font-extrabold text-[7rem] text-foreground/[0.02] overflow-hidden">
+          {headline.split(" ")[0].toUpperCase()}
+        </span>
+        <div className="relative z-10">
+          <div className="mb-4 mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-muted">
+            <SearchX className="h-7 w-7 text-foreground/20" />
+          </div>
+          <p className="font-heading font-semibold text-[15px] text-foreground/65">{headline}</p>
+          <p className="mt-2 text-[12px] text-foreground/30 max-w-[280px] leading-relaxed">
+            {sub}
+          </p>
+          <button
+            onClick={onClear}
+            className="mt-5 rounded-xl border border-primary/25 bg-primary/[0.07] px-5 py-2 text-xs font-semibold text-primary hover:bg-primary/[0.12] transition-colors"
+          >
+            Clear search &amp; filters
+          </button>
         </div>
-        <p className="text-sm font-semibold text-muted-foreground">{headline}</p>
-        <p className="mt-1.5 text-xs text-muted-foreground/60 max-w-[280px] leading-relaxed">
-          {sub}
-        </p>
-        <button
-          onClick={onClear}
-          className="mt-5 rounded-xl bg-[#009B3A]/15 border border-[#009B3A]/30 px-5 py-2 text-xs font-semibold text-[#009B3A] hover:bg-[#009B3A]/25 transition-colors"
-        >
-          Clear search &amp; filters
-        </button>
       </div>
     );
   }
   return (
-    <div className="col-span-full flex flex-col items-center justify-center rounded-2xl border border-border bg-card py-20 text-center px-8">
-      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#009B3A]/[0.07] ring-1 ring-[#009B3A]/20">
-        {tab === "judgments" ? <Scale className="h-7 w-7 text-[#009B3A]/50" /> : <Calendar className="h-7 w-7 text-[#009B3A]/50" />}
+    <div className="col-span-full relative overflow-hidden flex flex-col items-center justify-center rounded-2xl border border-border bg-card py-20 text-center px-8">
+      <span className="pointer-events-none select-none absolute inset-0 flex items-center justify-center font-heading font-extrabold text-[7rem] text-foreground/[0.02] overflow-hidden">
+        {tab === "judgments" ? "CASES" : "LISTS"}
+      </span>
+      <div className="relative z-10">
+        <div className="mb-4 mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-primary/[0.05]">
+          {tab === "judgments" ? <Scale className="h-7 w-7 text-primary/40" /> : <Calendar className="h-7 w-7 text-primary/40" />}
+        </div>
+        <p className="font-heading font-semibold text-[15px] text-foreground/55">
+          No {tab === "judgments" ? "judgments" : "sittings"} yet
+        </p>
+        <p className="mt-1.5 text-[12px] text-foreground/30 max-w-[220px] leading-relaxed">
+          New cases are scraped daily. Check back soon.
+        </p>
       </div>
-      <p className="text-sm font-semibold text-muted-foreground">
-        No {tab === "judgments" ? "judgments" : "sittings"} yet
-      </p>
-      <p className="mt-1.5 text-xs text-muted-foreground/60 max-w-[220px] leading-relaxed">
-        New cases are scraped daily. Check back soon.
-      </p>
     </div>
   );
 }
@@ -487,29 +494,30 @@ function Pagination({
   const pageList = buildPageList(page, totalPages);
   return (
     <div className="flex flex-col items-center gap-3 py-6">
-      <p className="text-[11px] text-muted-foreground">
-        Page {page} of {totalPages} &middot; {total.toLocaleString()} {itemLabel}
+      <p className="text-[11px] text-foreground/30 font-mono tracking-wide">
+        Page {page} of {totalPages} · {total.toLocaleString()} {itemLabel}
       </p>
       <div className="flex flex-wrap items-center justify-center gap-1.5">
         <button onClick={() => onPageChange(page - 1)} disabled={page === 1 || disabled} aria-label="Previous page"
-          className="flex min-h-[44px] items-center gap-1 rounded-xl border border-border bg-card px-3 text-[13px] text-foreground/60 transition-all hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30">
+          className="flex min-h-[44px] items-center gap-1 rounded-xl border border-border bg-card px-3 text-[13px] text-foreground/50 transition-all hover:bg-foreground/[0.05] hover:text-foreground hover:border-foreground/10 disabled:cursor-not-allowed disabled:opacity-30">
           <ChevronLeft className="h-4 w-4" /><span className="hidden sm:inline">Prev</span>
         </button>
         {pageList.map((n, i) =>
           n === "…" ? (
-            <span key={`e-${i}`} className="flex min-h-[44px] min-w-[44px] items-center justify-center text-[13px] text-muted-foreground/50">…</span>
+            <span key={`e-${i}`} className="flex min-h-[44px] min-w-[44px] items-center justify-center text-[13px] text-foreground/30">…</span>
           ) : (
             <button key={n} onClick={() => onPageChange(n as number)} disabled={disabled}
               aria-current={n === page ? "page" : undefined}
               className={["flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border text-[13px] font-medium transition-all",
-                n === page ? "border-[#009B3A]/50 bg-[#009B3A]/15 text-[#009B3A]"
-                  : "border-border bg-card text-foreground/60 hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"].join(" ")}>
+                n === page
+                  ? "border-primary/35 bg-primary/10 text-primary"
+                  : "border-border bg-card text-foreground/50 hover:bg-foreground/[0.05] hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"].join(" ")}>
               {n}
             </button>
           )
         )}
         <button onClick={() => onPageChange(page + 1)} disabled={page === totalPages || disabled} aria-label="Next page"
-          className="flex min-h-[44px] items-center gap-1 rounded-xl border border-border bg-card px-3 text-[13px] text-foreground/60 transition-all hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30">
+          className="flex min-h-[44px] items-center gap-1 rounded-xl border border-border bg-card px-3 text-[13px] text-foreground/50 transition-all hover:bg-foreground/[0.05] hover:text-foreground hover:border-foreground/10 disabled:cursor-not-allowed disabled:opacity-30">
           <span className="hidden sm:inline">Next</span><ChevronRight className="h-4 w-4" />
         </button>
       </div>
@@ -739,22 +747,22 @@ export default function CasesPage() {
 
           {/* Header */}
           <div className="mb-6">
-            <div className="mb-3 flex items-center gap-2">
-              <Scale className="h-4 w-4 text-[#009B3A]" />
-              <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#009B3A]">
+            <div className="mb-5 flex items-center gap-3">
+              <div className="h-px w-8 bg-primary/45" />
+              <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-primary/65">
                 Case Registry
               </span>
             </div>
-            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground mb-6">
-              Search Cases
+            <h1 className="font-heading font-extrabold text-[2.4rem] sm:text-[3.2rem] leading-none tracking-tight text-foreground mb-6">
+              Search Cases<span className="text-primary">.</span>
             </h1>
             <TabToggle active={activeTab} onChange={handleTabChange} />
 
-            {/* Quick access row */}
+            {/* Quick access */}
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <button
                 onClick={() => router.push("/parish-court")}
-                className="flex items-center gap-2 rounded-full border border-[#CD7F32]/30 bg-[#CD7F32]/10 px-4 py-2 text-[12px] font-semibold text-[#CD7F32] hover:bg-[#CD7F32]/20 hover:border-[#CD7F32]/50 transition-colors"
+                className="flex items-center gap-2 rounded-full border border-[rgba(205,127,50,0.25)] bg-[rgba(205,127,50,0.07)] px-4 py-2 text-[12px] font-semibold text-[#cd9060] hover:bg-[rgba(205,127,50,0.12)] hover:border-[rgba(205,127,50,0.4)] transition-all"
               >
                 <MapPin className="h-3.5 w-3.5" />
                 Parish Court
@@ -783,10 +791,10 @@ export default function CasesPage() {
                 type="button"
                 onClick={() => setFiltersOpen((o) => !o)}
                 className={[
-                  "inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition-colors",
+                  "inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition-all",
                   activeFilterCount > 0
-                    ? "border-[#009B3A]/40 bg-[#009B3A]/10 text-[#009B3A] hover:bg-[#009B3A]/20"
-                    : "border-border bg-card text-muted-foreground hover:text-foreground hover:bg-accent",
+                    ? "border-primary/35 bg-primary/[0.08] text-primary hover:bg-primary/[0.14]"
+                    : "border-border bg-card text-foreground/50 hover:text-foreground/80 hover:bg-foreground/[0.04]",
                 ].join(" ")}
               >
                 <SlidersHorizontal className="h-4 w-4" />
@@ -798,7 +806,7 @@ export default function CasesPage() {
                 <button
                   type="button"
                   onClick={handleClearFilters}
-                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  className="text-xs text-foreground/35 hover:text-foreground/70 transition-colors"
                 >
                   Clear all
                 </button>
@@ -823,7 +831,7 @@ export default function CasesPage() {
 
           {/* Result count */}
           {!loading && (
-            <p className="mt-3 mb-4 text-[11px] text-muted-foreground">
+            <p className="mt-3 mb-4 text-[11px] font-mono text-foreground/30 tracking-wide">
               {shownCount < totalCount
                 ? `Showing ${shownCount.toLocaleString()} of ${totalCount.toLocaleString()}`
                 : totalCount.toLocaleString()}{" "}
@@ -898,7 +906,7 @@ export default function CasesPage() {
                   <button
                     onClick={handleLoadMore}
                     disabled={loadingMore}
-                    className="flex items-center gap-2 rounded-xl border border-border bg-card px-6 py-3 text-sm font-semibold text-foreground/60 hover:bg-accent hover:text-foreground active:scale-[0.97] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center gap-2 rounded-xl border border-border bg-card px-6 py-3 text-sm font-semibold text-foreground/50 hover:bg-foreground/[0.05] hover:text-foreground hover:border-foreground/10 active:scale-[0.98] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {loadingMore ? (
                       <><Loader2 className="h-4 w-4 animate-spin" />Loading…</>

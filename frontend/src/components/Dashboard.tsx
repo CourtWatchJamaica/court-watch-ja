@@ -9,17 +9,13 @@ import LegalPulse from "@/components/LegalPulse";
 import { apiClient } from "@/lib/api";
 import { Judgment, UserCase, CourtSitting, User as UserProfile } from "@/lib/types";
 import {
-  FileText,
-  TrendingUp,
-  Scale,
   Calendar,
-  Building2,
-  User,
   ArrowUpRight,
   Megaphone,
   X,
+  User,
+  Building2,
 } from "lucide-react";
-import { VerdictIcon } from "@/components/icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Notification } from "@/lib/types";
 import WelcomeGuide from "@/components/WelcomeGuide";
@@ -32,64 +28,26 @@ function AnnouncementBanner({
   onDismiss: () => void;
 }) {
   return (
-    <div className="mb-5 flex items-start gap-3 rounded-2xl border border-[#FED100]/25 bg-[#FED100]/[0.05] px-4 py-3.5">
-      <Megaphone className="h-4 w-4 text-[#FED100] shrink-0 mt-0.5" />
+    <div className="mb-6 flex items-start gap-3 rounded-2xl border border-accent/[0.18] bg-accent/[0.04] px-4 py-3.5">
+      <Megaphone className="h-4 w-4 text-accent shrink-0 mt-0.5" />
       <div className="flex-1 min-w-0">
         {notif.title && (
-          <p className="text-sm font-semibold text-[#FED100] leading-snug">
+          <p className="text-sm font-semibold text-accent leading-snug">
             {notif.title}
           </p>
         )}
         {notif.message && (
-          <p className="mt-0.5 text-xs text-white/55 leading-relaxed">
+          <p className="mt-0.5 text-xs text-foreground/50 leading-relaxed">
             {notif.message}
           </p>
         )}
       </div>
       <button
         onClick={onDismiss}
-        className="shrink-0 rounded-lg p-1 text-white/25 hover:text-white/60 transition-colors"
+        className="shrink-0 rounded-lg p-1 text-foreground/20 hover:text-foreground/60 transition-colors"
       >
         <X className="h-3.5 w-3.5" />
       </button>
-    </div>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  icon: Icon,
-  iconBg,
-  iconColor,
-}: {
-  label: string;
-  value: string | number;
-  icon: React.ComponentType<{ className?: string }>;
-  iconBg: string;
-  iconColor: string;
-}) {
-  return (
-    <div className="flex items-center gap-3.5 rounded-2xl border border-border bg-card px-5 py-4 shrink-0">
-      <div className={`rounded-xl p-2.5 ${iconBg}`}>
-        <Icon className={`h-5 w-5 ${iconColor}`} />
-      </div>
-      <div>
-        <p className="text-xl font-bold text-foreground leading-none">{value}</p>
-        <p className="mt-1 text-[11px] text-muted-foreground leading-none">{label}</p>
-      </div>
-    </div>
-  );
-}
-
-function SkeletonStat() {
-  return (
-    <div className="flex items-center gap-3.5 rounded-2xl border border-border bg-card px-5 py-4 shrink-0 min-w-[140px]">
-      <Skeleton className="h-10 w-10 rounded-xl bg-white/[0.06]" />
-      <div className="space-y-2">
-        <Skeleton className="h-5 w-10 bg-white/[0.06]" />
-        <Skeleton className="h-2.5 w-20 bg-white/[0.04]" />
-      </div>
     </div>
   );
 }
@@ -119,14 +77,16 @@ function TodaySittings({ sittings, loading }: TodaySittingsProps) {
 
   return (
     <section>
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-[#FED100]" />
-          <h2 className="text-sm font-semibold text-foreground">{label}</h2>
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="h-px w-8 bg-accent/45" />
+          <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-accent/65">
+            {label}
+          </span>
         </div>
         <button
           onClick={() => router.push("/court-sittings/today")}
-          className="flex items-center gap-1 text-[11px] font-medium text-amber-600 hover:text-amber-700 dark:text-[#FED100]/70 dark:hover:text-[#FED100] transition-colors"
+          className="flex items-center gap-1 text-[11px] font-medium text-foreground/35 hover:text-foreground/70 transition-colors"
         >
           View All
           <ArrowUpRight className="h-3 w-3" />
@@ -136,7 +96,7 @@ function TodaySittings({ sittings, loading }: TodaySittingsProps) {
       {loading ? (
         <div className="space-y-2">
           {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-14 rounded-xl bg-muted" />
+            <Skeleton key={i} className="h-14 rounded-xl bg-foreground/[0.04]" />
           ))}
         </div>
       ) : display.length > 0 ? (
@@ -144,22 +104,20 @@ function TodaySittings({ sittings, loading }: TodaySittingsProps) {
           {display.map((sitting) => (
             <div
               key={sitting.id}
-              className="group flex items-start gap-3 px-4 py-3 hover:bg-accent/40 transition-colors cursor-pointer"
+              className="group flex items-start gap-3 px-4 py-3 hover:bg-foreground/[0.03] transition-colors cursor-pointer"
               onClick={() => router.push(`/cases/sittings/${sitting.id}`)}
             >
               <div className="shrink-0 text-center min-w-[44px]">
                 {sitting.event_time ? (
-                  <p className="text-[11px] font-bold text-amber-600 dark:text-[#FED100]">
+                  <p className="text-[11px] font-bold text-accent">
                     {formatSittingTime(sitting.event_time)}
                   </p>
                 ) : (
-                  <p className="text-[11px] text-muted-foreground/50">TBD</p>
+                  <p className="text-[11px] text-foreground/25">TBD</p>
                 )}
                 {sitting.event_date && sitting.event_date !== today && (
-                  <p className="text-[9px] text-muted-foreground/60 mt-0.5">
-                    {new Date(
-                      `${sitting.event_date}T00:00:00`,
-                    ).toLocaleDateString("en-JM", {
+                  <p className="text-[9px] text-foreground/30 mt-0.5">
+                    {new Date(`${sitting.event_date}T00:00:00`).toLocaleDateString("en-JM", {
                       month: "short",
                       day: "numeric",
                     })}
@@ -167,46 +125,47 @@ function TodaySittings({ sittings, loading }: TodaySittingsProps) {
                 )}
               </div>
 
-              <div className="mt-1 h-full w-px bg-border shrink-0 self-stretch" />
+              <div className="mt-1 h-full w-px bg-foreground/[0.06] shrink-0 self-stretch" />
 
               <div className="flex-1 min-w-0">
-                <p className="text-[12px] font-medium text-foreground/80 line-clamp-1 group-hover:text-foreground transition-colors">
+                <p className="text-[12px] font-medium text-foreground/70 line-clamp-1 group-hover:text-foreground transition-colors">
                   {sitting.title || sitting.case_number || "Untitled Sitting"}
                 </p>
                 <div className="mt-1 flex items-center gap-2 flex-wrap">
                   {sitting.judge_name && (
-                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                    <div className="flex items-center gap-1 text-[10px] text-foreground/35">
                       <User className="h-2.5 w-2.5" />
-                      <span className="truncate max-w-[100px]">
-                        {sitting.judge_name}
-                      </span>
+                      <span className="truncate max-w-[100px]">{sitting.judge_name}</span>
                     </div>
                   )}
                   {sitting.court_division && (
-                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                    <div className="flex items-center gap-1 text-[10px] text-foreground/35">
                       <Building2 className="h-2.5 w-2.5" />
-                      <span className="truncate max-w-[100px]">
-                        {sitting.court_division}
-                      </span>
+                      <span className="truncate max-w-[100px]">{sitting.court_division}</span>
                     </div>
                   )}
                 </div>
               </div>
-              <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/30 group-hover:text-muted-foreground transition-colors" />
+              <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-foreground/[0.15] group-hover:text-foreground/50 transition-colors" />
             </div>
           ))}
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card py-10 text-center px-6">
-          <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-[#FED100]/[0.07] ring-1 ring-[#FED100]/15">
-            <Calendar className="h-5 w-5 text-[#FED100]/50" />
+        <div className="relative overflow-hidden flex flex-col items-center justify-center rounded-2xl border border-border bg-card py-12 text-center px-6">
+          <span className="pointer-events-none absolute inset-0 flex items-center justify-center font-heading font-extrabold text-[6rem] text-foreground/[0.02] select-none">
+            NONE
+          </span>
+          <div className="relative z-10">
+            <div className="mb-3 mx-auto flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-muted">
+              <Calendar className="h-5 w-5 text-foreground/20" />
+            </div>
+            <p className="text-sm font-medium text-foreground/40">
+              No sittings scheduled
+            </p>
+            <p className="mt-1 text-xs text-foreground/25">
+              Court lists are updated daily.
+            </p>
           </div>
-          <p className="text-sm font-medium text-muted-foreground">
-            No sittings scheduled
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground/60">
-            Court lists are updated daily.
-          </p>
         </div>
       )}
     </section>
@@ -215,9 +174,9 @@ function TodaySittings({ sittings, loading }: TodaySittingsProps) {
 
 function getGreeting(): string {
   const h = new Date().getHours();
-  if (h < 12) return "Good morning";
-  if (h < 17) return "Good afternoon";
-  return "Good evening";
+  if (h < 12) return "Good morning,";
+  if (h < 17) return "Good afternoon,";
+  return "Good evening,";
 }
 
 export default function Dashboard() {
@@ -286,6 +245,9 @@ export default function Dashboard() {
     }
   }, []);
 
+  const todayStr = new Date().toISOString().split("T")[0];
+  const todaySittingsCount = sittings.filter((s) => s.event_date === todayStr).length;
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -301,17 +263,21 @@ export default function Dashboard() {
             />
           ))}
 
-        <div className="mb-7">
-          <div className="mb-2.5 flex items-center gap-2">
-            <Scale className="h-4 w-4 text-[#009B3A]" />
-            <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#009B3A]">
+        {/* ── Hero greeting ─────────────────────────────────────────────── */}
+        <div className="mb-10">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="h-px w-8 bg-primary/45" />
+            <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-primary/65">
               CourtWatch JA
             </span>
           </div>
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
-            {getGreeting()}, {user?.display_name || "Counsellor"}
+          <p className="text-[13px] font-medium uppercase tracking-[0.18em] text-foreground/40 mb-1">
+            {getGreeting()}
+          </p>
+          <h1 className="font-heading font-extrabold leading-none tracking-tight text-foreground text-[3.2rem] sm:text-[4.5rem] lg:text-[6rem]">
+            {user?.display_name || "Counsellor"}<span className="text-primary">.</span>
           </h1>
-          <p className="mt-1.5 text-sm text-muted-foreground">
+          <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.18em] text-foreground/30">
             {new Date().toLocaleDateString("en-JM", {
               weekday: "long",
               year: "numeric",
@@ -321,76 +287,86 @@ export default function Dashboard() {
           </p>
         </div>
 
-        <div className="mb-8 -mx-4 sm:mx-0">
-          <div className="flex gap-3 overflow-x-auto px-4 sm:px-0 sm:grid sm:grid-cols-2 lg:grid-cols-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pb-1">
+        {/* ── Stats strip ───────────────────────────────────────────────── */}
+        <div className="mb-10 -mx-4 sm:mx-0">
+          <div className="grid grid-cols-2 sm:grid-cols-4 border border-border rounded-2xl overflow-hidden bg-card divide-x divide-border">
             {loading ? (
-              [1, 2, 3, 4].map((i) => <SkeletonStat key={i} />)
+              [1, 2, 3, 4].map((i) => (
+                <div key={i} className="px-6 py-6 space-y-3">
+                  <Skeleton className="h-9 w-16 bg-foreground/[0.05]" />
+                  <Skeleton className="h-2 w-20 bg-foreground/[0.04]" />
+                </div>
+              ))
             ) : (
               <>
-                <StatCard
-                  label="Total Judgments"
-                  value={`${allJudgments.length}+`}
-                  icon={FileText}
-                  iconBg="bg-[#009B3A]/15"
-                  iconColor="text-[#009B3A]"
-                />
-                <StatCard
-                  label="Tracked Cases"
-                  value={trackedCases.length}
-                  icon={VerdictIcon}
-                  iconBg="bg-[#FED100]/12"
-                  iconColor="text-[#FED100]"
-                />
-                <StatCard
-                  label="Today's Sittings"
-                  value={
-                    sittings.filter(
-                      (s) =>
-                        s.event_date ===
-                        new Date().toISOString().split("T")[0],
-                    ).length
-                  }
-                  icon={Calendar}
-                  iconBg="bg-blue-500/15"
-                  iconColor="text-blue-400"
-                />
-                <StatCard
-                  label="Live Updates"
-                  value="Active"
-                  icon={TrendingUp}
-                  iconBg="bg-purple-500/15"
-                  iconColor="text-purple-400"
-                />
+                <div className="relative px-5 sm:px-6 py-6">
+                  <div className="absolute top-0 left-5 sm:left-6 right-5 sm:right-6 h-[1.5px] bg-gradient-to-r from-primary to-primary/20" />
+                  <p className="font-heading font-bold text-[2.2rem] sm:text-[2.5rem] text-foreground leading-none tabular-nums">
+                    {allJudgments.length}+
+                  </p>
+                  <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-foreground/30">
+                    Judgments
+                  </p>
+                </div>
+                <div className="px-5 sm:px-6 py-6">
+                  <p className="font-heading font-bold text-[2.2rem] sm:text-[2.5rem] text-foreground leading-none tabular-nums">
+                    {trackedCases.length}
+                  </p>
+                  <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-foreground/30">
+                    Tracked
+                  </p>
+                </div>
+                <div className="px-5 sm:px-6 py-6">
+                  <p className="font-heading font-bold text-[2.2rem] sm:text-[2.5rem] text-foreground leading-none tabular-nums">
+                    {todaySittingsCount}
+                  </p>
+                  <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-foreground/30">
+                    Today
+                  </p>
+                </div>
+                <div className="px-5 sm:px-6 py-6">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                    <p className="font-heading font-bold text-[1.4rem] text-primary leading-none">
+                      Live
+                    </p>
+                  </div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-foreground/30">
+                    Updates
+                  </p>
+                </div>
               </>
             )}
           </div>
         </div>
 
+        {/* ── Track a Case ──────────────────────────────────────────────── */}
         <div className="mb-8">
-          <div className="mb-3 flex items-center gap-2.5">
-            <div className="h-4 w-[3px] rounded-full bg-[#FED100]" />
-            <Scale className="h-3.5 w-3.5 text-[#FED100]" />
-            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#FED100]">
+          <div className="mb-3 flex items-center gap-3">
+            <div className="h-px w-8 bg-accent/45" />
+            <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-accent/65">
               Track a Case
             </span>
           </div>
           <AddByNumberForm onRefresh={fetchData} />
         </div>
 
+        {/* ── Judgment carousel ─────────────────────────────────────────── */}
         <div className="mb-8 carousel-container group">
           {loading ? (
             <div>
               <div className="mb-3 flex items-center justify-between">
-                <Skeleton className="h-4 w-32 bg-white/[0.06]" />
-                <Skeleton className="h-3.5 w-24 bg-white/[0.04]" />
+                <Skeleton className="h-3 w-28 bg-foreground/[0.05]" />
+                <Skeleton className="h-3 w-20 bg-foreground/[0.04]" />
               </div>
-              <Skeleton className="h-[168px] sm:h-[200px] rounded-2xl bg-white/[0.04]" />
+              <Skeleton className="h-[168px] sm:h-[200px] rounded-2xl bg-foreground/[0.04]" />
             </div>
           ) : (
             <JudgmentCarousel judgments={latestJudgments} />
           )}
         </div>
 
+        {/* ── Docket + Sittings ─────────────────────────────────────────── */}
         <div className="mb-8 grid gap-6 lg:grid-cols-2">
           <DocketSection
             trackedCases={trackedCases}

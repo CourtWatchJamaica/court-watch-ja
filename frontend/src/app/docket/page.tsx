@@ -47,9 +47,21 @@ function CaseCard({
   return (
     <button
       onClick={onClick}
-      className="group w-full text-left rounded-2xl border border-border bg-card hover:bg-muted/20 hover:border-[#009B3A]/40 transition-all duration-200 p-5"
+      className="group w-full text-left relative overflow-hidden rounded-2xl border border-border bg-card hover:border-primary/20 hover:shadow-[0_8px_32px_rgba(0,196,74,0.06),0_2px_8px_rgba(0,0,0,0.5)] transition-all duration-250 p-5 hover:-translate-y-0.5"
     >
-      <div className="flex items-start justify-between gap-3">
+      {/* Ghost case number watermark */}
+      <span
+        aria-hidden
+        className="pointer-events-none select-none absolute right-4 top-2 font-mono font-bold leading-none text-foreground/[0.035] overflow-hidden"
+        style={{ fontSize: "3.5rem", maxWidth: "200px", display: "block", whiteSpace: "nowrap", textOverflow: "clip" }}
+      >
+        {item.case_number}
+      </span>
+
+      {/* Hover ambient glow */}
+      <div className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-br from-primary/[0.03] via-transparent to-transparent" />
+
+      <div className="relative z-10 flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           {/* Case number */}
           <div className="flex items-center gap-2.5 mb-3">
@@ -57,7 +69,7 @@ function CaseCard({
               {item.case_number}
             </span>
             {item.unread_count > 0 && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-[#009B3A]/15 px-2 py-0.5 text-[10px] font-bold text-[#009B3A]">
+              <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] font-bold text-primary">
                 <Bell className="h-2.5 w-2.5" />
                 {item.unread_count}
               </span>
@@ -66,33 +78,33 @@ function CaseCard({
 
           {/* Next sitting */}
           {hasUpcoming ? (
-            <div className={`flex items-center gap-2 text-xs ${upcoming ? "text-[#009B3A]" : "text-muted-foreground"}`}>
+            <div className={`flex items-center gap-2 text-xs ${upcoming ? "text-primary" : "text-foreground/40"}`}>
               <Calendar className="h-3.5 w-3.5 shrink-0" />
               <span className="font-medium">
                 {item.next_event_type ?? "Hearing"}
               </span>
-              <span className="text-muted-foreground/60">·</span>
+              <span className="text-foreground/20">·</span>
               <span>{formatDate(item.next_event_date)}</span>
               {item.next_court_division && (
                 <>
-                  <span className="text-muted-foreground/60">·</span>
+                  <span className="text-foreground/20">·</span>
                   <span className="truncate">{item.next_court_division}</span>
                 </>
               )}
             </div>
           ) : (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground/50">
+            <div className="flex items-center gap-2 text-xs text-foreground/25">
               <Calendar className="h-3.5 w-3.5 shrink-0" />
               <span>No upcoming sittings</span>
             </div>
           )}
         </div>
 
-        <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-[#009B3A] group-hover:translate-x-0.5 transition-all mt-0.5 shrink-0" />
+        <ChevronRight className="h-4 w-4 text-foreground/[0.18] group-hover:text-primary group-hover:translate-x-0.5 transition-all mt-0.5 shrink-0" />
       </div>
 
       {/* Tracked since */}
-      <div className="mt-3 pt-3 border-t border-border/50 flex items-center gap-1.5 text-[11px] text-muted-foreground/40">
+      <div className="relative z-10 mt-3 pt-3 border-t border-foreground/[0.04] flex items-center gap-1.5 text-[11px] text-foreground/20">
         <Clock className="h-3 w-3" />
         <span>
           Tracked since{" "}
@@ -103,6 +115,9 @@ function CaseCard({
           })}
         </span>
       </div>
+
+      {/* Bottom hover line */}
+      <div className="absolute bottom-0 left-0 h-px w-0 group-hover:w-full transition-all duration-500 bg-gradient-to-r from-primary via-primary/40 to-transparent" />
     </button>
   );
 }
@@ -115,14 +130,14 @@ function SkeletonCard() {
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 space-y-3">
           <div className="flex gap-2 mb-1">
-            <div className="h-5 w-32 rounded bg-muted font-mono" />
+            <div className="h-5 w-32 rounded bg-foreground/[0.05] font-mono" />
           </div>
-          <div className="h-3.5 w-48 rounded bg-muted/60" />
+          <div className="h-3.5 w-48 rounded bg-foreground/[0.04]" />
         </div>
-        <div className="h-4 w-4 rounded bg-muted/40 mt-0.5" />
+        <div className="h-4 w-4 rounded bg-foreground/[0.03] mt-0.5" />
       </div>
-      <div className="mt-3 pt-3 border-t border-border/50">
-        <div className="h-3 w-36 rounded bg-muted/40" />
+      <div className="mt-3 pt-3 border-t border-foreground/[0.04]">
+        <div className="h-3 w-36 rounded bg-foreground/[0.03]" />
       </div>
     </div>
   );
@@ -163,25 +178,25 @@ export default function DocketPage() {
         <main className="max-w-2xl mx-auto px-4 sm:px-6 py-8 pb-32 md:pb-16">
 
           {/* Header */}
-          <div className="mb-6 flex items-start justify-between gap-3">
+          <div className="mb-10 flex items-start justify-between gap-6">
             <div>
-              <div className="mb-1.5 flex items-center gap-2">
-                <FolderOpen className="h-4 w-4 text-[#009B3A]" />
-                <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#009B3A]">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="h-px w-8 bg-primary/45" />
+                <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-primary/65">
                   Case Files
                 </span>
               </div>
-              <h1 className="text-2xl font-bold tracking-tight text-foreground">
-                My Docket
+              <h1 className="font-heading font-extrabold text-[2.8rem] sm:text-[3.5rem] leading-none tracking-tight text-foreground mb-2">
+                My Docket<span className="text-primary">.</span>
               </h1>
               {!loading && items.length > 0 && (
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="text-[13px] text-foreground/40">
                   {items.length} case{items.length !== 1 ? "s" : ""} tracked
                   {upcomingCount > 0 && (
-                    <> · <span className="text-[#009B3A] font-medium">{upcomingCount} upcoming</span></>
+                    <> · <span className="text-primary font-medium">{upcomingCount} upcoming</span></>
                   )}
                   {totalUnread > 0 && (
-                    <> · <span className="text-[#009B3A] font-medium">{totalUnread} unread</span></>
+                    <> · <span className="text-primary font-medium">{totalUnread} unread</span></>
                   )}
                 </p>
               )}
@@ -189,10 +204,10 @@ export default function DocketPage() {
 
             <button
               onClick={() => router.push("/cases")}
-              className="shrink-0 flex items-center gap-1.5 rounded-xl bg-[#009B3A]/10 border border-[#009B3A]/30 px-3.5 py-2.5 text-xs font-semibold text-[#009B3A] hover:bg-[#009B3A]/20 transition-colors"
+              className="shrink-0 flex items-center gap-1.5 rounded-xl border border-primary/22 bg-primary/[0.06] px-4 py-2.5 text-xs font-semibold text-primary hover:bg-primary/[0.12] hover:border-primary/[0.32] transition-all"
             >
               <Plus className="h-3.5 w-3.5" />
-              Track new case
+              Track new
             </button>
           </div>
 
@@ -205,24 +220,28 @@ export default function DocketPage() {
 
           {/* Empty */}
           {!loading && items.length === 0 && (
-            <div className="rounded-2xl border border-border bg-card flex flex-col items-center justify-center py-20 text-center px-6">
-              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted/30">
-                <FolderOpen className="h-7 w-7 text-muted-foreground/30" />
+            <div className="relative overflow-hidden rounded-2xl border border-border bg-card flex flex-col items-center justify-center py-24 text-center px-8">
+              <span className="pointer-events-none select-none absolute inset-0 flex items-center justify-center font-heading font-extrabold text-[7rem] text-foreground/[0.02] overflow-hidden">
+                EMPTY
+              </span>
+              <div className="relative z-10">
+                <div className="mb-5 mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-border bg-muted">
+                  <FolderOpen className="h-7 w-7 text-foreground/[0.18]" />
+                </div>
+                <h2 className="font-heading font-bold text-xl text-foreground/75 mb-2">
+                  Your docket is empty
+                </h2>
+                <p className="text-[13px] text-foreground/30 max-w-[240px] leading-relaxed mb-6">
+                  Track cases to monitor hearings and receive alerts when they&apos;re updated.
+                </p>
+                <button
+                  onClick={() => router.push("/cases")}
+                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-black hover:bg-primary/90 transition-colors active:scale-[0.98]"
+                >
+                  <Plus className="h-4 w-4" />
+                  Browse Cases
+                </button>
               </div>
-              <p className="text-sm font-medium text-muted-foreground">
-                You aren&apos;t tracking any cases yet
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground/60 max-w-[240px]">
-                Browse cases to start tracking hearings and receive alerts when
-                they&apos;re updated.
-              </p>
-              <button
-                onClick={() => router.push("/cases")}
-                className="mt-5 flex items-center gap-1.5 rounded-xl bg-[#009B3A] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#009B3A]/90 transition-colors"
-              >
-                <Plus className="h-4 w-4" />
-                Browse Cases
-              </button>
             </div>
           )}
 

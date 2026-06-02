@@ -11,7 +11,7 @@ interface SearchBarProps {
 
 export default function SearchBar({
   onSearch,
-  placeholder = "Search...",
+  placeholder = "Search…",
   initialValue = "",
 }: SearchBarProps) {
   const [query, setQuery] = useState(initialValue);
@@ -24,19 +24,19 @@ export default function SearchBar({
   }, [query, onSearch]);
 
   return (
-    <div className="relative">
-      <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/25" />
+    <div className="relative group">
+      <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/20 transition-colors group-focus-within:text-primary" />
       <input
         type="text"
         placeholder={placeholder}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        className="h-11 w-full rounded-xl border border-white/[0.08] bg-white/[0.04] pl-10 pr-9 text-sm text-white placeholder:text-white/30 outline-none focus:border-[#009B3A]/50 focus:bg-white/[0.06] focus:ring-1 focus:ring-[#009B3A]/30 transition-all"
+        className="h-12 w-full rounded-2xl border border-border bg-card pl-11 pr-10 text-[14px] text-foreground placeholder:text-foreground/30 outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/[0.12] transition-all duration-200"
       />
       {query && (
         <button
           onClick={() => setQuery("")}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-white/25 hover:text-white/60 transition-colors"
+          className="absolute right-3.5 top-1/2 -translate-y-1/2 rounded-lg p-0.5 text-foreground/25 hover:text-foreground/70 hover:bg-foreground/[0.06] transition-all"
           aria-label="Clear search"
         >
           <X className="h-3.5 w-3.5" />
