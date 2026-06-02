@@ -3078,3 +3078,30 @@ pub async fn admin_get_user_detail(
         recent_notifications,
     }))
 }
+
+// ── Broadcast emails ───────────────────────────────────────────────────────
+
+/// Returns emails of all verified users, used for broadcast sends.
+pub async fn get_all_verified_emails(pool: &PgPool) -> sqlx::Result<Vec<String>> {
+    sqlx::query_scalar("SELECT email FROM users WHERE email_verified = true ORDER BY id")
+        .fetch_all(pool)
+        .await
+}
+
+/// Logs a completed broadcast to the broadcast_emails table.
+pub async fn log_broadcast_email(
+    pool: &PgPool,
+    subject: &str,
+    body_html: &str,
+    recipient_count: i32,
+) -> sqlx::Result<i32> {
+    sqlx::query_scalar(
+        "INSERT INTO broadcast_emails (subject, body_html, recipient_count, status)
+         VALUES ($1, $2, $3, 'done') RETURNING id",
+    )
+    .bind(subject)
+    .bind(body_html)
+    .bind(recipient_count)
+    .fetch_one(pool)
+    .await
+}

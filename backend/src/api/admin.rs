@@ -8,8 +8,9 @@ use axum::{
 use chrono::{NaiveDate, NaiveTime};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use sqlx::PgPool;
 
-use crate::{api::errors::AppError, db::queries, scraper::ScraperState, AppState};
+use crate::{api::errors::AppError, db::queries, notifications::email as notif_email, scraper::ScraperState, AppState};
 
 fn get_client_ip(headers: &HeaderMap) -> Option<String> {
     headers
@@ -576,14 +577,96 @@ pub async fn announce(
     }
     let user_count = queries::admin_announce(&state.db, &body.title, &body.message).await?;
     if body.promo.unwrap_or(false) {
-        tracing::info!(
-            "[Email stub] Promo broadcast '{}' → {} recipient(s). Body: {}",
-            body.title,
-            user_count,
-            body.message
-        );
+        if let Some(api_key) = state.config.resend_api_key.clone() {
+            let pool = state.db.clone();
+            let subject = body.title.clone();
+            let message = body.message.clone();
+            tokio::spawn(async move {
+                send_broadcast(&pool, &api_key, &subject, &message).await;
+            });
+        } else {
+            tracing::warn!("[Broadcast] RESEND_API_KEY not set — email broadcast skipped (in-app notifications were still sent)");
+        }
     }
     Ok(Json(json!({ "sent": true, "user_count": user_count })))
+}
+
+async fn send_broadcast(pool: &PgPool, api_key: &str, subject: &str, message: &str) {
+    let emails = match queries::get_all_verified_emails(pool).await {
+        Ok(e) => e,
+        Err(err) => {
+            tracing::error!("[Broadcast] Failed to fetch user emails: {err}");
+            return;
+        }
+    };
+
+    let total = emails.len();
+    tracing::info!("[Broadcast] Starting email broadcast '{subject}' → {total} verified recipients");
+
+    if total == 0 {
+        tracing::warn!("[Broadcast] No verified users found — nothing to send");
+        return;
+    }
+
+    let html = format_broadcast_html(subject, message);
+    let client = reqwest::Client::new();
+    let mut sent: i32 = 0;
+
+    for (i, chunk) in emails.chunks(50).enumerate() {
+        if i > 0 {
+            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        }
+        for email in chunk {
+            match notif_email::send_email(
+                &client,
+                api_key,
+                notif_email::EmailSender::Alerts,
+                email,
+                subject,
+                &html,
+            )
+            .await
+            {
+                Ok(()) => sent += 1,
+                Err(e) => tracing::error!("[Broadcast] Failed to send to {email}: {e}"),
+            }
+        }
+    }
+
+    match queries::log_broadcast_email(pool, subject, &html, sent).await {
+        Ok(id) => tracing::info!("[Broadcast] Logged as broadcast_emails.id={id}"),
+        Err(e) => tracing::error!("[Broadcast] Failed to log broadcast: {e}"),
+    }
+
+    tracing::info!("[Broadcast] Done — {sent}/{total} emails delivered");
+}
+
+fn format_broadcast_html(title: &str, message: &str) -> String {
+    let app_url = std::env::var("APP_URL")
+        .unwrap_or_else(|_| "https://courtwatchjamaica.com".into());
+    let app_url_trimmed = app_url.trim_end_matches('/');
+    let message_html = html_escape(message).replace('\n', "<br>");
+    format!(
+        r#"<!DOCTYPE html>
+<html>
+<body style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#111;padding:24px 16px;">
+  <p style="font-size:15px;font-weight:700;margin:0 0 12px;">{title}</p>
+  <p style="font-size:14px;line-height:1.6;margin:0 0 24px;">{message_html}</p>
+  <p><a href="{app_url_trimmed}" style="color:#009B3A;font-weight:600;">Visit CourtWatch JA →</a></p>
+  <hr style="margin:32px 0;border:none;border-top:1px solid #eee;">
+  <p style="font-size:11px;color:#999;">
+    You're receiving this because you registered at courtwatchjamaica.com.
+  </p>
+</body>
+</html>"#
+    )
+}
+
+fn html_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
 }
 
 // ── Maintenance mode ───────────────────────────────────────────────────────
