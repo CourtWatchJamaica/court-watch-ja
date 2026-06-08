@@ -129,6 +129,7 @@ pub fn router(state: AppState) -> Router {
         .route("/api/admin/promos/:id", put(promos::admin_update_promo))
         .route("/api/admin/promos/:id", delete(promos::admin_delete_promo))
         .route("/api/admin/service-alert", post(service_alert::set_service_alert))
+        .route("/api/admin/backup", get(admin::download_backup))
         .layer(middleware::from_fn(require_admin))
         .layer(middleware::from_fn_with_state(state.clone(), require_auth));
 

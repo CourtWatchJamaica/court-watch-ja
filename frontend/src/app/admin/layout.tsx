@@ -16,6 +16,7 @@ import {
   Megaphone,
   Sparkles,
   AlertTriangle,
+  HardDriveDownload,
 } from "lucide-react";
 
 const NAV = [
@@ -29,6 +30,7 @@ const NAV = [
   { href: "/admin/alerts", label: "Alerts", icon: AlertTriangle },
   { href: "/admin/logs", label: "Logs", icon: ScrollText },
   { href: "/admin/config", label: "Config", icon: Settings },
+  { href: "/admin/backup", label: "Backup", icon: HardDriveDownload },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

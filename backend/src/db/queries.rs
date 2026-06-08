@@ -1655,7 +1655,9 @@ pub async fn check_notifications(pool: &PgPool) {
 
     for row in &judgment_pairs {
         if let Err(e) = sqlx::query(
-            "INSERT INTO notifications (user_id, case_id, type) VALUES ($1, $2, 'new_judgment')",
+            "INSERT INTO notifications (user_id, case_id, type)
+             VALUES ($1, $2, 'new_judgment')
+             ON CONFLICT DO NOTHING",
         )
         .bind(row.user_id)
         .bind(row.case_id)
@@ -1687,6 +1689,9 @@ pub async fn check_notifications(pool: &PgPool) {
     }
 
     let changed: Vec<SittingChange> = match sqlx::query_as(
+        // Guard: skip cases where a sitting_changed was already sent in the last
+        // 23 hours.  This prevents re-notification if the last_event_date UPDATE
+        // failed mid-run, and handles concurrent check_notifications calls.
         "SELECT uc.id          AS uc_id,
                 uc.user_id,
                 uc.case_id,
@@ -1696,7 +1701,14 @@ pub async fn check_notifications(pool: &PgPool) {
          JOIN court_sittings cs ON cs.id = uc.case_id
          WHERE uc.case_type = 'sitting'
            AND (uc.last_event_date IS DISTINCT FROM cs.event_date
-                OR uc.last_event_time IS DISTINCT FROM cs.event_time)",
+                OR uc.last_event_time IS DISTINCT FROM cs.event_time)
+           AND NOT EXISTS (
+               SELECT 1 FROM notifications n
+               WHERE n.user_id = uc.user_id
+                 AND n.case_id = uc.case_id
+                 AND n.type    = 'sitting_changed'
+                 AND n.sent_at > NOW() - INTERVAL '23 hours'
+           )",
     )
     .fetch_all(pool)
     .await
@@ -1710,7 +1722,9 @@ pub async fn check_notifications(pool: &PgPool) {
 
     for row in &changed {
         if let Err(e) = sqlx::query(
-            "INSERT INTO notifications (user_id, case_id, type) VALUES ($1, $2, 'sitting_changed')",
+            "INSERT INTO notifications (user_id, case_id, type)
+             VALUES ($1, $2, 'sitting_changed')
+             ON CONFLICT DO NOTHING",
         )
         .bind(row.user_id)
         .bind(row.case_id)
@@ -1755,6 +1769,9 @@ pub async fn check_notifications(pool: &PgPool) {
     }
 
     let day_before: Vec<ReminderPair> = match sqlx::query_as(
+        // Dedup by (case_number, event_date) rather than case_id so that a
+        // sitting row evicted and reinserted with a new id does not produce a
+        // second reminder for the same calendar event.
         "SELECT uc.user_id, uc.case_id
          FROM user_cases uc
          JOIN court_sittings cs ON cs.id = uc.case_id
@@ -1762,11 +1779,13 @@ pub async fn check_notifications(pool: &PgPool) {
            AND uc.case_id IS NOT NULL
            AND cs.event_date = CURRENT_DATE + 1
            AND NOT EXISTS (
-               SELECT 1 FROM notifications n
-               WHERE n.user_id = uc.user_id
-                 AND n.case_id = uc.case_id
-                 AND n.type = 'sitting_reminder_1d'
-                 AND n.sent_at::date = CURRENT_DATE
+               SELECT 1
+               FROM   notifications n
+               JOIN   court_sittings cs2 ON cs2.id = n.case_id
+               WHERE  n.user_id       = uc.user_id
+                 AND  cs2.case_number = cs.case_number
+                 AND  cs2.event_date  = cs.event_date
+                 AND  n.type          = 'sitting_reminder_1d'
            )",
     )
     .fetch_all(pool)
@@ -1781,7 +1800,9 @@ pub async fn check_notifications(pool: &PgPool) {
 
     for row in &day_before {
         if let Err(e) = sqlx::query(
-            "INSERT INTO notifications (user_id, case_id, type) VALUES ($1, $2, 'sitting_reminder_1d')",
+            "INSERT INTO notifications (user_id, case_id, type)
+             VALUES ($1, $2, 'sitting_reminder_1d')
+             ON CONFLICT DO NOTHING",
         )
         .bind(row.user_id)
         .bind(row.case_id)
@@ -1803,6 +1824,7 @@ pub async fn check_notifications(pool: &PgPool) {
 
     // ── Sitting reminders — morning of ───────────────────────────────────
     let morning_of: Vec<ReminderPair> = match sqlx::query_as(
+        // Same case_number+event_date dedup as sitting_reminder_1d above.
         "SELECT uc.user_id, uc.case_id
          FROM user_cases uc
          JOIN court_sittings cs ON cs.id = uc.case_id
@@ -1810,11 +1832,13 @@ pub async fn check_notifications(pool: &PgPool) {
            AND uc.case_id IS NOT NULL
            AND cs.event_date = CURRENT_DATE
            AND NOT EXISTS (
-               SELECT 1 FROM notifications n
-               WHERE n.user_id = uc.user_id
-                 AND n.case_id = uc.case_id
-                 AND n.type = 'sitting_reminder_morning'
-                 AND n.sent_at::date = CURRENT_DATE
+               SELECT 1
+               FROM   notifications n
+               JOIN   court_sittings cs2 ON cs2.id = n.case_id
+               WHERE  n.user_id       = uc.user_id
+                 AND  cs2.case_number = cs.case_number
+                 AND  cs2.event_date  = cs.event_date
+                 AND  n.type          = 'sitting_reminder_morning'
            )",
     )
     .fetch_all(pool)
@@ -1829,7 +1853,9 @@ pub async fn check_notifications(pool: &PgPool) {
 
     for row in &morning_of {
         if let Err(e) = sqlx::query(
-            "INSERT INTO notifications (user_id, case_id, type) VALUES ($1, $2, 'sitting_reminder_morning')",
+            "INSERT INTO notifications (user_id, case_id, type)
+             VALUES ($1, $2, 'sitting_reminder_morning')
+             ON CONFLICT DO NOTHING",
         )
         .bind(row.user_id)
         .bind(row.case_id)
@@ -1858,17 +1884,29 @@ pub async fn check_notifications(pool: &PgPool) {
     }
 
     let listed: Vec<CaseListed> = match sqlx::query_as(
-        "SELECT uc.user_id, uc.id AS uc_id, cs.id AS sitting_id
-         FROM user_cases uc
-         JOIN court_sittings cs ON cs.case_number = uc.case_number
-         WHERE uc.case_id IS NULL
-           AND uc.case_number IS NOT NULL
-           AND NOT EXISTS (
-               SELECT 1 FROM notifications n
-               WHERE n.user_id = uc.user_id
-                 AND n.case_id = cs.id
-                 AND n.type = 'case_listed'
-           )",
+        // DISTINCT ON ensures exactly ONE notification per (user, case_number)
+        // even when a case has multiple sittings — previously the JOIN could
+        // return N rows and fire N case_listed notifications for the same case.
+        //
+        // NOT EXISTS now matches by case_number (not case_id) so a sitting that
+        // was evicted and reinserted with a new id doesn't re-trigger the alert.
+        "SELECT DISTINCT ON (uc.user_id, uc.case_number)
+                uc.user_id,
+                uc.id  AS uc_id,
+                cs.id  AS sitting_id
+         FROM   user_cases uc
+         JOIN   court_sittings cs ON cs.case_number = uc.case_number
+         WHERE  uc.case_id IS NULL
+           AND  uc.case_number IS NOT NULL
+           AND  NOT EXISTS (
+                    SELECT 1
+                    FROM   notifications n
+                    JOIN   court_sittings cs2 ON cs2.id = n.case_id
+                    WHERE  n.user_id       = uc.user_id
+                      AND  cs2.case_number = uc.case_number
+                      AND  n.type          = 'case_listed'
+                )
+         ORDER BY uc.user_id, uc.case_number, cs.event_date ASC NULLS LAST",
     )
     .fetch_all(pool)
     .await
@@ -1882,7 +1920,9 @@ pub async fn check_notifications(pool: &PgPool) {
 
     for row in &listed {
         if let Err(e) = sqlx::query(
-            "INSERT INTO notifications (user_id, case_id, type) VALUES ($1, $2, 'case_listed')",
+            "INSERT INTO notifications (user_id, case_id, type)
+             VALUES ($1, $2, 'case_listed')
+             ON CONFLICT DO NOTHING",
         )
         .bind(row.user_id)
         .bind(row.sitting_id)
@@ -1958,7 +1998,8 @@ pub async fn check_notifications(pool: &PgPool) {
             .unwrap_or("Case Available");
         if let Err(e) = sqlx::query(
             "INSERT INTO notifications (user_id, case_id, type, title, message)
-             VALUES ($1, $2, 'case_available', $3, 'Your tracked case has been published as a judgment.')",
+             VALUES ($1, $2, 'case_available', $3, 'Your tracked case has been published as a judgment.')
+             ON CONFLICT DO NOTHING",
         )
         .bind(row.user_id)
         .bind(row.judgment_id)

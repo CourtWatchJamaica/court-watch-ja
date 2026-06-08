@@ -2,7 +2,8 @@ use std::sync::atomic::Ordering;
 
 use axum::{
     extract::{Path, Query, State},
-    http::HeaderMap,
+    http::{header, HeaderMap, HeaderValue, StatusCode},
+    response::IntoResponse,
     Extension, Json,
 };
 use chrono::{NaiveDate, NaiveTime};
@@ -764,4 +765,283 @@ pub async fn upload_pdf(
         "extracted": 0,
         "message": "Upload received. Processing will run on next scheduled scrape."
     })))
+}
+
+// ── Database backup ────────────────────────────────────────────────────────
+
+const BACKUP_RATE_LIMIT_KEY: &str = "backup_last_request_at";
+const BACKUP_RATE_LIMIT_SECS: i64 = 900; // 15 minutes
+
+pub async fn download_backup(
+    State(state): State<AppState>,
+    Extension(admin_id): Extension<i32>,
+    req_headers: HeaderMap,
+) -> Result<axum::response::Response, AppError> {
+    // ── Rate limit: once per 15 minutes ──────────────────────────────────
+    if let Ok(Some(last_str)) =
+        queries::get_system_config(&state.db, BACKUP_RATE_LIMIT_KEY).await
+    {
+        if let Ok(last_dt) =
+            chrono::NaiveDateTime::parse_from_str(&last_str, "%Y-%m-%dT%H:%M:%S")
+        {
+            let elapsed = (chrono::Utc::now().naive_utc() - last_dt).num_seconds();
+            if elapsed < BACKUP_RATE_LIMIT_SECS {
+                let retry_after = BACKUP_RATE_LIMIT_SECS - elapsed;
+                let mut res = (
+                    StatusCode::TOO_MANY_REQUESTS,
+                    Json(json!({
+                        "error": "Backup rate-limited",
+                        "retry_after_secs": retry_after
+                    })),
+                )
+                    .into_response();
+                res.headers_mut()
+                    .insert("retry-after", retry_after.to_string().parse().unwrap());
+                return Ok(res);
+            }
+        }
+    }
+
+    // Record this request immediately so parallel requests are also blocked.
+    let _ = queries::set_system_config(
+        &state.db,
+        BACKUP_RATE_LIMIT_KEY,
+        &chrono::Utc::now().naive_utc().format("%Y-%m-%dT%H:%M:%S").to_string(),
+    )
+    .await;
+
+    // ── Generate the SQL dump ─────────────────────────────────────────────
+    let sql =
+        build_sql_backup(&state.db)
+            .await
+            .map_err(|e| AppError::Internal(format!("Backup generation failed: {e}")))?;
+
+    // ── Update the staleness indicator used by the overview page ─────────
+    let date_str = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+    let _ = queries::set_system_config(&state.db, "backup_last_date", &date_str).await;
+
+    // ── Audit log ─────────────────────────────────────────────────────────
+    let _ = queries::log_admin_action(
+        &state.db,
+        admin_id,
+        "DB_BACKUP_DOWNLOAD",
+        None,
+        None,
+        Some(json!({ "size_bytes": sql.len() })),
+        get_client_ip(&req_headers).as_deref(),
+    )
+    .await;
+
+    let filename = format!(
+        "courtwatch_backup_{}.sql",
+        chrono::Utc::now().format("%Y-%m-%d_%H%M%S")
+    );
+
+    let mut res = (StatusCode::OK, sql).into_response();
+    res.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("text/plain; charset=utf-8"),
+    );
+    res.headers_mut().insert(
+        header::CONTENT_DISPOSITION,
+        format!("attachment; filename=\"{filename}\"")
+            .parse::<HeaderValue>()
+            .unwrap(),
+    );
+    Ok(res)
+}
+
+// ── SQL dump generation ────────────────────────────────────────────────────
+
+async fn build_sql_backup(pool: &PgPool) -> anyhow::Result<String> {
+    use std::fmt::Write as FmtWrite;
+
+    let now = chrono::Utc::now();
+    let mut out = String::with_capacity(1024 * 1024); // 1 MB initial capacity
+
+    // ── Header ────────────────────────────────────────────────────────────
+    writeln!(out, "-- CourtWatch JA — Database Backup")?;
+    writeln!(out, "-- Generated : {}", now.format("%Y-%m-%d %H:%M:%S UTC"))?;
+    writeln!(out)?;
+    writeln!(out, "-- RESTORE (incremental — skips rows that already exist):")?;
+    writeln!(out, "--   psql \"$DATABASE_URL\" < backup.sql")?;
+    writeln!(out)?;
+    writeln!(out, "-- RESTORE (full replace — add TRUNCATE block first):")?;
+    writeln!(out, "--   Uncomment the TRUNCATE lines below, then run psql.")?;
+    writeln!(out)?;
+    writeln!(out, "BEGIN;")?;
+    writeln!(out, "SET session_replication_role = 'replica'; -- skip FK checks during restore")?;
+    writeln!(out)?;
+    writeln!(out, "-- Uncomment for full-replace restore (wipes all data):")?;
+
+    // ── Discover tables ───────────────────────────────────────────────────
+    let tables: Vec<(String,)> = sqlx::query_as(
+        "SELECT table_name
+         FROM information_schema.tables
+         WHERE table_schema = 'public'
+           AND table_type   = 'BASE TABLE'
+           AND table_name  != '_sqlx_migrations'
+         ORDER BY table_name",
+    )
+    .fetch_all(pool)
+    .await?;
+
+    // Emit a commented-out TRUNCATE for all tables (users can uncomment it).
+    let table_list = tables
+        .iter()
+        .map(|(t,)| format!("\"{t}\""))
+        .collect::<Vec<_>>()
+        .join(", ");
+    writeln!(out, "-- TRUNCATE {table_list} RESTART IDENTITY CASCADE;")?;
+    writeln!(out)?;
+
+    // ── Dump each table ───────────────────────────────────────────────────
+    for (table_name,) in &tables {
+        dump_table(&mut out, pool, table_name).await?;
+    }
+
+    // ── Reset sequences ───────────────────────────────────────────────────
+    let seq_cols: Vec<(String, String, String)> = sqlx::query_as(
+        "SELECT table_name, column_name, column_default
+         FROM information_schema.columns
+         WHERE table_schema  = 'public'
+           AND column_default LIKE 'nextval%'",
+    )
+    .fetch_all(pool)
+    .await?;
+
+    if !seq_cols.is_empty() {
+        writeln!(out)?;
+        writeln!(out, "-- Reset sequences to current max so future inserts don't collide")?;
+        for (table, col, default) in &seq_cols {
+            if let Some(seq) = extract_seq_name(default) {
+                writeln!(
+                    out,
+                    "SELECT setval('{seq}', COALESCE((SELECT MAX(\"{col}\") FROM \"{table}\"), 0) + 1, false);"
+                )?;
+            }
+        }
+    }
+
+    writeln!(out)?;
+    writeln!(out, "SET session_replication_role = 'origin';")?;
+    writeln!(out, "COMMIT;")?;
+
+    Ok(out)
+}
+
+async fn dump_table(out: &mut String, pool: &PgPool, table_name: &str) -> anyhow::Result<()> {
+    use std::fmt::Write as FmtWrite;
+
+    // Ordered column list from schema
+    let columns: Vec<(String,)> = sqlx::query_as(
+        "SELECT column_name
+         FROM information_schema.columns
+         WHERE table_schema = 'public' AND table_name = $1
+         ORDER BY ordinal_position",
+    )
+    .bind(table_name)
+    .fetch_all(pool)
+    .await?;
+
+    if columns.is_empty() {
+        return Ok(());
+    }
+
+    let col_names: Vec<String> = columns.into_iter().map(|(c,)| c).collect();
+
+    // Pick a stable ORDER BY column: prefer id, then first column
+    let order_col = if col_names.iter().any(|c| c == "id") {
+        "id"
+    } else {
+        col_names[0].as_str()
+    };
+
+    let cols_select = col_names
+        .iter()
+        .map(|c| format!("\"{c}\""))
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    // row_to_json handles all Postgres type → JSON serialization for us
+    let query = format!(
+        "SELECT row_to_json(row)::text \
+         FROM (SELECT {cols_select} FROM \"{table_name}\" ORDER BY \"{order_col}\") row"
+    );
+
+    let rows: Vec<(String,)> = sqlx::query_as(&query).fetch_all(pool).await?;
+
+    writeln!(out)?;
+    writeln!(out, "-- {table_name} ({} row(s))", rows.len())?;
+
+    if rows.is_empty() {
+        return Ok(());
+    }
+
+    let col_list = col_names
+        .iter()
+        .map(|c| format!("\"{c}\""))
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    for (json_str,) in &rows {
+        let val: serde_json::Value = serde_json::from_str(json_str)
+            .map_err(|e| anyhow::anyhow!("row_to_json parse error in {table_name}: {e}"))?;
+
+        let obj = val
+            .as_object()
+            .ok_or_else(|| anyhow::anyhow!("expected JSON object for table {table_name}"))?;
+
+        let values = col_names
+            .iter()
+            .map(|c| json_val_to_sql(obj.get(c.as_str())))
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        writeln!(
+            out,
+            "INSERT INTO \"{table_name}\" ({col_list}) VALUES ({values}) ON CONFLICT DO NOTHING;"
+        )?;
+    }
+
+    Ok(())
+}
+
+/// Convert a serde_json Value coming out of `row_to_json` to a SQL literal.
+fn json_val_to_sql(val: Option<&serde_json::Value>) -> String {
+    match val {
+        None | Some(serde_json::Value::Null) => "NULL".to_string(),
+        Some(serde_json::Value::Bool(b)) => if *b { "TRUE" } else { "FALSE" }.to_string(),
+        Some(serde_json::Value::Number(n)) => n.to_string(),
+        Some(serde_json::Value::String(s)) => {
+            // Escape embedded single quotes by doubling them (standard SQL)
+            format!("'{}'", s.replace('\'', "''"))
+        }
+        Some(serde_json::Value::Array(arr)) => {
+            // Postgres text[] — row_to_json emits text arrays as JSON arrays
+            if arr.is_empty() {
+                "ARRAY[]::text[]".to_string()
+            } else {
+                let elems = arr
+                    .iter()
+                    .map(|v| json_val_to_sql(Some(v)))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                format!("ARRAY[{elems}]")
+            }
+        }
+        Some(obj @ serde_json::Value::Object(_)) => {
+            // JSONB column — embed as a quoted JSON literal with ::jsonb cast
+            format!("'{}'::jsonb", obj.to_string().replace('\'', "''"))
+        }
+    }
+}
+
+/// Extract the sequence name from a `column_default` value like
+/// `nextval('users_id_seq'::regclass)`.
+fn extract_seq_name(default_val: &str) -> Option<String> {
+    let start = default_val.find('\'')? + 1;
+    let rest = &default_val[start..];
+    let end = rest.find('\'')?;
+    Some(rest[..end].to_string())
 }

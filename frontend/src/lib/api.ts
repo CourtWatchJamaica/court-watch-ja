@@ -678,5 +678,37 @@ export const apiClient = {
       body: JSON.stringify({ filename, content, doc_type, court }),
     });
   },
+
+  // Returns { blob, filename } — caller triggers the browser download.
+  async adminDownloadBackup(): Promise<{ blob: Blob; filename: string; retryAfterSecs?: number }> {
+    const token =
+      typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
+    const res = await fetch(`${apiBase}/admin/backup`, {
+      headers: {
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+    });
+
+    if (res.status === 429) {
+      const body = await res.json().catch(() => ({}));
+      return {
+        blob: new Blob(),
+        filename: "",
+        retryAfterSecs: body.retry_after_secs ?? 900,
+      };
+    }
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `Backup request failed: ${res.status}`);
+    }
+
+    const disposition = res.headers.get("content-disposition") ?? "";
+    const match = disposition.match(/filename="([^"]+)"/);
+    const filename = match?.[1] ?? `courtwatch_backup_${new Date().toISOString().slice(0, 10)}.sql`;
+    const blob = await res.blob();
+    return { blob, filename };
+  },
 };
 // force rebuild
