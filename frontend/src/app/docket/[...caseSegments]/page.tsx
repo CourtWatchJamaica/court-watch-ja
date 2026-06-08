@@ -54,11 +54,6 @@ function formatTime(s: string | null | undefined): string {
   return `${h12}:${m} ${ampm}`;
 }
 
-function isFuture(dateStr: string | null | undefined): boolean {
-  if (!dateStr) return false;
-  return new Date(dateStr) >= new Date(new Date().toDateString());
-}
-
 // ── Untrack confirmation modal ────────────────────────────────────────────────
 
 function UntrackModal({
@@ -312,101 +307,83 @@ function SittingsTab({ detail }: { detail: DocketDetail }) {
   }
 
   const today = new Date(new Date().toDateString());
-  const upcoming = sittings.filter((s) => s.event_date && new Date(s.event_date) >= today);
-  const past = sittings.filter((s) => !s.event_date || new Date(s.event_date) < today);
-
-  const SittingRow = ({ s, future }: { s: typeof sittings[0]; future: boolean }) => (
-    <div
-      className={`flex items-start gap-4 px-5 py-4 border-b last:border-0 border-border/50 ${
-        future ? "bg-[#009B3A]/[0.03]" : ""
-      }`}
-    >
-      {/* Date column */}
-      <div className="shrink-0 w-24 text-right">
-        {s.event_date ? (
-          <>
-            <p className={`text-sm font-bold ${future ? "text-[#009B3A]" : "text-foreground/70"}`}>
-              {new Date(s.event_date).toLocaleDateString("en-JM", { month: "short", day: "numeric" })}
-            </p>
-            <p className="text-[11px] text-muted-foreground/60">
-              {new Date(s.event_date).getFullYear()}
-            </p>
-          </>
-        ) : (
-          <p className="text-sm text-muted-foreground">—</p>
-        )}
-      </div>
-
-      {/* Divider dot */}
-      <div className="flex flex-col items-center pt-1.5">
-        <div className={`h-2 w-2 rounded-full ${future ? "bg-[#009B3A]" : "bg-muted-foreground/30"}`} />
-        <div className="mt-1 flex-1 w-px bg-border" />
-      </div>
-
-      {/* Details */}
-      <div className="flex-1 min-w-0 pb-1">
-        <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mb-1">
-          <span className={`text-sm font-semibold ${future ? "text-foreground" : "text-foreground/70"}`}>
-            {s.event_type ?? "Hearing"}
-          </span>
-          {future && (
-            <span className="rounded-full bg-[#009B3A]/15 px-2 py-px text-[10px] font-bold text-[#009B3A]">
-              Upcoming
-            </span>
-          )}
-        </div>
-
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-          {s.event_time && (
-            <span className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              {formatTime(s.event_time)}
-            </span>
-          )}
-          {s.judge_name && (
-            <span className="flex items-center gap-1">
-              <Gavel className="h-3 w-3" />
-              {s.judge_name}
-            </span>
-          )}
-          {s.court_division && (
-            <span className="flex items-center gap-1">
-              <MapPin className="h-3 w-3" />
-              {s.court_division}
-            </span>
-          )}
-        </div>
-      </div>
-    </div>
-  );
 
   return (
-    <div className="space-y-4">
-      {upcoming.length > 0 && (
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60 mb-2 px-1">
-            Upcoming
-          </p>
-          <div className="rounded-2xl border border-[#009B3A]/30 bg-card overflow-hidden">
-            {upcoming.map((s) => (
-              <SittingRow key={s.id} s={s} future={true} />
-            ))}
-          </div>
-        </div>
-      )}
+    <div className="rounded-2xl border border-border bg-card overflow-hidden">
+      {sittings.map((s, i) => {
+        const isPast = !s.event_date || new Date(s.event_date) < today;
+        return (
+          <div
+            key={s.id}
+            className={`flex items-start gap-4 px-5 py-4 border-b last:border-0 border-border/50 transition-opacity ${
+              isPast ? "opacity-50" : "bg-[#009B3A]/[0.03]"
+            }`}
+          >
+            {/* Date column */}
+            <div className="shrink-0 w-24 text-right">
+              {s.event_date ? (
+                <>
+                  <p className={`text-sm font-bold ${isPast ? "text-foreground/60" : "text-[#009B3A]"}`}>
+                    {new Date(s.event_date).toLocaleDateString("en-JM", { month: "short", day: "numeric" })}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground/60">
+                    {new Date(s.event_date).getFullYear()}
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">—</p>
+              )}
+            </div>
 
-      {past.length > 0 && (
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60 mb-2 px-1">
-            Past
-          </p>
-          <div className="rounded-2xl border border-border bg-card overflow-hidden">
-            {past.map((s) => (
-              <SittingRow key={s.id} s={s} future={false} />
-            ))}
+            {/* Timeline dot + connector */}
+            <div className="flex flex-col items-center pt-1.5 self-stretch">
+              <div className={`h-2 w-2 shrink-0 rounded-full ${isPast ? "bg-muted-foreground/25" : "bg-[#009B3A]"}`} />
+              {i < sittings.length - 1 && (
+                <div className="mt-1 w-px flex-1 bg-border/60" />
+              )}
+            </div>
+
+            {/* Details */}
+            <div className="flex-1 min-w-0 pb-1">
+              <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mb-1">
+                <span className={`text-sm font-semibold ${isPast ? "text-foreground/60" : "text-foreground"}`}>
+                  {s.event_type ?? "Hearing"}
+                </span>
+                {isPast ? (
+                  <span className="rounded-full bg-muted/60 px-2 py-px text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wide">
+                    Past
+                  </span>
+                ) : (
+                  <span className="rounded-full bg-[#009B3A]/15 px-2 py-px text-[10px] font-bold text-[#009B3A]">
+                    Upcoming
+                  </span>
+                )}
+              </div>
+
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                {s.event_time && (
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {formatTime(s.event_time)}
+                  </span>
+                )}
+                {s.judge_name && (
+                  <span className="flex items-center gap-1">
+                    <Gavel className="h-3 w-3" />
+                    {s.judge_name}
+                  </span>
+                )}
+                {s.court_division && (
+                  <span className="flex items-center gap-1">
+                    <MapPin className="h-3 w-3" />
+                    {s.court_division}
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })}
     </div>
   );
 }
