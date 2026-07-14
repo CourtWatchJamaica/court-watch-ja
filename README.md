@@ -64,6 +64,10 @@ CourtWatch JA is free and always will be. If it helps you, consider supporting h
 
 [AGPL-3.0](./LICENSE) — forks that run a modified version as a web service must publish their source code.
 
+## Competition Use
+
+This project was created and is maintained by **CourtWatchJamaica** (https://github.com/CourtWatchJamaica). Any use of this codebase in hackathons, competitions, grants, or awards must clearly credit CourtWatchJamaica as the original author. Entering this project or a derivative of it in a competition without attribution is a violation of the terms of this license and the spirit of open source. All competition rights for the original CourtWatch JA project belong to CourtWatchJamaica.
+
 ---
 
 Built in Jamaica. For Jamaica. 🇯🇲
