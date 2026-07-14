@@ -88,6 +88,19 @@ export default function RootLayout({
           gtag('js', new Date());
           gtag('config', 'AW-18168669700');
         `}</Script>
+        <Script
+          src="https://storage.ko-fi.com/cdn/scripts/overlay-widget.js"
+          strategy="afterInteractive"
+          onLoad={() => {
+            (window as unknown as Record<string, {draw: (id: string, opts: Record<string, string>) => void}>)
+              .kofiWidgetOverlay.draw('courtwatchja', {
+                'type': 'floating-chat',
+                'floating-chat.donateButton.text': 'Support Us',
+                'floating-chat.donateButton.background-color': '#009B3A',
+                'floating-chat.donateButton.text-color': '#ffffff',
+              });
+          }}
+        />
         <Providers>
           <MaintenanceGate>
             {children}
