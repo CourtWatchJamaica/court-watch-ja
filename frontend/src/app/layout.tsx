@@ -7,6 +7,7 @@ import Providers from "@/components/Providers";
 import ScrollToTop from "@/components/ScrollToTop";
 import ChambersPanel from "@/components/ChambersPanel";
 import MaintenanceGate from "@/components/MaintenanceGate";
+import Footer from "@/components/Footer";
 
 const syne = Syne({
   subsets: ["latin"],
@@ -90,6 +91,7 @@ export default function RootLayout({
         <Providers>
           <MaintenanceGate>
             {children}
+            <Footer />
             <ScrollToTop />
             <ChambersPanel />
           </MaintenanceGate>
