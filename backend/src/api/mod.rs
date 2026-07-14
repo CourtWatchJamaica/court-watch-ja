@@ -59,6 +59,7 @@ pub fn router(state: AppState) -> Router {
         .route("/api/pdf/judgment/:id", get(pdf::judgment_pdf))
         .route("/api/pdf/sitting/:id", get(pdf::sitting_pdf))
         .route("/api/public/preview", get(public::get_preview))
+        .route("/api/public/case-history/*case_number", get(public::get_case_history))
         .route("/api/promo/active", get(promos::get_active_promo))
         .route("/api/service-alert", get(service_alert::get_service_alert));
 

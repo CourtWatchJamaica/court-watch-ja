@@ -710,5 +710,18 @@ export const apiClient = {
     const blob = await res.blob();
     return { blob, filename };
   },
+
+  async getCaseHistory(caseNumber: string): Promise<{
+    case_number: string;
+    judgment: import("./types").Judgment | null;
+    sittings: import("./types").CourtSitting[];
+  }> {
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
+    const res = await fetch(
+      `${apiBase}/public/case-history/${encodeURIComponent(caseNumber)}`,
+    );
+    if (!res.ok) throw Object.assign(new Error("Not found"), { status: res.status });
+    return res.json();
+  },
 };
 // force rebuild

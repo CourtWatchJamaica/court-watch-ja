@@ -18,6 +18,7 @@ import {
   Clock,
   Scale,
   Users,
+  History,
 } from "lucide-react";
 import { VerdictIcon, VerdictCheckIcon } from "@/components/icons";
 
@@ -117,9 +118,13 @@ export default function SittingDetailPage() {
                       {sitting.title || sitting.case_number || "Untitled Sitting"}
                     </h1>
                     {sitting.case_number && sitting.title && (
-                      <p className="mt-2 font-mono text-[11px] text-[#FED100]/50 tracking-wider">
+                      <Link
+                        href={`/cases/history/${encodeURIComponent(sitting.case_number)}`}
+                        className="mt-2 inline-flex items-center gap-1.5 font-mono text-[11px] text-[#FED100]/60 tracking-wider hover:text-[#FED100] transition-colors group"
+                      >
                         {sitting.case_number}
-                      </p>
+                        <History className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </Link>
                     )}
                   </div>
 
