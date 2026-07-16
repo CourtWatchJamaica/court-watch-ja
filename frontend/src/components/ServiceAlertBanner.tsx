@@ -71,7 +71,7 @@ export default function ServiceAlertBanner() {
         <button
           onClick={handleDismiss}
           aria-label="Dismiss alert"
-          className="shrink-0 text-white/25 hover:text-white/55 transition-colors"
+          className="shrink-0 text-white/55 hover:text-white/75 transition-colors"
         >
           <X className="h-4 w-4" />
         </button>

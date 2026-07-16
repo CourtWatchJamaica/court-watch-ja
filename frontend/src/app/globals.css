@@ -56,19 +56,19 @@
     --card-foreground: #0c0c18;
     --popover: #ffffff;
     --popover-foreground: #0c0c18;
-    --primary: #009b3a;
+    --primary: #00772d;
     --primary-foreground: #ffffff;
     --secondary: #eeeef5;
     --secondary-foreground: #0c0c18;
     --muted: #eeeef5;
-    --muted-foreground: rgba(12, 12, 24, 0.45);
+    --muted-foreground: rgba(12, 12, 24, 0.58);
     --accent: #b8820a;
     --accent-foreground: #000000;
-    --destructive: #e53535;
+    --destructive: #d31b1b;
     --border: rgba(0, 0, 0, 0.07);
     --input: rgba(0, 0, 0, 0.07);
-    --ring: #009b3a;
-    --chart-1: #009b3a;
+    --ring: #00772d;
+    --chart-1: #00772d;
     --chart-2: #b8820a;
     --chart-3: oklch(0.439 0 0);
     --chart-4: oklch(0.371 0 0);
@@ -76,12 +76,12 @@
     --radius: 0.625rem;
     --sidebar: #ffffff;
     --sidebar-foreground: #0c0c18;
-    --sidebar-primary: #009b3a;
+    --sidebar-primary: #00772d;
     --sidebar-primary-foreground: #ffffff;
     --sidebar-accent: #eeeef5;
     --sidebar-accent-foreground: #0c0c18;
     --sidebar-border: rgba(0, 0, 0, 0.07);
-    --sidebar-ring: #009b3a;
+    --sidebar-ring: #00772d;
 }
 
 /* ── CourtWatch JA – Dark Mode ───────────────────────────────────────────── */
@@ -97,7 +97,7 @@
     --secondary: #141422;
     --secondary-foreground: #ededf8;
     --muted: #141422;
-    --muted-foreground: rgba(237, 237, 248, 0.4);
+    --muted-foreground: rgba(237, 237, 248, 0.49);
     --accent: #f0c040;
     --accent-foreground: #000000;
     --destructive: #ff5a5a;

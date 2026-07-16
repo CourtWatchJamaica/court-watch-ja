@@ -90,7 +90,7 @@ export default function BackupPage() {
           </span>
         </div>
         <h1 className="text-2xl font-bold text-white">Database Backup</h1>
-        <p className="mt-1 text-sm text-white/40">
+        <p className="mt-1 text-sm text-white/70">
           Download a complete SQL dump of the live database.
         </p>
       </div>
@@ -121,7 +121,7 @@ export default function BackupPage() {
         </div>
 
         <div className="flex items-start gap-3">
-          <Clock className="mt-0.5 h-4 w-4 shrink-0 text-white/40" />
+          <Clock className="mt-0.5 h-4 w-4 shrink-0 text-white/70" />
           <div>
             <p className="text-sm font-semibold text-white">Rate limit</p>
             <p className="mt-1 text-xs text-white/50">
@@ -139,7 +139,7 @@ export default function BackupPage() {
           </div>
           <div>
             <p className="text-sm font-semibold text-white">SQL Dump</p>
-            <p className="text-xs text-white/40">
+            <p className="text-xs text-white/70">
               Plain-SQL file, restorable with{" "}
               <code className="font-mono text-white/60">psql</code>
             </p>
@@ -208,7 +208,7 @@ export default function BackupPage() {
           )}
         </button>
 
-        <p className="mt-3 text-center text-[11px] text-white/25">
+        <p className="mt-3 text-center text-[11px] text-white/55">
           Generation time scales with database size. Large databases may take
           10–30 seconds.
         </p>
@@ -216,19 +216,19 @@ export default function BackupPage() {
 
       {/* Restore instructions */}
       <div className="mt-6 rounded-2xl border border-white/[0.07] bg-[#0d0d1a] p-5">
-        <p className="text-xs font-semibold uppercase tracking-wider text-white/40 mb-3">
+        <p className="text-xs font-semibold uppercase tracking-wider text-white/70 mb-3">
           How to restore
         </p>
         <div className="space-y-3 text-xs text-white/50 leading-relaxed">
           <div className="rounded-lg bg-black/30 px-4 py-3 font-mono text-[11px] text-white/60">
-            <p className="text-white/30 mb-1"># incremental restore (safe — skips existing rows)</p>
+            <p className="text-white/60 mb-1"># incremental restore (safe — skips existing rows)</p>
             <p>psql "$DATABASE_URL" &lt; courtwatch_backup_YYYY-MM-DD.sql</p>
           </div>
           <div className="rounded-lg bg-black/30 px-4 py-3 font-mono text-[11px] text-white/60">
-            <p className="text-white/30 mb-1"># full replace — uncomment the TRUNCATE line in the file first</p>
+            <p className="text-white/60 mb-1"># full replace — uncomment the TRUNCATE line in the file first</p>
             <p>psql "$DATABASE_URL" &lt; courtwatch_backup_YYYY-MM-DD.sql</p>
           </div>
-          <p className="text-white/30">
+          <p className="text-white/60">
             On Render: set <code className="font-mono">DATABASE_URL</code> to
             your Postgres internal connection string, available in the Render
             dashboard under your database's Info tab.

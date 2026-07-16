@@ -41,7 +41,7 @@ function ConfigRow({
             <code className="text-sm font-mono font-semibold text-white">{entry.key}</code>
           </div>
           {KEY_DESCRIPTIONS[entry.key] && (
-            <p className="text-[11px] text-white/35 leading-relaxed mb-3">
+            <p className="text-[11px] text-white/65 leading-relaxed mb-3">
               {KEY_DESCRIPTIONS[entry.key]}
             </p>
           )}
@@ -68,7 +68,7 @@ function ConfigRow({
               </button>
               <button
                 onClick={() => { setDraft(entry.value); setEditing(false); }}
-                className="rounded-xl px-3 py-2 text-sm text-white/40 hover:text-white/70 hover:bg-white/[0.05] transition-colors"
+                className="rounded-xl px-3 py-2 text-sm text-white/70 hover:text-white/90 hover:bg-white/[0.05] transition-colors"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -80,7 +80,7 @@ function ConfigRow({
               </code>
               <button
                 onClick={() => { setDraft(entry.value); setEditing(true); }}
-                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-white/35 hover:bg-white/[0.05] hover:text-white/70 transition-colors"
+                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-white/65 hover:bg-white/[0.05] hover:text-white/70 transition-colors"
               >
                 <Pencil className="h-3 w-3" />
                 Edit
@@ -90,8 +90,8 @@ function ConfigRow({
         </div>
 
         <div className="text-right shrink-0">
-          <p className="text-[10px] text-white/20">Last updated</p>
-          <p className="text-[10px] text-white/35 mt-0.5">
+          <p className="text-[10px] text-white/50">Last updated</p>
+          <p className="text-[10px] text-white/65 mt-0.5">
             {new Date(entry.updated_at).toLocaleString("en-JM", {
               month: "short",
               day: "numeric",
@@ -155,14 +155,14 @@ export default function AdminConfigPage() {
           <Settings className="h-5 w-5 text-purple-400" />
           <div>
             <h1 className="text-xl font-bold text-white">System Config</h1>
-            <p className="text-xs text-white/40 mt-0.5">
+            <p className="text-xs text-white/70 mt-0.5">
               Runtime settings stored in the database. Changes take effect without restart.
             </p>
           </div>
         </div>
         <button
           onClick={fetchConfig}
-          className="flex items-center gap-1.5 text-xs text-white/30 hover:text-white/60 transition-colors"
+          className="flex items-center gap-1.5 text-xs text-white/50 hover:text-white/60 transition-colors"
         >
           <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
           Refresh
@@ -184,7 +184,7 @@ export default function AdminConfigPage() {
       ) : config.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.05] bg-[#0d0d1a] py-16 text-center">
           <Settings className="h-8 w-8 text-white/10 mb-3" />
-          <p className="text-sm text-white/30">No config entries found</p>
+          <p className="text-sm text-white/60">No config entries found</p>
         </div>
       ) : (
         <div className="space-y-3">

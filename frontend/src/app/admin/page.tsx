@@ -66,8 +66,8 @@ function StatTile({
       </div>
       <div className="min-w-0">
         <p className="text-xl font-bold text-white leading-tight truncate">{value}</p>
-        <p className="text-[10px] text-white/40 mt-0.5 leading-tight">{label}</p>
-        {sub && <p className="text-[9px] text-white/25 mt-0.5 truncate">{sub}</p>}
+        <p className="text-[10px] text-white/70 mt-0.5 leading-tight">{label}</p>
+        {sub && <p className="text-[9px] text-white/55 mt-0.5 truncate">{sub}</p>}
       </div>
     </div>
   );
@@ -188,7 +188,7 @@ export default function AdminOverviewPage() {
           </span>
         </div>
         <h1 className="text-2xl font-bold text-white">Admin Overview</h1>
-        <p className="mt-1 text-sm text-white/40">System status at a glance.</p>
+        <p className="mt-1 text-sm text-white/70">System status at a glance.</p>
       </div>
 
       {/* Backup reminder */}
@@ -238,12 +238,12 @@ export default function AdminOverviewPage() {
           <div className="mb-4 flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-blue-400" />
             <h2 className="text-sm font-semibold text-white">New Users / Week</h2>
-            <span className="ml-auto text-[10px] text-white/25">last 8 weeks</span>
+            <span className="ml-auto text-[10px] text-white/55">last 8 weeks</span>
           </div>
           {loading ? (
             <div className="h-36 animate-pulse rounded-xl bg-white/[0.03]" />
           ) : usersPerWeek.length === 0 ? (
-            <div className="h-36 flex items-center justify-center text-xs text-white/20">No data yet</div>
+            <div className="h-36 flex items-center justify-center text-xs text-white/50">No data yet</div>
           ) : (
             <ResponsiveContainer width="100%" height={140}>
               <BarChart data={usersPerWeek} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
@@ -262,12 +262,12 @@ export default function AdminOverviewPage() {
           <div className="mb-4 flex items-center gap-2">
             <Mail className="h-4 w-4 text-purple-400" />
             <h2 className="text-sm font-semibold text-white">Emails Sent / Day</h2>
-            <span className="ml-auto text-[10px] text-white/25">last 14 days</span>
+            <span className="ml-auto text-[10px] text-white/55">last 14 days</span>
           </div>
           {loading ? (
             <div className="h-36 animate-pulse rounded-xl bg-white/[0.03]" />
           ) : emailsPerDay.length === 0 ? (
-            <div className="h-36 flex items-center justify-center text-xs text-white/20">No data yet</div>
+            <div className="h-36 flex items-center justify-center text-xs text-white/50">No data yet</div>
           ) : (
             <ResponsiveContainer width="100%" height={140}>
               <BarChart data={emailsPerDay} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
@@ -290,7 +290,7 @@ export default function AdminOverviewPage() {
               <Cpu className="h-4 w-4 text-[#FED100]" />
               <h2 className="text-sm font-semibold text-white">Scraper</h2>
             </div>
-            <Link href="/admin/scraper" className="text-[11px] text-white/40 hover:text-white/70 transition-colors">
+            <Link href="/admin/scraper" className="text-[11px] text-white/70 hover:text-white/90 transition-colors">
               Manage →
             </Link>
           </div>
@@ -308,7 +308,7 @@ export default function AdminOverviewPage() {
                 ].map((s) => (
                   <div key={s.label} className="rounded-lg bg-black/20 px-3 py-2 text-center">
                     <p className="text-base font-bold text-white">{s.value}</p>
-                    <p className="text-[10px] text-white/35 mt-0.5">{s.label}</p>
+                    <p className="text-[10px] text-white/65 mt-0.5">{s.label}</p>
                   </div>
                 ))}
               </div>
@@ -329,7 +329,7 @@ export default function AdminOverviewPage() {
               <Settings className="h-4 w-4 text-purple-400" />
               <h2 className="text-sm font-semibold text-white">System Config</h2>
             </div>
-            <Link href="/admin/config" className="text-[11px] text-white/40 hover:text-white/70 transition-colors">
+            <Link href="/admin/config" className="text-[11px] text-white/70 hover:text-white/90 transition-colors">
               Edit →
             </Link>
           </div>
@@ -341,7 +341,7 @@ export default function AdminOverviewPage() {
               </div>
             ))}
             {config.length === 0 && (
-              <p className="text-xs text-white/25 py-4 text-center">No config entries</p>
+              <p className="text-xs text-white/55 py-4 text-center">No config entries</p>
             )}
           </div>
         </div>
@@ -353,11 +353,11 @@ export default function AdminOverviewPage() {
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className={`rounded-xl p-2.5 ${maintenance ? "bg-[#FED100]/15" : "bg-white/[0.06]"}`}>
-                <Wrench className={`h-4 w-4 ${maintenance ? "text-[#FED100]" : "text-white/30"}`} />
+                <Wrench className={`h-4 w-4 ${maintenance ? "text-[#FED100]" : "text-white/60"}`} />
               </div>
               <div>
                 <p className="text-sm font-semibold text-white">Maintenance Mode</p>
-                <p className="text-xs text-white/40 mt-0.5">
+                <p className="text-xs text-white/70 mt-0.5">
                   {maintenance
                     ? "Site is hidden — only admins can access it"
                     : "Site is live and accessible to all users"}
@@ -383,14 +383,14 @@ export default function AdminOverviewPage() {
       <div className="mt-6 flex items-center justify-between">
         <Link
           href="/admin/logs"
-          className="flex items-center gap-1.5 text-xs text-white/30 hover:text-white/60 transition-colors"
+          className="flex items-center gap-1.5 text-xs text-white/50 hover:text-white/60 transition-colors"
         >
           <Clock className="h-3 w-3" />
           View Admin Logs →
         </Link>
         <button
           onClick={fetchAll}
-          className="min-h-[44px] flex items-center gap-1.5 px-2 text-xs text-white/30 hover:text-white/60 transition-colors"
+          className="min-h-[44px] flex items-center gap-1.5 px-2 text-xs text-white/50 hover:text-white/60 transition-colors"
         >
           <RefreshCw className="h-3 w-3" />
           Refresh

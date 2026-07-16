@@ -20,7 +20,7 @@ function ConstellationSkeleton() {
       <div className="relative flex-1 rounded-2xl overflow-hidden border border-white/[0.05] bg-[#050510]">
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
           <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/[0.08] border-t-[#009B3A]" />
-          <p className="text-[11px] text-white/20">Loading judicial constellation…</p>
+          <p className="text-[11px] text-white/50">Loading judicial constellation…</p>
         </div>
       </div>
       {/* Legend skeleton */}
@@ -75,12 +75,12 @@ export default function JudgesPage() {
                 The Judicial Constellation
               </h1>
               {!loading && (
-                <p className="text-[11px] text-white/30 shrink-0 pb-0.5">
+                <p className="text-[11px] text-white/60 shrink-0 pb-0.5">
                   {judges.length} judge{judges.length !== 1 ? "s" : ""} · {connections.length} connection{connections.length !== 1 ? "s" : ""}
                 </p>
               )}
             </div>
-            <p className="mt-1 text-sm text-white/35">
+            <p className="mt-1 text-sm text-white/65">
               Each star is a judge — size reflects caseload, colour reflects court.
             </p>
           </div>

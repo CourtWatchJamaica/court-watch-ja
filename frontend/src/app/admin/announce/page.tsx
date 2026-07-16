@@ -43,7 +43,7 @@ export default function AdminAnnouncePage() {
         <Megaphone className="h-5 w-5 text-[#FED100]" />
         <div>
           <h1 className="text-xl font-bold text-white">Send Announcement</h1>
-          <p className="text-xs text-white/40 mt-0.5">
+          <p className="text-xs text-white/70 mt-0.5">
             Broadcast a message to all registered users
           </p>
         </div>
@@ -60,7 +60,7 @@ export default function AdminAnnouncePage() {
 
       <form onSubmit={handleSend} className="space-y-4">
         <div>
-          <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40 mb-1.5">
+          <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70 mb-1.5">
             Title <span className="text-red-400">*</span>
           </label>
           <input
@@ -70,13 +70,13 @@ export default function AdminAnnouncePage() {
             placeholder="e.g. Scheduled Maintenance on Friday"
             maxLength={120}
           />
-          <p className="mt-1 text-right text-[10px] text-white/20">
+          <p className="mt-1 text-right text-[10px] text-white/50">
             {title.length}/120
           </p>
         </div>
 
         <div>
-          <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40 mb-1.5">
+          <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70 mb-1.5">
             Message <span className="text-red-400">*</span>
           </label>
           <textarea
@@ -87,7 +87,7 @@ export default function AdminAnnouncePage() {
             placeholder="Type your announcement here…"
             maxLength={2000}
           />
-          <p className="mt-1 text-right text-[10px] text-white/20">
+          <p className="mt-1 text-right text-[10px] text-white/50">
             {message.length}/2000
           </p>
         </div>
@@ -136,7 +136,7 @@ export default function AdminAnnouncePage() {
         {/* Preview */}
         {(title || message) && (
           <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a] p-4">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/25 mb-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/55 mb-3">
               Preview
             </p>
             <div className="flex items-start gap-3">
@@ -152,7 +152,7 @@ export default function AdminAnnouncePage() {
                     {message}
                   </p>
                 )}
-                <p className="mt-2 text-[10px] text-white/20">Just now</p>
+                <p className="mt-2 text-[10px] text-white/50">Just now</p>
               </div>
             </div>
           </div>

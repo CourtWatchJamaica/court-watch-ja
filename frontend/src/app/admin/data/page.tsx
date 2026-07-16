@@ -42,7 +42,7 @@ function Field({
 }) {
   return (
     <div>
-      <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40 mb-1.5">
+      <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70 mb-1.5">
         {label}
         {required && <span className="text-red-400 ml-0.5">*</span>}
       </label>
@@ -74,7 +74,7 @@ function Modal({
           <h2 className="text-sm font-semibold text-white">{title}</h2>
           <button
             onClick={onClose}
-            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-white/30 hover:bg-white/[0.06] hover:text-white transition-colors"
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-white/60 hover:bg-white/[0.06] hover:text-white transition-colors"
           >
             <X className="h-4 w-4" />
           </button>
@@ -165,7 +165,7 @@ function AddJudgmentModal({
           <textarea className={inputCls + " resize-none"} rows={3} value={form.summary_text} onChange={(e) => set("summary_text", e.target.value)} placeholder="Brief summary…" />
         </Field>
         <div className="flex justify-end gap-2 pt-1">
-          <button type="button" onClick={onClose} className="min-h-[44px] rounded-xl px-4 text-sm text-white/40 hover:bg-white/[0.05] hover:text-white transition-colors">Cancel</button>
+          <button type="button" onClick={onClose} className="min-h-[44px] rounded-xl px-4 text-sm text-white/70 hover:bg-white/[0.05] hover:text-white transition-colors">Cancel</button>
           <button type="submit" disabled={saving} className="min-h-[44px] flex items-center gap-2 rounded-xl bg-[#009B3A] px-5 text-sm font-semibold text-white hover:bg-[#009B3A]/85 disabled:opacity-50 transition-colors">
             {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {saving ? "Saving…" : "Add Judgment"}
@@ -267,7 +267,7 @@ function AddSittingModal({
           <input className={inputCls} value={form.pdf_source_url} onChange={(e) => set("pdf_source_url", e.target.value)} placeholder="https://…" />
         </Field>
         <div className="flex justify-end gap-2 pt-1">
-          <button type="button" onClick={onClose} className="min-h-[44px] rounded-xl px-4 text-sm text-white/40 hover:bg-white/[0.05] hover:text-white transition-colors">Cancel</button>
+          <button type="button" onClick={onClose} className="min-h-[44px] rounded-xl px-4 text-sm text-white/70 hover:bg-white/[0.05] hover:text-white transition-colors">Cancel</button>
           <button type="submit" disabled={saving} className="min-h-[44px] flex items-center gap-2 rounded-xl bg-[#009B3A] px-5 text-sm font-semibold text-white hover:bg-[#009B3A]/85 disabled:opacity-50 transition-colors">
             {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {saving ? "Saving…" : "Add Sitting"}
@@ -290,7 +290,7 @@ function EditCell({ value, onSave }: { value: string | null; onSave: (v: string)
         className="group flex items-center gap-1 text-left text-xs text-white/60 hover:text-white transition-colors min-h-[44px]"
         onClick={() => { setDraft(value ?? ""); setEditing(true); }}
       >
-        <span className="line-clamp-1 max-w-[160px]">{value || <em className="text-white/20">—</em>}</span>
+        <span className="line-clamp-1 max-w-[160px]">{value || <em className="text-white/50">—</em>}</span>
         <Pencil className="h-2.5 w-2.5 shrink-0 opacity-0 group-hover:opacity-60" />
       </button>
     );
@@ -311,7 +311,7 @@ function EditCell({ value, onSave }: { value: string | null; onSave: (v: string)
       <button onClick={() => { onSave(draft); setEditing(false); }} className="min-h-[44px] min-w-[44px] flex items-center justify-center text-[#009B3A]">
         <Check className="h-3.5 w-3.5" />
       </button>
-      <button onClick={() => setEditing(false)} className="min-h-[44px] min-w-[44px] flex items-center justify-center text-white/30">
+      <button onClick={() => setEditing(false)} className="min-h-[44px] min-w-[44px] flex items-center justify-center text-white/60">
         <X className="h-3.5 w-3.5" />
       </button>
     </div>
@@ -334,7 +334,7 @@ function Pagination({
   onNext: () => void;
 }) {
   return (
-    <div className="mt-4 flex items-center justify-between text-xs text-white/40">
+    <div className="mt-4 flex items-center justify-between text-xs text-white/70">
       <span>{total.toLocaleString()} total</span>
       <div className="flex items-center gap-1">
         <button
@@ -454,7 +454,7 @@ function JudgmentsTab() {
       {/* Search / filter bar */}
       <div className="mb-3 flex flex-wrap gap-2">
         <div className="relative flex-1 min-w-[180px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/25 pointer-events-none" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/55 pointer-events-none" />
           <input
             value={search}
             onChange={(e) => handleSearchChange(e.target.value)}
@@ -474,7 +474,7 @@ function JudgmentsTab() {
 
       <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a] overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.05]">
-          <span className="text-xs text-white/30">{total.toLocaleString()} total</span>
+          <span className="text-xs text-white/60">{total.toLocaleString()} total</span>
           <button
             onClick={() => setShowAdd(true)}
             className="min-h-[44px] flex items-center gap-1.5 rounded-xl bg-[#009B3A]/15 border border-[#009B3A]/25 px-3 text-xs font-semibold text-[#009B3A] hover:bg-[#009B3A]/25 transition-colors"
@@ -488,7 +488,7 @@ function JudgmentsTab() {
             <thead>
               <tr className="border-b border-white/[0.06]">
                 {["ID", "Case No.", "Title", "Judge", "Court", "Date", ""].map((h, i) => (
-                  <th key={i} className={`px-4 py-3 text-left text-[10px] font-bold uppercase tracking-[0.15em] text-white/30 ${i === 0 ? "w-12" : i === 6 ? "w-10" : ""}`}>
+                  <th key={i} className={`px-4 py-3 text-left text-[10px] font-bold uppercase tracking-[0.15em] text-white/60 ${i === 0 ? "w-12" : i === 6 ? "w-10" : ""}`}>
                     {h}
                   </th>
                 ))}
@@ -505,7 +505,7 @@ function JudgmentsTab() {
                   ))
                 : judgments.map((j) => (
                     <tr key={j.id} className="hover:bg-white/[0.02] transition-colors">
-                      <td className="px-4 py-2 font-mono text-[10px] text-white/25">{j.id}</td>
+                      <td className="px-4 py-2 font-mono text-[10px] text-white/55">{j.id}</td>
                       <td className="px-4 py-2 font-mono text-[10px] text-white/50">{j.case_number}</td>
                       <td className="px-4 py-2"><EditCell value={j.title} onSave={(v) => handleUpdate(j.id, "title", v)} /></td>
                       <td className="px-4 py-2"><EditCell value={j.judge_name} onSave={(v) => handleUpdate(j.id, "judge_name", v)} /></td>
@@ -513,11 +513,11 @@ function JudgmentsTab() {
                       <td className="px-4 py-2"><EditCell value={j.date} onSave={(v) => handleUpdate(j.id, "date", v)} /></td>
                       <td className="px-4 py-2">
                         {deletingId === j.id ? (
-                          <Loader2 className="h-3.5 w-3.5 text-white/30 animate-spin" />
+                          <Loader2 className="h-3.5 w-3.5 text-white/60 animate-spin" />
                         ) : (
                           <button
                             onClick={() => setConfirmDelete({ id: j.id, label: j.case_number })}
-                            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded text-white/20 hover:bg-red-500/10 hover:text-red-400 transition-colors"
+                            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded text-white/50 hover:bg-red-500/10 hover:text-red-400 transition-colors"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -629,7 +629,7 @@ function SittingsTab() {
       {/* Search / filter bar */}
       <div className="mb-3 flex flex-wrap gap-2">
         <div className="relative flex-1 min-w-[180px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/25 pointer-events-none" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/55 pointer-events-none" />
           <input
             value={search}
             onChange={(e) => handleSearchChange(e.target.value)}
@@ -649,7 +649,7 @@ function SittingsTab() {
 
       <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a] overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.05]">
-          <span className="text-xs text-white/30">{total.toLocaleString()} total</span>
+          <span className="text-xs text-white/60">{total.toLocaleString()} total</span>
           <button
             onClick={() => setShowAdd(true)}
             className="min-h-[44px] flex items-center gap-1.5 rounded-xl bg-[#009B3A]/15 border border-[#009B3A]/25 px-3 text-xs font-semibold text-[#009B3A] hover:bg-[#009B3A]/25 transition-colors"
@@ -663,7 +663,7 @@ function SittingsTab() {
             <thead>
               <tr className="border-b border-white/[0.06]">
                 {["ID", "Title", "Judge", "Division", "Date", "Time", ""].map((h, i) => (
-                  <th key={i} className={`px-4 py-3 text-left text-[10px] font-bold uppercase tracking-[0.15em] text-white/30 ${i === 0 ? "w-12" : i === 6 ? "w-10" : ""}`}>
+                  <th key={i} className={`px-4 py-3 text-left text-[10px] font-bold uppercase tracking-[0.15em] text-white/60 ${i === 0 ? "w-12" : i === 6 ? "w-10" : ""}`}>
                     {h}
                   </th>
                 ))}
@@ -680,19 +680,19 @@ function SittingsTab() {
                   ))
                 : sittings.map((s) => (
                     <tr key={s.id} className="hover:bg-white/[0.02] transition-colors">
-                      <td className="px-4 py-2 font-mono text-[10px] text-white/25">{s.id}</td>
+                      <td className="px-4 py-2 font-mono text-[10px] text-white/55">{s.id}</td>
                       <td className="px-4 py-2"><EditCell value={s.title} onSave={(v) => handleUpdate(s.id, "title", v)} /></td>
                       <td className="px-4 py-2"><EditCell value={s.judge_name} onSave={(v) => handleUpdate(s.id, "judge_name", v)} /></td>
-                      <td className="px-4 py-2 text-xs text-white/40">{s.court_division ?? "—"}</td>
+                      <td className="px-4 py-2 text-xs text-white/70">{s.court_division ?? "—"}</td>
                       <td className="px-4 py-2"><EditCell value={s.event_date} onSave={(v) => handleUpdate(s.id, "event_date", v)} /></td>
                       <td className="px-4 py-2"><EditCell value={s.event_time} onSave={(v) => handleUpdate(s.id, "event_time", v)} /></td>
                       <td className="px-4 py-2">
                         {deletingId === s.id ? (
-                          <Loader2 className="h-3.5 w-3.5 text-white/30 animate-spin" />
+                          <Loader2 className="h-3.5 w-3.5 text-white/60 animate-spin" />
                         ) : (
                           <button
                             onClick={() => setConfirmDelete({ id: s.id, label: s.title ?? `#${s.id}` })}
-                            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded text-white/20 hover:bg-red-500/10 hover:text-red-400 transition-colors"
+                            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded text-white/50 hover:bg-red-500/10 hover:text-red-400 transition-colors"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -727,7 +727,7 @@ export default function AdminDataPage() {
         <Database className="h-5 w-5 text-[#009B3A]" />
         <div>
           <h1 className="text-xl font-bold text-white">Data</h1>
-          <p className="text-xs text-white/40 mt-0.5">
+          <p className="text-xs text-white/70 mt-0.5">
             Click any cell to edit inline. Changes save immediately.
           </p>
         </div>
@@ -739,7 +739,7 @@ export default function AdminDataPage() {
             key={t}
             onClick={() => setTab(t)}
             className={`min-h-[44px] rounded-lg px-4 text-sm font-medium transition-colors ${
-              tab === t ? "bg-white/[0.07] text-white" : "text-white/40 hover:text-white/70"
+              tab === t ? "bg-white/[0.07] text-white" : "text-white/70 hover:text-white/90"
             }`}
           >
             {t.charAt(0).toUpperCase() + t.slice(1)}

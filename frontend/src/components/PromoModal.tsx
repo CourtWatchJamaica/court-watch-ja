@@ -56,7 +56,7 @@ export default function PromoModal() {
         <button
           onClick={handleDismiss}
           aria-label="Dismiss"
-          className="absolute top-4 right-4 flex h-7 w-7 items-center justify-center rounded-full bg-white/[0.06] text-white/40 hover:bg-white/[0.12] hover:text-white/70 transition-colors"
+          className="absolute top-4 right-4 flex h-7 w-7 items-center justify-center rounded-full bg-white/[0.06] text-white/70 hover:bg-white/[0.12] hover:text-white/70 transition-colors"
         >
           <X className="h-3.5 w-3.5" />
         </button>
@@ -89,7 +89,7 @@ export default function PromoModal() {
         <div className="mt-5 flex justify-end">
           <button
             onClick={handleDismiss}
-            className="rounded-lg px-4 py-2 text-xs font-semibold text-white/40 hover:bg-white/[0.06] hover:text-white/70 transition-colors"
+            className="rounded-lg px-4 py-2 text-xs font-semibold text-white/70 hover:bg-white/[0.06] hover:text-white/70 transition-colors"
           >
             Dismiss
           </button>

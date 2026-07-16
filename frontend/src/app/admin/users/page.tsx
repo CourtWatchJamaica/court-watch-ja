@@ -62,7 +62,7 @@ function ExpandedRow({ userId, onClose }: { userId: number; onClose: () => void 
 
   if (loading) {
     return (
-      <div className="px-6 py-4 flex items-center gap-2 text-xs text-white/30">
+      <div className="px-6 py-4 flex items-center gap-2 text-xs text-white/60">
         <Loader2 className="h-3 w-3 animate-spin" />
         Loading…
       </div>
@@ -73,11 +73,11 @@ function ExpandedRow({ userId, onClose }: { userId: number; onClose: () => void 
   return (
     <div className="px-6 pb-5 pt-2 grid md:grid-cols-2 gap-5 border-b border-white/[0.04]">
       <div>
-        <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/30 mb-2 flex items-center gap-1.5">
+        <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/60 mb-2 flex items-center gap-1.5">
           <Briefcase className="h-3 w-3" /> Tracked Cases
         </p>
         {detail.tracked_cases.length === 0 ? (
-          <p className="text-xs text-white/20">None</p>
+          <p className="text-xs text-white/50">None</p>
         ) : (
           <div className="space-y-1.5">
             {detail.tracked_cases.map((c) => (
@@ -85,7 +85,7 @@ function ExpandedRow({ userId, onClose }: { userId: number; onClose: () => void 
                 <span className="font-mono text-xs text-white/60">
                   {c.case_number ?? "(number pending)"}
                 </span>
-                <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[9px] text-white/35">
+                <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[9px] text-white/65">
                   {c.case_type}
                 </span>
               </div>
@@ -94,11 +94,11 @@ function ExpandedRow({ userId, onClose }: { userId: number; onClose: () => void 
         )}
       </div>
       <div>
-        <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/30 mb-2 flex items-center gap-1.5">
+        <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/60 mb-2 flex items-center gap-1.5">
           <Bell className="h-3 w-3" /> Recent Notifications
         </p>
         {detail.recent_notifications.length === 0 ? (
-          <p className="text-xs text-white/20">None</p>
+          <p className="text-xs text-white/50">None</p>
         ) : (
           <div className="space-y-1.5">
             {detail.recent_notifications.map((n) => (
@@ -106,7 +106,7 @@ function ExpandedRow({ userId, onClose }: { userId: number; onClose: () => void 
                 <span className="text-xs text-white/60 truncate">
                   {n.title ?? n.type}
                 </span>
-                <span className="text-[10px] text-white/25 shrink-0">
+                <span className="text-[10px] text-white/55 shrink-0">
                   {new Date(n.sent_at).toLocaleDateString("en-JM", { month: "short", day: "numeric" })}
                 </span>
               </div>
@@ -116,7 +116,7 @@ function ExpandedRow({ userId, onClose }: { userId: number; onClose: () => void 
       </div>
       <button
         onClick={onClose}
-        className="md:col-span-2 text-[10px] text-white/20 hover:text-white/50 transition-colors text-right"
+        className="md:col-span-2 text-[10px] text-white/50 hover:text-white/70 transition-colors text-right"
       >
         Collapse ↑
       </button>
@@ -234,7 +234,7 @@ export default function AdminUsersPage() {
         <Users className="h-5 w-5 text-blue-400 shrink-0" />
         <div>
           <h1 className="text-xl font-bold text-white">Users</h1>
-          <p className="text-xs text-white/40 mt-0.5">Manage roles and access</p>
+          <p className="text-xs text-white/70 mt-0.5">Manage roles and access</p>
         </div>
         <div className="flex-1" />
         <div className="rounded-full bg-white/[0.06] px-3 py-1 text-[11px] font-semibold text-white/50">
@@ -245,16 +245,16 @@ export default function AdminUsersPage() {
       {/* Filters */}
       <div className="flex flex-wrap gap-3 mb-5">
         <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/60" />
           <input
             type="text"
             value={q}
             onChange={(e) => handleSearch(e.target.value)}
             placeholder="Search name or email…"
-            className="h-[42px] w-full rounded-xl border border-white/[0.08] bg-black/20 pl-9 pr-8 text-sm text-white placeholder:text-white/25 focus:border-white/20 focus:outline-none transition-colors"
+            className="h-[42px] w-full rounded-xl border border-white/[0.08] bg-black/20 pl-9 pr-8 text-sm text-white placeholder:text-white/55 focus:border-white/20 focus:outline-none transition-colors"
           />
           {q && (
-            <button onClick={() => handleSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60">
+            <button onClick={() => handleSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 hover:text-white/60">
               <X className="h-3.5 w-3.5" />
             </button>
           )}
@@ -281,11 +281,11 @@ export default function AdminUsersPage() {
       <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a] overflow-hidden">
         <div className="hidden md:grid grid-cols-[auto_1fr_auto_auto_auto_auto] items-center gap-3 px-4 py-3 border-b border-white/[0.06]">
           <span className="w-8" />
-          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/30">User</span>
-          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/30">Cases</span>
-          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/30">Joined</span>
-          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/30">Role</span>
-          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/30">Actions</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/60">User</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/60">Cases</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/60">Joined</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/60">Role</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/60">Actions</span>
         </div>
 
         {loading ? (
@@ -307,7 +307,7 @@ export default function AdminUsersPage() {
         ) : users.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16">
             <Users className="h-8 w-8 text-white/10 mb-3" />
-            <p className="text-sm text-white/30">No users found</p>
+            <p className="text-sm text-white/60">No users found</p>
           </div>
         ) : (
           <div>
@@ -326,8 +326,8 @@ export default function AdminUsersPage() {
                     {/* Expand indicator */}
                     <div className="flex items-center justify-center w-8">
                       {isExpanded
-                        ? <ChevronDown className="h-3.5 w-3.5 text-white/30" />
-                        : <ChevronRight className="h-3.5 w-3.5 text-white/20" />}
+                        ? <ChevronDown className="h-3.5 w-3.5 text-white/60" />
+                        : <ChevronRight className="h-3.5 w-3.5 text-white/50" />}
                     </div>
 
                     {/* Identity */}
@@ -338,10 +338,10 @@ export default function AdminUsersPage() {
                           {user.display_name ?? user.email}
                         </p>
                         {user.display_name && (
-                          <p className="text-[10px] text-white/30 truncate">{user.email}</p>
+                          <p className="text-[10px] text-white/60 truncate">{user.email}</p>
                         )}
                         <div className="flex items-center gap-1.5 mt-0.5">
-                          <p className="text-[10px] text-white/20 font-mono">#{user.id}</p>
+                          <p className="text-[10px] text-white/50 font-mono">#{user.id}</p>
                           {user.email_verified
                             ? <CheckCircle2 className="h-2.5 w-2.5 text-[#009B3A]/60" />
                             : <XCircle className="h-2.5 w-2.5 text-amber-400/40" />}
@@ -351,7 +351,7 @@ export default function AdminUsersPage() {
 
                     {/* Case count */}
                     <span
-                      className="text-xs text-white/30 font-mono min-w-[1.5rem] text-center"
+                      className="text-xs text-white/60 font-mono min-w-[1.5rem] text-center"
                       onClick={(e) => e.stopPropagation()}
                     >
                       {user.case_count}
@@ -359,7 +359,7 @@ export default function AdminUsersPage() {
 
                     {/* Joined date */}
                     <span
-                      className="text-xs text-white/30 whitespace-nowrap hidden md:block"
+                      className="text-xs text-white/60 whitespace-nowrap hidden md:block"
                       onClick={(e) => e.stopPropagation()}
                     >
                       {new Date(user.created_at).toLocaleDateString("en-JM", {
@@ -379,7 +379,7 @@ export default function AdminUsersPage() {
                         {ROLE_LABELS[user.role]}
                       </span>
                       {isBusy ? (
-                        <Loader2 className="h-3.5 w-3.5 text-white/30 animate-spin" />
+                        <Loader2 className="h-3.5 w-3.5 text-white/60 animate-spin" />
                       ) : (
                         <select
                           value={user.role}
@@ -399,7 +399,7 @@ export default function AdminUsersPage() {
                     <button
                       onClick={(e) => { e.stopPropagation(); setDeleteTarget(user); }}
                       disabled={isBusy}
-                      className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-white/20 hover:bg-red-500/10 hover:text-red-400 transition-colors disabled:opacity-40"
+                      className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-white/50 hover:bg-red-500/10 hover:text-red-400 transition-colors disabled:opacity-40"
                       aria-label="Delete user"
                     >
                       {isBusy
@@ -429,7 +429,7 @@ export default function AdminUsersPage() {
           >
             ← Prev
           </button>
-          <span className="text-xs text-white/30">
+          <span className="text-xs text-white/60">
             Page {page} of {totalPages}
           </span>
           <button

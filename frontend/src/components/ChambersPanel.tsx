@@ -310,7 +310,7 @@ const selectCls =
   "w-full rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-[13px] text-gray-900 focus:outline-none focus:border-[#009B3A]/60 focus:ring-1 focus:ring-[#009B3A]/30 " +
   "dark:border-white/[0.1] dark:bg-white/[0.05] dark:text-white [color-scheme:light] dark:[color-scheme:dark]";
 
-const labelCls = "mb-1 block text-[10px] text-gray-500 dark:text-white/35";
+const labelCls = "mb-1 block text-[10px] text-gray-500 dark:text-white/65";
 
 /* ── Donut Chart ── */
 
@@ -340,7 +340,7 @@ function DonutChart({ data }: { data: PAYEResult }) {
         <div className="h-full w-full rounded-full" style={{ background: `conic-gradient(${gradient})` }} />
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="h-14 w-14 rounded-full bg-gray-100 dark:bg-[#0d0d1a] flex items-center justify-center">
-            <span className="text-[9px] font-semibold text-gray-400 dark:text-white/40 text-center leading-tight">
+            <span className="text-[9px] font-semibold text-gray-500 dark:text-white/70 text-center leading-tight">
               Net<br />Pay
             </span>
           </div>
@@ -423,7 +423,7 @@ function DeadlineCalculator({ sittingIds }: { sittingIds: Set<number> }) {
             <option key={t.id} value={t.id}>{t.label}</option>
           ))}
         </select>
-        <p className="mt-1 text-[10px] text-gray-400 dark:text-white/30 italic">{task.description}</p>
+        <p className="mt-1 text-[10px] text-gray-500 dark:text-white/60 italic">{task.description}</p>
       </div>
 
       {/* Custom days */}
@@ -466,7 +466,7 @@ function DeadlineCalculator({ sittingIds }: { sittingIds: Set<number> }) {
                 <p className="text-[11px] font-medium text-gray-800 dark:text-white/80 truncate">
                   {s.title || s.case_number || `Case #${s.id}`}
                 </p>
-                <p className="text-[10px] text-gray-500 dark:text-white/40">
+                <p className="text-[10px] text-gray-500 dark:text-white/70">
                   {new Date(s.event_date! + "T00:00:00").toLocaleDateString("en-JM", {
                     weekday: "short", day: "numeric", month: "short", year: "numeric",
                   })}
@@ -524,7 +524,7 @@ function DeadlineCalculator({ sittingIds }: { sittingIds: Set<number> }) {
               "flex items-center gap-1.5 text-[10px] font-medium transition-all duration-150 self-start",
               copied
                 ? "text-[#009B3A]"
-                : "text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/55",
+                : "text-gray-500 dark:text-white/60 hover:text-gray-600 dark:hover:text-white/55",
             )}
           >
             {copied ? <CopyCheck className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
@@ -532,7 +532,7 @@ function DeadlineCalculator({ sittingIds }: { sittingIds: Set<number> }) {
           </button>
 
           <div className="border-t border-black/[0.06] dark:border-white/10 pt-2.5 space-y-1.5">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-white/30">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-white/60">
               Calculation
             </p>
             {result.steps.map((step, i) => (
@@ -549,13 +549,13 @@ function DeadlineCalculator({ sittingIds }: { sittingIds: Set<number> }) {
 
       <button
         onClick={handleClear}
-        className="flex items-center gap-1.5 text-[11px] text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/50 transition-colors"
+        className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-white/60 hover:text-gray-600 dark:hover:text-white/50 transition-colors"
       >
         <RotateCcw className="h-3 w-3" />
         Clear
       </button>
 
-      <p className="text-[10px] text-gray-400 dark:text-white/25 italic leading-relaxed">
+      <p className="text-[10px] text-gray-500 dark:text-white/55 italic leading-relaxed">
         Weekends, Ash Wednesday, Good Friday, Easter Monday, National Heroes Day, and other
         Jamaican statutory holidays are excluded. Always verify deadlines with a qualified attorney.
       </p>
@@ -619,7 +619,7 @@ function PAYETool() {
               "flex-1 rounded-lg py-1.5 text-[11px] font-semibold capitalize transition-all duration-150",
               mode === m
                 ? "bg-[#009B3A] text-white"
-                : "text-gray-500 dark:text-white/40 hover:text-gray-700 dark:hover:text-white/60",
+                : "text-gray-500 dark:text-white/70 hover:text-gray-700 dark:hover:text-white/60",
             )}
           >
             {m}
@@ -629,7 +629,7 @@ function PAYETool() {
 
       {/* Over 65 toggle */}
       <div className="flex items-center justify-between">
-        <label className="text-[11px] text-gray-500 dark:text-white/40">Age 65 or over?</label>
+        <label className="text-[11px] text-gray-500 dark:text-white/70">Age 65 or over?</label>
         <button
           onClick={() => setIsOver65(!isOver65)}
           className={cn(
@@ -678,7 +678,7 @@ function PAYETool() {
               <CheckCircle className="h-4 w-4 mt-0.5 text-[#009B3A] shrink-0" />
               <div>
                 <p className="text-[12px] font-semibold text-[#009B3A]">No income tax applies</p>
-                <p className="text-[10px] text-gray-500 dark:text-white/40 mt-0.5">
+                <p className="text-[10px] text-gray-500 dark:text-white/70 mt-0.5">
                   Your statutory income is below the {fmt(data.threshold)} threshold.
                   Only NIS, NHT, and Education Tax apply.
                 </p>
@@ -688,12 +688,12 @@ function PAYETool() {
 
           {/* Large net take-home */}
           <div className="text-center py-1">
-            <p className="text-[10px] text-gray-400 dark:text-white/35 uppercase tracking-wider mb-1">
+            <p className="text-[10px] text-gray-500 dark:text-white/65 uppercase tracking-wider mb-1">
               Monthly Take-home
             </p>
             <p className="text-3xl font-bold text-[#009B3A]">{fmt(data.netMonthly)}</p>
             {mode === "annual" && (
-              <p className="text-[11px] text-gray-400 dark:text-white/35 mt-0.5">
+              <p className="text-[11px] text-gray-500 dark:text-white/65 mt-0.5">
                 ({fmt(data.netMonthly * 12)} / year)
               </p>
             )}
@@ -703,7 +703,7 @@ function PAYETool() {
                 "mt-2 inline-flex items-center gap-1.5 text-[10px] font-medium transition-all duration-150",
                 copied
                   ? "text-[#009B3A]"
-                  : "text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/55",
+                  : "text-gray-500 dark:text-white/60 hover:text-gray-600 dark:hover:text-white/55",
               )}
             >
               {copied ? <CopyCheck className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
@@ -751,7 +751,7 @@ function PAYETool() {
             ))}
           </div>
 
-          <p className="text-[10px] text-gray-400 dark:text-white/25 italic">
+          <p className="text-[10px] text-gray-500 dark:text-white/55 italic">
             2025 rates (effective April 1, 2025): NIS 3% capped at $150,000/yr, NHT 2%,
             Education Tax 2.25%, PAYE threshold {fmt(data.threshold)}.
             {isOver65 ? " Includes $250,040 over-65 allowance." : ""}
@@ -761,7 +761,7 @@ function PAYETool() {
 
       <button
         onClick={handleClear}
-        className="flex items-center gap-1.5 text-[11px] text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/50 transition-colors"
+        className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-white/60 hover:text-gray-600 dark:hover:text-white/50 transition-colors"
       >
         <RotateCcw className="h-3 w-3" />
         Clear
@@ -808,12 +808,12 @@ function CourtFeesTool() {
               onClick={() => toggle(section.section)}
               className="w-full flex items-center justify-between group"
             >
-              <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-white/40 group-hover:text-gray-700 dark:group-hover:text-white/60 transition-colors">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-white/70 group-hover:text-gray-700 dark:group-hover:text-white/60 transition-colors">
                 {section.section}
               </p>
               <ChevronDown
                 className={cn(
-                  "h-3.5 w-3.5 text-gray-400 dark:text-white/30 transition-transform duration-200",
+                  "h-3.5 w-3.5 text-gray-500 dark:text-white/60 transition-transform duration-200",
                   open && "rotate-180",
                 )}
               />
@@ -829,13 +829,13 @@ function CourtFeesTool() {
                       </p>
                       <p className="text-[13px] font-bold text-[#FED100] shrink-0">{item.fee}</p>
                     </div>
-                    <p className="mt-1 text-[9px] text-gray-400 dark:text-white/25 italic">
+                    <p className="mt-1 text-[9px] text-gray-500 dark:text-white/55 italic">
                       Verify at the Stamp Office. Fees are subject to change.
                     </p>
                   </div>
                 ))}
                 <div className="px-4 py-2 bg-gray-50 dark:bg-white/[0.02]">
-                  <p className="text-[10px] text-gray-400 dark:text-white/30 italic">{section.note}</p>
+                  <p className="text-[10px] text-gray-500 dark:text-white/60 italic">{section.note}</p>
                 </div>
               </div>
             )}
@@ -843,7 +843,7 @@ function CourtFeesTool() {
         );
       })}
 
-      <p className="text-[10px] text-gray-400 dark:text-white/25 italic">
+      <p className="text-[10px] text-gray-500 dark:text-white/55 italic">
         All amounts in JMD. Last verified: April 2025.
       </p>
     </div>
@@ -882,12 +882,12 @@ function PanelContent({ onClose }: { onClose: () => void }) {
           </div>
           <div>
             <p className="text-[13px] font-bold text-gray-900 dark:text-white">Chambers</p>
-            <p className="text-[10px] text-gray-400 dark:text-white/35">Legal Tools</p>
+            <p className="text-[10px] text-gray-500 dark:text-white/65">Legal Tools</p>
           </div>
         </div>
         <button
           onClick={onClose}
-          className="rounded-lg p-1.5 text-gray-400 dark:text-white/40 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/[0.07] transition-colors"
+          className="rounded-lg p-1.5 text-gray-500 dark:text-white/70 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/[0.07] transition-colors"
         >
           <X className="h-4 w-4" />
         </button>
@@ -904,7 +904,7 @@ function PanelContent({ onClose }: { onClose: () => void }) {
                 "flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 px-1.5 text-[11px] font-semibold transition-all duration-150",
                 activeTool === id
                   ? "bg-white dark:bg-white/[0.1] text-gray-900 dark:text-white shadow-sm ring-1 ring-black/[0.04] dark:ring-white/[0.08]"
-                  : "text-gray-400 dark:text-white/40 hover:text-gray-600 dark:hover:text-white/60",
+                  : "text-gray-500 dark:text-white/70 hover:text-gray-600 dark:hover:text-white/60",
               )}
             >
               <Icon className="h-3.5 w-3.5 shrink-0" />

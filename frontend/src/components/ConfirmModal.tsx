@@ -30,7 +30,7 @@ export default function ConfirmModal({
           </div>
           <button
             onClick={onCancel}
-            className="shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-white/30 hover:bg-white/[0.06] hover:text-white transition-colors"
+            className="shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-white/60 hover:bg-white/[0.06] hover:text-white transition-colors"
           >
             <X className="h-4 w-4" />
           </button>
@@ -38,7 +38,7 @@ export default function ConfirmModal({
         <div className="flex gap-2 justify-end">
           <button
             onClick={onCancel}
-            className="min-h-[44px] rounded-xl px-4 text-sm text-white/40 hover:bg-white/[0.05] hover:text-white transition-colors"
+            className="min-h-[44px] rounded-xl px-4 text-sm text-white/70 hover:bg-white/[0.05] hover:text-white transition-colors"
           >
             Cancel
           </button>

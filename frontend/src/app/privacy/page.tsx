@@ -34,7 +34,7 @@ export default function PrivacyPage() {
             Legal
           </span>
           <h1 className="mt-2 text-3xl sm:text-4xl font-bold">Privacy Policy</h1>
-          <p className="mt-3 text-sm text-white/40">Last updated: May 15, 2026</p>
+          <p className="mt-3 text-sm text-white/70">Last updated: May 15, 2026</p>
         </div>
 
         <div className="prose prose-sm max-w-none space-y-8 text-white/65 leading-relaxed">
@@ -145,7 +145,7 @@ export default function PrivacyPage() {
       </main>
 
       <footer className="border-t border-white/[0.05] py-8 px-6">
-        <div className="max-w-3xl mx-auto flex flex-wrap items-center gap-4 text-xs text-white/30">
+        <div className="max-w-3xl mx-auto flex flex-wrap items-center gap-4 text-xs text-white/60">
           <span>© 2026 CourtWatch JA</span>
           <Link href="/terms" className="hover:text-white/55 transition-colors">Terms of Service</Link>
           <Link href="/about" className="hover:text-white/55 transition-colors">About</Link>

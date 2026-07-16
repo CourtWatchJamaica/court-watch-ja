@@ -57,7 +57,7 @@ export default function ForgotPasswordPage() {
               Court<span className="text-[#009B3A]">Watch</span>
               <span className="text-[#FED100]"> JA</span>
             </h1>
-            <p className="mt-1 text-sm text-white/40">
+            <p className="mt-1 text-sm text-white/70">
               {submitted ? "Check your inbox" : "Reset your password"}
             </p>
           </div>
@@ -74,7 +74,7 @@ export default function ForgotPasswordPage() {
                 <span className="font-medium text-white">{email}</span>, you will
                 receive a password reset link within a few minutes.
               </p>
-              <p className="text-xs text-white/35">
+              <p className="text-xs text-white/65">
                 The link expires in 1 hour. Check your spam folder if you don&apos;t see it.
               </p>
               <Link
@@ -92,7 +92,7 @@ export default function ForgotPasswordPage() {
               </p>
 
               <div>
-                <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40 mb-1.5">
+                <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70 mb-1.5">
                   Email
                 </label>
                 <input
@@ -128,7 +128,7 @@ export default function ForgotPasswordPage() {
                 )}
               </button>
 
-              <div className="text-center text-sm text-white/35">
+              <div className="text-center text-sm text-white/65">
                 <Link
                   href="/auth/login"
                   className="font-medium text-[#009B3A] hover:text-[#009B3A]/80 transition-colors"

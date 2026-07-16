@@ -58,7 +58,7 @@ const CATEGORY_CONFIG: Record<
   Violent:  { label: "Violent",  color: "text-red-400",   bg: "bg-red-500/10",   border: "border-red-500/30",   Icon: AlertTriangle },
   Property: { label: "Property", color: "text-blue-400",  bg: "bg-blue-500/10",  border: "border-blue-500/30",  Icon: Home },
   Drugs:    { label: "Drugs",    color: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/30", Icon: Pill },
-  Other:    { label: "Other",    color: "text-gray-400",  bg: "bg-gray-500/10",  border: "border-gray-500/30",  Icon: Shield },
+  Other:    { label: "Other",    color: "text-gray-500",  bg: "bg-gray-500/10",  border: "border-gray-500/30",  Icon: Shield },
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -140,10 +140,10 @@ function ChargeRow({
         </p>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1">
           {statusLabel && (
-            <span className="text-[10px] text-white/35">{statusLabel}</span>
+            <span className="text-[10px] text-white/65">{statusLabel}</span>
           )}
           {c.week_of && (
-            <span className="flex items-center gap-1 text-[10px] text-white/25">
+            <span className="flex items-center gap-1 text-[10px] text-white/55">
               <Calendar className="h-2.5 w-2.5" />
               {formatWeekOf(c.week_of)}
             </span>
@@ -248,7 +248,7 @@ function ParishCaseDetail() {
           <DetailSkeleton />
         ) : notFound || !courtCase ? (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.07] bg-black/30 py-16 text-center gap-4 px-6">
-            <p className="text-sm text-white/40">Case not found.</p>
+            <p className="text-sm text-white/70">Case not found.</p>
             <button
               onClick={() => router.push("/parish-court")}
               className="rounded-xl border border-[#CD7F32]/25 bg-[#CD7F32]/10 px-4 py-2.5 text-[13px] font-semibold text-[#CD7F32] hover:bg-[#CD7F32]/20 transition-colors"
@@ -281,7 +281,7 @@ function ParishCaseDetail() {
                     href={parishCourtUrl(courtCase.parish)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1 rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[10px] text-white/35 hover:text-white/60 hover:border-white/[0.15] transition-colors"
+                    className="flex items-center gap-1 rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[10px] text-white/65 hover:text-white/80 hover:border-white/[0.15] transition-colors"
                   >
                     View official court list
                     <ExternalLink className="h-2.5 w-2.5" />
@@ -292,7 +292,7 @@ function ParishCaseDetail() {
                 <h1 className="text-2xl sm:text-3xl font-bold text-white leading-tight mb-1">
                   {courtCase.accused_name ?? "Unknown"}
                 </h1>
-                <p className="text-[12px] text-white/30 flex items-center gap-1.5">
+                <p className="text-[12px] text-white/60 flex items-center gap-1.5">
                   <Hash className="h-3 w-3" />
                   Case record #{courtCase.id} · Indexed{" "}
                   {new Date(courtCase.created_at).toLocaleDateString("en-JM")}
@@ -303,7 +303,7 @@ function ParishCaseDetail() {
             {/* ── Offence tally cards ───────────────────────────────────── */}
             {tallies && (
               <section>
-                <h2 className="text-xs font-semibold text-white/30 uppercase tracking-widest mb-3">
+                <h2 className="text-xs font-semibold text-white/60 uppercase tracking-widest mb-3">
                   Charge Summary — {totalCount} total
                 </h2>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -328,7 +328,7 @@ function ParishCaseDetail() {
                       >
                         <div
                           className={`flex items-center gap-2 mb-2 ${
-                            count > 0 ? cfg.color : "text-white/25"
+                            count > 0 ? cfg.color : "text-white/55"
                           }`}
                         >
                           <CatIcon className="h-3.5 w-3.5" />
@@ -338,7 +338,7 @@ function ParishCaseDetail() {
                         </div>
                         <p
                           className={`text-3xl font-bold ${
-                            count > 0 ? cfg.color : "text-white/20"
+                            count > 0 ? cfg.color : "text-white/50"
                           }`}
                         >
                           {count}
@@ -352,12 +352,12 @@ function ParishCaseDetail() {
 
             {/* ── Full charge list ──────────────────────────────────────── */}
             <section>
-              <h2 className="text-xs font-semibold text-white/30 uppercase tracking-widest mb-3">
+              <h2 className="text-xs font-semibold text-white/60 uppercase tracking-widest mb-3">
                 All Charges{allCharges.length > 0 ? ` · ${allCharges.length}` : ""}
               </h2>
               {allCharges.length === 0 ? (
                 <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] px-4 py-10 text-center">
-                  <p className="text-[13px] text-white/30">No charges on record.</p>
+                  <p className="text-[13px] text-white/60">No charges on record.</p>
                 </div>
               ) : (
                 <div className="space-y-2">

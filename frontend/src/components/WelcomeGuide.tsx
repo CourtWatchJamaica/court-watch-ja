@@ -76,7 +76,7 @@ export default function WelcomeGuide({ notificationId, onClose }: WelcomeGuidePr
         {/* Skip button */}
         <button
           onClick={handleClose}
-          className="absolute top-4 right-4 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-white/[0.06] text-white/35 hover:bg-white/[0.12] hover:text-white/60 transition-colors"
+          className="absolute top-4 right-4 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-white/[0.06] text-white/65 hover:bg-white/[0.12] hover:text-white/60 transition-colors"
           aria-label="Skip guide"
         >
           <X className="h-3.5 w-3.5" />
@@ -101,7 +101,7 @@ export default function WelcomeGuide({ notificationId, onClose }: WelcomeGuidePr
           </div>
 
           {/* Step label */}
-          <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/30 mb-2">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/60 mb-2">
             Step {step + 1} of {STEPS.length}
           </p>
 
@@ -119,7 +119,7 @@ export default function WelcomeGuide({ notificationId, onClose }: WelcomeGuidePr
           <div className="flex items-center justify-between">
             <button
               onClick={handleClose}
-              className="text-xs text-white/25 hover:text-white/50 transition-colors"
+              className="text-xs text-white/55 hover:text-white/70 transition-colors"
             >
               Skip guide
             </button>

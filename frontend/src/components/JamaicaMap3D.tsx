@@ -469,7 +469,7 @@ function MapLegend({
 
   return (
     <div className="flex items-center gap-3 mt-3 px-2 flex-wrap">
-      <span className="text-[10px] text-white/30 uppercase tracking-widest shrink-0">
+      <span className="text-[10px] text-white/60 uppercase tracking-widest shrink-0">
         Cases
       </span>
       <div className="flex items-center gap-1 flex-1 min-w-0">
@@ -479,12 +479,12 @@ function MapLegend({
               className="w-full h-3 rounded-sm"
               style={{ background: hex }}
             />
-            <span className="text-[9px] text-white/30 tabular-nums">
+            <span className="text-[9px] text-white/60 tabular-nums">
               {i === 0 ? "0" : `${(i * step).toLocaleString()}`}
             </span>
           </div>
         ))}
-        <span className="text-[9px] text-white/30 tabular-nums ml-1">
+        <span className="text-[9px] text-white/60 tabular-nums ml-1">
           {maxCount > 0 ? `${maxCount.toLocaleString()}+` : ""}
         </span>
       </div>
@@ -538,17 +538,17 @@ function ParishLeaderboard({
   }
 
   const thCls =
-    "px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-widest text-white/30 cursor-pointer hover:text-white/60 transition-colors select-none whitespace-nowrap";
+    "px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-widest text-white/60 cursor-pointer hover:text-white/60 transition-colors select-none whitespace-nowrap";
 
   return (
     <div className="mt-6 overflow-x-auto rounded-2xl border border-white/[0.06]">
       <table className="w-full min-w-[540px] text-sm">
         <thead>
           <tr className="border-b border-white/[0.06] bg-white/[0.02]">
-            <th className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-widest text-white/30 w-10">
+            <th className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-widest text-white/60 w-10">
               #
             </th>
-            <th className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-widest text-white/30">
+            <th className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-widest text-white/60">
               Parish
             </th>
             <th className={thCls} onClick={() => handleSort("total")}>
@@ -588,7 +588,7 @@ function ParishLeaderboard({
                 }`}
                 style={active ? { borderLeft: "2px solid #FED100" } : {}}
               >
-                <td className="px-3 py-2.5 text-white/30 tabular-nums text-xs">{i + 1}</td>
+                <td className="px-3 py-2.5 text-white/60 tabular-nums text-xs">{i + 1}</td>
                 <td className={`px-3 py-2.5 font-medium text-[13px] ${active ? "text-[#FED100]" : "text-white/80"}`}>
                   {p.name}
                 </td>
@@ -650,7 +650,7 @@ function TopOffences({ cases }: { cases: ParishCourtCase[] }) {
             {["Offence", "Count", "% of Total", "Most Affected Parish"].map((h) => (
               <th
                 key={h}
-                className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-widest text-white/30 whitespace-nowrap"
+                className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-widest text-white/60 whitespace-nowrap"
               >
                 {h}
               </th>
@@ -673,7 +673,7 @@ function TopOffences({ cases }: { cases: ParishCourtCase[] }) {
               <td className="px-3 py-2.5 text-[#CD7F32]/70 tabular-nums text-[12px]">
                 {row.pct}%
               </td>
-              <td className="px-3 py-2.5 text-white/40 text-[12px] whitespace-nowrap">
+              <td className="px-3 py-2.5 text-white/70 text-[12px] whitespace-nowrap">
                 {row.topParish}
               </td>
             </tr>
@@ -848,7 +848,7 @@ export default function JamaicaMap3D({
               className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all duration-200 ${
                 active
                   ? CAT_ACTIVE_COLORS[id]
-                  : "border-white/[0.08] text-white/40 hover:text-white/70 hover:border-white/20"
+                  : "border-white/[0.08] text-white/70 hover:text-white/90 hover:border-white/20"
               }`}
             >
               <Icon className="h-3.5 w-3.5" />
@@ -892,7 +892,7 @@ export default function JamaicaMap3D({
 
       {/* Parish Leaderboard */}
       <div>
-        <h3 className="text-xs font-semibold text-white/30 uppercase tracking-widest mb-2">
+        <h3 className="text-xs font-semibold text-white/60 uppercase tracking-widest mb-2">
           Parish Leaderboard
         </h3>
         <ParishLeaderboard
@@ -906,7 +906,7 @@ export default function JamaicaMap3D({
       {/* Top Offences */}
       {analyticsCases.length > 0 && (
         <div>
-          <h3 className="text-xs font-semibold text-white/30 uppercase tracking-widest mb-2">
+          <h3 className="text-xs font-semibold text-white/60 uppercase tracking-widest mb-2">
             Top 10 Offences
           </h3>
           <TopOffences cases={analyticsCases} />

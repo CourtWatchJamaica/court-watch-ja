@@ -193,7 +193,7 @@ function CasePanel({
         <div className="px-4 pb-4 pt-2">
           <p className="text-[10px] text-muted-foreground">
             Method: <span className="text-foreground font-medium">In-app</span>
-            <span className="ml-1 text-white/25">(email &amp; push coming soon)</span>
+            <span className="ml-1 text-white/55">(email &amp; push coming soon)</span>
           </p>
         </div>
       </div>
@@ -229,8 +229,8 @@ function ActiveNotifsList({
     return (
       <div className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.05] bg-[#0d0d1a] py-12 text-center px-4">
         <Bell className="mb-3 h-10 w-10 text-white/10" />
-        <p className="text-sm text-white/40">No alerts scheduled</p>
-        <p className="mt-1 text-[12px] text-white/25">
+        <p className="text-sm text-white/70">No alerts scheduled</p>
+        <p className="mt-1 text-[12px] text-white/55">
           Track a case and enable notification timings above.
         </p>
       </div>
@@ -244,7 +244,7 @@ function ActiveNotifsList({
           <Bell className="h-3.5 w-3.5 text-[#009B3A] shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-[12px] font-medium text-white/80 truncate">{title}</p>
-            <p className="text-[10px] text-white/35">{timing}</p>
+            <p className="text-[10px] text-white/65">{timing}</p>
           </div>
           <span className="text-[10px] rounded-full bg-[#009B3A]/10 border border-[#009B3A]/20 px-2 py-0.5 text-[#009B3A] font-medium shrink-0">
             Active
@@ -395,7 +395,7 @@ export default function NotificationSettingsPage() {
                         "rounded-full px-2.5 py-1 text-[10px] font-semibold border transition-all duration-150",
                         settings.defaultTimings.includes(id)
                           ? "border-[#009B3A]/50 bg-[#009B3A]/15 text-[#009B3A]"
-                          : "border-white/[0.1] text-white/40 hover:border-white/25 hover:text-white/60",
+                          : "border-white/[0.1] text-white/70 hover:border-white/25 hover:text-white/60",
                       )}
                     >
                       {label}
@@ -416,7 +416,7 @@ export default function NotificationSettingsPage() {
                   "flex-1 rounded-lg py-2 text-[12px] font-semibold capitalize transition-all duration-150",
                   activeTab === tab
                     ? "bg-[#009B3A] text-white"
-                    : "text-white/40 hover:text-white/60",
+                    : "text-white/70 hover:text-white/90",
                 )}
               >
                 {tab === "settings" ? "Case Alerts" : "Active Alerts"}
@@ -442,8 +442,8 @@ export default function NotificationSettingsPage() {
           ) : trackedCases.length === 0 ? (
             <div className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.05] bg-[#0d0d1a] py-16 text-center">
               <Bell className="mb-3 h-10 w-10 text-white/10" />
-              <p className="text-sm text-white/40">No tracked cases</p>
-              <p className="mt-1 text-[12px] text-white/25">
+              <p className="text-sm text-white/70">No tracked cases</p>
+              <p className="mt-1 text-[12px] text-white/55">
                 Track a case to set up custom alert schedules.
               </p>
               <button
@@ -494,7 +494,7 @@ export default function NotificationSettingsPage() {
                           <Bell
                             className={cn(
                               "h-3.5 w-3.5",
-                              cs.enabled ? "text-[#009B3A]" : "text-white/30",
+                              cs.enabled ? "text-[#009B3A]" : "text-white/60",
                             )}
                           />
                         </div>
@@ -503,10 +503,10 @@ export default function NotificationSettingsPage() {
                             {j?.title || `Case #${uc.case_id}`}
                           </p>
                           {j?.court && (
-                            <p className="text-[10px] text-white/35 truncate">{j.court}</p>
+                            <p className="text-[10px] text-white/65 truncate">{j.court}</p>
                           )}
                         </div>
-                        <ChevronRight className="h-3.5 w-3.5 text-white/20 shrink-0" />
+                        <ChevronRight className="h-3.5 w-3.5 text-white/50 shrink-0" />
                       </button>
                     );
                   })}
@@ -523,7 +523,7 @@ export default function NotificationSettingsPage() {
                     onUpdate={(cs) => updateCaseSettings(selectedCaseId, cs)}
                   />
                 ) : (
-                  <div className="flex items-center justify-center h-48 rounded-2xl border border-white/[0.06] text-white/30 text-sm">
+                  <div className="flex items-center justify-center h-48 rounded-2xl border border-white/[0.06] text-white/60 text-sm">
                     Select a case to manage alerts
                   </div>
                 )}
@@ -548,7 +548,7 @@ export default function NotificationSettingsPage() {
                 <p className="text-sm font-semibold text-white">Case Alerts</p>
                 <button
                   onClick={() => setMobileSheetOpen(false)}
-                  className="rounded-lg p-1.5 text-white/40 hover:text-white hover:bg-white/[0.07]"
+                  className="rounded-lg p-1.5 text-white/70 hover:text-white hover:bg-white/[0.07]"
                 >
                   <X className="h-4 w-4" />
                 </button>

@@ -118,7 +118,7 @@ export default function AboutPage() {
 
         {/* CTA */}
         <div className="mt-12 text-center">
-          <p className="text-white/40 text-sm mb-5">
+          <p className="text-white/70 text-sm mb-5">
             Ready to track your cases?
           </p>
           <Link
@@ -131,7 +131,7 @@ export default function AboutPage() {
       </main>
 
       <footer className="border-t border-white/[0.05] py-8 px-6">
-        <div className="max-w-3xl mx-auto flex flex-wrap items-center gap-4 text-xs text-white/30">
+        <div className="max-w-3xl mx-auto flex flex-wrap items-center gap-4 text-xs text-white/60">
           <span>© 2026 CourtWatch JA. Made in Jamaica.</span>
           <Link
             href="/privacy"
