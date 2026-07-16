@@ -769,7 +769,7 @@ function JudgeInfoCard({
           </div>
           <button
             onClick={onClose}
-            className="rounded-md p-0.5 text-white/30 hover:text-white/60 transition-colors shrink-0"
+            className="rounded-md p-0.5 text-white/50 hover:text-white/60 transition-colors shrink-0"
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -777,7 +777,7 @@ function JudgeInfoCard({
 
         {judge.total_cases !== undefined && (
           <div className="flex items-center gap-1.5">
-            <Users className="h-3 w-3 text-white/25" />
+            <Users className="h-3 w-3 text-white/55" />
             <span className="text-[11px] text-white/45">
               {judge.total_cases} case{judge.total_cases !== 1 ? "s" : ""} on
               record
@@ -789,7 +789,7 @@ function JudgeInfoCard({
       <div className="flex-1 overflow-y-auto px-4 pb-3 space-y-4 min-h-0">
         {dataLoading ? (
           <div className="flex items-center justify-center py-4">
-            <Loader2 className="h-4 w-4 animate-spin text-white/20" />
+            <Loader2 className="h-4 w-4 animate-spin text-white/50" />
           </div>
         ) : (
           <>
@@ -797,7 +797,7 @@ function JudgeInfoCard({
               <div>
                 <div className="flex items-center gap-1.5 mb-2">
                   <FileText className="h-3 w-3 text-[#009B3A]/70" />
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-white/30">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-white/60">
                     Recent Judgments
                   </p>
                 </div>
@@ -812,7 +812,7 @@ function JudgeInfoCard({
                         {j.title}
                       </p>
                       {j.date && (
-                        <p className="mt-0.5 text-[10px] text-white/30">
+                        <p className="mt-0.5 text-[10px] text-white/60">
                           {new Date(`${j.date}T00:00:00`).toLocaleDateString(
                             "en-JM",
                             { month: "short", year: "numeric" },
@@ -829,7 +829,7 @@ function JudgeInfoCard({
               <div>
                 <div className="flex items-center gap-1.5 mb-2">
                   <Calendar className="h-3 w-3 text-[#FED100]/70" />
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-white/30">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-white/60">
                     Upcoming Sittings
                   </p>
                 </div>
@@ -844,7 +844,7 @@ function JudgeInfoCard({
                         {s.title || s.case_number || "Sitting"}
                       </p>
                       {s.event_date && (
-                        <p className="mt-0.5 text-[10px] text-white/30">
+                        <p className="mt-0.5 text-[10px] text-white/60">
                           {new Date(
                             `${s.event_date}T00:00:00`,
                           ).toLocaleDateString("en-JM", {
@@ -861,7 +861,7 @@ function JudgeInfoCard({
             )}
 
             {recentJudgments.length === 0 && upcomingSittings.length === 0 && (
-              <p className="text-[11px] text-white/25 text-center py-2">
+              <p className="text-[11px] text-white/55 text-center py-2">
                 No recent activity
               </p>
             )}
@@ -959,13 +959,13 @@ function MobileSheet({
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-white/30 hover:text-white/60"
+            className="rounded-lg p-1.5 text-white/50 hover:text-white/60"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
         {judge.total_cases !== undefined && (
-          <p className="text-[12px] text-white/40">
+          <p className="text-[12px] text-white/70">
             {judge.total_cases} case{judge.total_cases !== 1 ? "s" : ""} on
             record
           </p>
@@ -975,7 +975,7 @@ function MobileSheet({
       <div className="flex-1 overflow-y-auto px-5 pb-2 space-y-4 min-h-0">
         {dataLoading ? (
           <div className="flex items-center justify-center py-6">
-            <Loader2 className="h-5 w-5 animate-spin text-white/20" />
+            <Loader2 className="h-5 w-5 animate-spin text-white/50" />
           </div>
         ) : (
           <>
@@ -983,7 +983,7 @@ function MobileSheet({
               <div>
                 <div className="flex items-center gap-1.5 mb-2">
                   <FileText className="h-3.5 w-3.5 text-[#009B3A]/70" />
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-white/30">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-white/60">
                     Recent Judgments
                   </p>
                 </div>
@@ -998,7 +998,7 @@ function MobileSheet({
                         {j.title}
                       </p>
                       {j.date && (
-                        <p className="mt-1 text-[11px] text-white/30">
+                        <p className="mt-1 text-[11px] text-white/60">
                           {new Date(`${j.date}T00:00:00`).toLocaleDateString(
                             "en-JM",
                             { month: "short", year: "numeric" },
@@ -1015,7 +1015,7 @@ function MobileSheet({
               <div>
                 <div className="flex items-center gap-1.5 mb-2">
                   <Calendar className="h-3.5 w-3.5 text-[#FED100]/70" />
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-white/30">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-white/60">
                     Upcoming Sittings
                   </p>
                 </div>
@@ -1030,7 +1030,7 @@ function MobileSheet({
                         {s.title || s.case_number || "Sitting"}
                       </p>
                       {s.event_date && (
-                        <p className="mt-1 text-[11px] text-white/30">
+                        <p className="mt-1 text-[11px] text-white/60">
                           {new Date(
                             `${s.event_date}T00:00:00`,
                           ).toLocaleDateString("en-JM", {
@@ -1047,7 +1047,7 @@ function MobileSheet({
             )}
 
             {recentJudgments.length === 0 && upcomingSittings.length === 0 && (
-              <p className="text-[13px] text-white/25 text-center py-2">
+              <p className="text-[13px] text-white/55 text-center py-2">
                 No recent activity
               </p>
             )}
@@ -1119,10 +1119,10 @@ function Legend() {
             className="h-2.5 w-2.5 rounded-sm"
             style={{ background: color }}
           />
-          <span className="text-[10px] text-white/40">{court}</span>
+          <span className="text-[10px] text-white/70">{court}</span>
         </div>
       ))}
-      <span className="ml-auto text-[10px] text-white/20">Size = caseload</span>
+      <span className="ml-auto text-[10px] text-white/50">Size = caseload</span>
     </div>
   );
 }
@@ -1353,7 +1353,7 @@ export default function JudicialConstellation({ judges, connections }: Props) {
       {/* Search bar + view toggle */}
       <div className="px-1 pb-4 shrink-0 flex gap-2">
         <div className="relative flex-1">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-white/30 pointer-events-none" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-white/60 pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
@@ -1364,7 +1364,7 @@ export default function JudicialConstellation({ judges, connections }: Props) {
           {searchQuery && (
             <button
               onClick={() => setSearchQuery("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 hover:text-white/60"
             >
               <X className="h-4 w-4" />
             </button>
@@ -1413,7 +1413,7 @@ export default function JudicialConstellation({ judges, connections }: Props) {
         )}
 
         {!selectedJudge && filteredJudges.length > 0 && (
-          <p className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 text-[10px] text-white/20 whitespace-nowrap">
+          <p className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 text-[10px] text-white/50 whitespace-nowrap">
             Tap a star to explore · Drag to rotate
           </p>
         )}

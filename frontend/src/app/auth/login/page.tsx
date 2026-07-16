@@ -83,7 +83,7 @@ export default function LoginPage() {
               Court<span className="text-[#009B3A]">Watch</span>
               <span className="text-[#FED100]"> JA</span>
             </h1>
-            <p className="mt-1 text-sm text-white/40">
+            <p className="mt-1 text-sm text-white/70">
               Sign in to your account
             </p>
           </div>
@@ -145,7 +145,7 @@ export default function LoginPage() {
                   <div className="w-full border-t border-white/[0.08]" />
                 </div>
                 <div className="relative flex justify-center">
-                  <span className="bg-[#0d0d1a] px-3 text-[11px] text-white/25">
+                  <span className="bg-[#0d0d1a] px-3 text-[11px] text-white/55">
                     or sign in with email
                   </span>
                 </div>
@@ -162,7 +162,7 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40 mb-1.5">
+              <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70 mb-1.5">
                 Email
               </label>
               <input
@@ -178,12 +178,12 @@ export default function LoginPage() {
 
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40">
+                <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70">
                   Password
                 </label>
                 <Link
                   href="/forgot-password"
-                  className="text-[11px] text-white/35 hover:text-[#009B3A] transition-colors"
+                  className="text-[11px] text-white/65 hover:text-[#009B3A] transition-colors"
                 >
                   Forgot password?
                 </Link>
@@ -241,7 +241,7 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-5 text-center text-sm text-white/35">
+          <div className="mt-5 text-center text-sm text-white/65">
             Don&apos;t have an account?{" "}
             <Link
               href="/auth/signup"
@@ -252,7 +252,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <p className="mt-6 text-center text-[11px] text-white/20">
+        <p className="mt-6 text-center text-[11px] text-white/50">
           Jamaica&apos;s premier legal case tracker
         </p>
       </div>

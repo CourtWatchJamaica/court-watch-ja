@@ -34,8 +34,8 @@ function CarouselCard({ judgment }: { judgment: Judgment }) {
         </div>
         {judgment.date && (
           <div className="flex items-center gap-1 shrink-0">
-            <Calendar className="h-3 w-3 text-white/25" />
-            <span className="text-[10px] text-white/35">
+            <Calendar className="h-3 w-3 text-white/55" />
+            <span className="text-[10px] text-white/65">
               {new Date(judgment.date).toLocaleDateString("en-JM", {
                 month: "short",
                 day: "numeric",
@@ -52,7 +52,7 @@ function CarouselCard({ judgment }: { judgment: Judgment }) {
           {judgment.title || judgment.case_number}
         </h3>
         {judgment.case_number && judgment.title && (
-          <p className="mt-1 font-mono text-[10px] text-white/30 tracking-wide">
+          <p className="mt-1 font-mono text-[10px] text-white/60 tracking-wide">
             {judgment.case_number}
           </p>
         )}
@@ -62,8 +62,8 @@ function CarouselCard({ judgment }: { judgment: Judgment }) {
       <div className="mt-3 flex items-center justify-between gap-2">
         {judgment.judge_name ? (
           <div className="flex items-center gap-1.5">
-            <Building2 className="h-3 w-3 text-white/25 shrink-0" />
-            <span className="text-[11px] text-white/40 truncate max-w-[140px]">
+            <Building2 className="h-3 w-3 text-white/55 shrink-0" />
+            <span className="text-[11px] text-white/70 truncate max-w-[140px]">
               {judgment.judge_name}
             </span>
           </div>
@@ -82,7 +82,7 @@ function CarouselCard({ judgment }: { judgment: Judgment }) {
           ) : (
             <button
               onClick={(e) => { e.stopPropagation(); track(judgment.id, "judgment"); }}
-              className="flex items-center gap-1 rounded-full border border-white/[0.12] px-2 py-0.5 text-[9px] font-semibold text-white/40 hover:border-[#009B3A]/40 hover:text-[#009B3A] hover:bg-[#009B3A]/10 transition-colors"
+              className="flex items-center gap-1 rounded-full border border-white/[0.12] px-2 py-0.5 text-[9px] font-semibold text-white/70 hover:border-[#009B3A]/40 hover:text-[#009B3A] hover:bg-[#009B3A]/10 transition-colors"
             >
               <Bookmark className="h-2.5 w-2.5" />
               Track
@@ -257,7 +257,7 @@ export default function JudgmentCarousel({ judgments }: JudgmentCarouselProps) {
             />
           ))}
           {extraCount > 0 && (
-            <span className="text-[10px] text-white/25 ml-0.5">+{extraCount}</span>
+            <span className="text-[10px] text-white/55 ml-0.5">+{extraCount}</span>
           )}
         </div>
       </div>

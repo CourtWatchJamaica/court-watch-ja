@@ -168,7 +168,7 @@ export default function AdminPromosPage() {
         <Sparkles className="h-5 w-5 text-[#FED100]" />
         <div>
           <h1 className="text-xl font-bold text-white">Promo Popups</h1>
-          <p className="text-xs text-white/40 mt-0.5">
+          <p className="text-xs text-white/70 mt-0.5">
             Manage promotional popups shown to authenticated users
           </p>
         </div>
@@ -176,13 +176,13 @@ export default function AdminPromosPage() {
 
       {/* Form */}
       <div className="mb-8 rounded-2xl border border-white/[0.07] bg-[#0d0d1a] p-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-white/40 mb-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-white/70 mb-4">
           {editingId !== null ? "Edit Promo" : "New Promo"}
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40 mb-1.5">
+            <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70 mb-1.5">
               Title <span className="text-red-400">*</span>
             </label>
             <input
@@ -195,7 +195,7 @@ export default function AdminPromosPage() {
           </div>
 
           <div>
-            <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40 mb-1.5">
+            <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70 mb-1.5">
               Message <span className="text-red-400">*</span>
             </label>
             <textarea
@@ -206,14 +206,14 @@ export default function AdminPromosPage() {
               placeholder="Describe the promotion or announcement…"
               maxLength={500}
             />
-            <p className="mt-1 text-right text-[10px] text-white/20">
+            <p className="mt-1 text-right text-[10px] text-white/50">
               {form.message.length}/500
             </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40 mb-1.5">
+              <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70 mb-1.5">
                 CTA URL
               </label>
               <input
@@ -224,7 +224,7 @@ export default function AdminPromosPage() {
               />
             </div>
             <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40 mb-1.5">
+              <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70 mb-1.5">
                 CTA Button Text
               </label>
               <input
@@ -238,7 +238,7 @@ export default function AdminPromosPage() {
           </div>
 
           <div>
-            <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40 mb-1.5">
+            <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70 mb-1.5">
               Display Frequency
             </label>
             <select
@@ -256,7 +256,7 @@ export default function AdminPromosPage() {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40 mb-1.5">
+              <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70 mb-1.5">
                 Starts At
               </label>
               <input
@@ -267,7 +267,7 @@ export default function AdminPromosPage() {
               />
             </div>
             <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40 mb-1.5">
+              <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70 mb-1.5">
                 Ends At
               </label>
               <input
@@ -351,17 +351,17 @@ export default function AdminPromosPage() {
 
       {/* Promo list */}
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-white/40 mb-3">
+        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-white/70 mb-3">
           Existing Promos ({promos.length})
         </p>
 
         {loading ? (
-          <div className="flex items-center gap-2 text-sm text-white/30 py-4">
+          <div className="flex items-center gap-2 text-sm text-white/60 py-4">
             <Loader2 className="h-4 w-4 animate-spin" />
             Loading…
           </div>
         ) : promos.length === 0 ? (
-          <p className="text-sm text-white/25 py-4">No promos yet.</p>
+          <p className="text-sm text-white/55 py-4">No promos yet.</p>
         ) : (
           <div className="space-y-3">
             {promos.map((p) => (
@@ -383,12 +383,12 @@ export default function AdminPromosPage() {
                         className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
                           p.enabled
                             ? "bg-[#009B3A]/15 text-[#009B3A]"
-                            : "bg-white/[0.06] text-white/30"
+                            : "bg-white/[0.06] text-white/60"
                         }`}
                       >
                         {p.enabled ? "Active" : "Disabled"}
                       </span>
-                      <span className="shrink-0 rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] text-white/40">
+                      <span className="shrink-0 rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] text-white/70">
                         {p.display_frequency}
                       </span>
                     </div>
@@ -396,7 +396,7 @@ export default function AdminPromosPage() {
                       {p.message}
                     </p>
                     {(p.starts_at || p.ends_at) && (
-                      <p className="mt-1 text-[10px] text-white/25">
+                      <p className="mt-1 text-[10px] text-white/55">
                         {p.starts_at && `From ${p.starts_at.slice(0, 10)}`}
                         {p.starts_at && p.ends_at && " → "}
                         {p.ends_at && `Until ${p.ends_at.slice(0, 10)}`}
@@ -406,14 +406,14 @@ export default function AdminPromosPage() {
                   <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       onClick={() => handleEdit(p)}
-                      className="flex h-7 w-7 items-center justify-center rounded-lg text-white/30 hover:bg-white/[0.06] hover:text-white/60 transition-colors"
+                      className="flex h-7 w-7 items-center justify-center rounded-lg text-white/60 hover:bg-white/[0.06] hover:text-white/60 transition-colors"
                       title="Edit"
                     >
                       <Pencil className="h-3.5 w-3.5" />
                     </button>
                     <button
                       onClick={() => setDeleteTarget(p)}
-                      className="flex h-7 w-7 items-center justify-center rounded-lg text-white/30 hover:bg-red-500/10 hover:text-red-400 transition-colors"
+                      className="flex h-7 w-7 items-center justify-center rounded-lg text-white/60 hover:bg-red-500/10 hover:text-red-400 transition-colors"
                       title="Delete"
                     >
                       <Trash2 className="h-3.5 w-3.5" />

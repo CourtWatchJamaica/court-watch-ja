@@ -219,11 +219,11 @@ function TodaySittingsPage() {
             </div>
             <div>
               <span className="text-sm font-semibold text-white/80">Today&apos;s Sittings</span>
-              <p className="text-[10px] text-white/30 leading-none mt-0.5">{todayLabel}</p>
+              <p className="text-[10px] text-white/60 leading-none mt-0.5">{todayLabel}</p>
             </div>
           </div>
           {!loading && (
-            <span className="text-[11px] font-medium text-white/30">
+            <span className="text-[11px] font-medium text-white/60">
               {totalCount} sitting{totalCount !== 1 ? "s" : ""}
             </span>
           )}
@@ -242,7 +242,7 @@ function TodaySittingsPage() {
 
         {/* Search bar */}
         <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-white/25 pointer-events-none" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-white/55 pointer-events-none" />
           <input
             type="text"
             value={query}
@@ -253,7 +253,7 @@ function TodaySittingsPage() {
           {query && (
             <button
               onClick={() => setQuery("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-white/25 hover:text-white/60 transition-colors"
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-white/55 hover:text-white/60 transition-colors"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -267,7 +267,7 @@ function TodaySittingsPage() {
             className={`rounded-full border px-4 py-1.5 text-[12px] font-semibold transition-colors ${
               courtFilter === null
                 ? "border-white/30 bg-white/10 text-white/90"
-                : "border-white/10 bg-transparent text-white/40 hover:text-white/60"
+                : "border-white/10 bg-transparent text-white/70 hover:text-white/90"
             }`}
           >
             All Courts
@@ -281,7 +281,7 @@ function TodaySittingsPage() {
                 className={`rounded-full border px-4 py-1.5 text-[12px] font-semibold transition-colors ${
                   courtFilter === group
                     ? cfg.pill
-                    : "border-white/10 bg-transparent text-white/40 hover:text-white/60"
+                    : "border-white/10 bg-transparent text-white/70 hover:text-white/90"
                 }`}
               >
                 {cfg.label}
@@ -314,7 +314,7 @@ function TodaySittingsPage() {
                     </div>
                     <div>
                       <h2 className={`text-sm font-bold ${cfg.accent}`}>{cfg.label}</h2>
-                      <p className="text-[10px] text-white/30 leading-none mt-0.5">
+                      <p className="text-[10px] text-white/60 leading-none mt-0.5">
                         {items.length} sitting{items.length !== 1 ? "s" : ""}
                       </p>
                     </div>
@@ -346,7 +346,7 @@ function TodaySittingsPage() {
                       <div className={`mb-3 flex h-10 w-10 items-center justify-center rounded-xl ${cfg.bg}`}>
                         <CfgIcon className={`h-5 w-5 ${cfg.accent} opacity-40`} />
                       </div>
-                      <p className="text-sm font-semibold text-white/30">
+                      <p className="text-sm font-semibold text-white/60">
                         {query
                           ? `No ${cfg.label} sittings match your search`
                           : hasData
@@ -354,7 +354,7 @@ function TodaySittingsPage() {
                           : `No ${cfg.label} sittings scheduled for today`}
                       </p>
                       {!query && !hasData && (
-                        <p className="mt-1 text-xs text-white/20 max-w-[220px] leading-relaxed">
+                        <p className="mt-1 text-xs text-white/50 max-w-[220px] leading-relaxed">
                           Court lists are updated daily. Check back soon.
                         </p>
                       )}

@@ -207,7 +207,7 @@ export default function DashboardPage() {
                                 {judgment.case_number}
                               </Badge>
                               {judgment.court && (
-                                <span className="text-xs text-white/40 flex items-center gap-1">
+                                <span className="text-xs text-white/70 flex items-center gap-1">
                                   <Gavel className="w-3 h-3" />
                                   {judgment.court}
                                 </span>
@@ -298,7 +298,7 @@ export default function DashboardPage() {
               <CardContent>
                 {trackedCases.length === 0 ? (
                   <div className="text-center py-8">
-                    <Clock className="w-12 h-12 text-white/20 mx-auto mb-3" />
+                    <Clock className="w-12 h-12 text-white/50 mx-auto mb-3" />
                     <p className="text-white/50 text-sm">No tracked cases yet</p>
                     <Link href="/cases">
                       <Button variant="link" className="text-[#009B3A] mt-2">

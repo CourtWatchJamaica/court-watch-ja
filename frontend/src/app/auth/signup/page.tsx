@@ -94,14 +94,14 @@ export default function SignupPage() {
               Court<span className="text-[#009B3A]">Watch</span>
               <span className="text-[#FED100]"> JA</span>
             </h1>
-            <p className="mt-1 text-sm text-white/40">Create your account</p>
+            <p className="mt-1 text-sm text-white/70">Create your account</p>
           </div>
         </div>
 
         <div className="rounded-2xl border border-white/[0.08] bg-[#0d0d1a] p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40 mb-1.5">
+              <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70 mb-1.5">
                 Email
               </label>
               <input
@@ -116,7 +116,7 @@ export default function SignupPage() {
             </div>
 
             <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40 mb-1.5">
+              <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70 mb-1.5">
                 Display Name <span className="normal-case font-normal">(optional)</span>
               </label>
               <input
@@ -130,7 +130,7 @@ export default function SignupPage() {
             </div>
 
             <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40 mb-1.5">
+              <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70 mb-1.5">
                 Password
               </label>
               <input
@@ -145,7 +145,7 @@ export default function SignupPage() {
             </div>
 
             <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40 mb-1.5">
+              <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70 mb-1.5">
                 Confirm Password
               </label>
               <input
@@ -182,7 +182,7 @@ export default function SignupPage() {
                   <div className="w-full border-t border-white/[0.08]" />
                 </div>
                 <div className="relative flex justify-center">
-                  <span className="bg-[#0d0d1a] px-3 text-[11px] text-white/25">
+                  <span className="bg-[#0d0d1a] px-3 text-[11px] text-white/55">
                     or continue with
                   </span>
                 </div>
@@ -218,7 +218,7 @@ export default function SignupPage() {
             </>
           )}
 
-          <div className="mt-5 text-center text-sm text-white/35">
+          <div className="mt-5 text-center text-sm text-white/65">
             Already have an account?{" "}
             <Link
               href="/auth/login"
@@ -229,7 +229,7 @@ export default function SignupPage() {
           </div>
         </div>
 
-        <p className="mt-6 text-center text-[11px] text-white/20">
+        <p className="mt-6 text-center text-[11px] text-white/50">
           Jamaica&apos;s premier legal case tracker
         </p>
       </div>

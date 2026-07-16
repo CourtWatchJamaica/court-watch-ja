@@ -47,7 +47,7 @@ export default function CheckEmailPage() {
         <div className="mt-4">
           <Link
             href="/auth/login"
-            className="text-sm text-white/35 hover:text-white/60 transition-colors"
+            className="text-sm text-white/65 hover:text-white/80 transition-colors"
           >
             Back to sign in
           </Link>

@@ -77,7 +77,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                       : "text-white/50 hover:bg-white/[0.04] hover:text-white/80"
                   }`}
                 >
-                  <Icon className={`h-4 w-4 shrink-0 ${active ? "text-[#009B3A]" : "text-white/35 group-hover:text-white/60"}`} />
+                  <Icon className={`h-4 w-4 shrink-0 ${active ? "text-[#009B3A]" : "text-white/65 group-hover:text-white/80"}`} />
                   <span className="flex-1 font-medium">{label}</span>
                   {active && <ChevronRight className="h-3 w-3 text-[#009B3A]/60" />}
                 </Link>
@@ -89,7 +89,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div className="px-3 py-4 border-t border-white/[0.06] space-y-1">
             <Link
               href="/"
-              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/40 hover:bg-white/[0.04] hover:text-white/70 transition-colors"
+              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/70 hover:bg-white/[0.04] hover:text-white/70 transition-colors"
             >
               <ChevronRight className="h-4 w-4 rotate-180" />
               <span className="font-medium">Back to App</span>
@@ -116,7 +116,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               className={`flex items-center justify-center rounded-lg p-2 transition-colors ${
                 isActive(href)
                   ? "bg-[#009B3A]/12 text-[#009B3A]"
-                  : "text-white/40 hover:text-white/70"
+                  : "text-white/70 hover:text-white/90"
               }`}
               title={label}
             >

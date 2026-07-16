@@ -29,7 +29,7 @@ function StatBox({
   return (
     <div className="rounded-xl border border-white/[0.07] bg-black/20 px-4 py-3 text-center">
       <p className={`text-xl font-bold ${color}`}>{value}</p>
-      <p className="text-[10px] text-white/35 mt-1">{label}</p>
+      <p className="text-[10px] text-white/65 mt-1">{label}</p>
     </div>
   );
 }
@@ -48,7 +48,7 @@ function StatusBadge({ count }: { count: number }) {
       </span>
     );
   return (
-    <span className="shrink-0 rounded-full bg-white/[0.08] px-2 py-0.5 text-[10px] font-bold text-white/40">
+    <span className="shrink-0 rounded-full bg-white/[0.08] px-2 py-0.5 text-[10px] font-bold text-white/70">
       {count}× failed
     </span>
   );
@@ -219,14 +219,14 @@ export default function AdminScraperPage() {
           <Cpu className="h-5 w-5 text-[#FED100]" />
           <div>
             <h1 className="text-xl font-bold text-white">Scraper Control</h1>
-            <p className="text-xs text-white/40 mt-0.5">
+            <p className="text-xs text-white/70 mt-0.5">
               Trigger runs and manage PDF queues
             </p>
           </div>
         </div>
         <button
           onClick={fetchStatus}
-          className="flex items-center gap-1.5 text-xs text-white/30 hover:text-white/60 transition-colors"
+          className="flex items-center gap-1.5 text-xs text-white/50 hover:text-white/60 transition-colors"
         >
           <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
           Refresh
@@ -307,7 +307,7 @@ export default function AdminScraperPage() {
             </div>
             <div>
               <p className="text-sm font-semibold text-white">Maintenance Mode</p>
-              <p className="mt-0.5 text-[11px] text-white/35 leading-relaxed">
+              <p className="mt-0.5 text-[11px] text-white/65 leading-relaxed">
                 When enabled, non-admin users see a maintenance page instead of the app.
               </p>
             </div>
@@ -343,7 +343,7 @@ export default function AdminScraperPage() {
               <p className="text-sm font-semibold text-white">
                 Deep Scrape (Backfill to 2020)
               </p>
-              <p className="mt-0.5 text-[11px] text-white/35 leading-relaxed">
+              <p className="mt-0.5 text-[11px] text-white/65 leading-relaxed">
                 Temporarily lowers the judgment cutoff to 2020-01-01, runs all
                 scrapers in full, reseeds judges, then restores the cutoff to
                 2026-01-01. May take several minutes.
@@ -379,7 +379,7 @@ export default function AdminScraperPage() {
               value={status.next_parish_page}
             />
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-4 text-xs text-white/40">
+          <div className="mt-4 grid grid-cols-2 gap-4 text-xs text-white/70">
             <div>
               Last SC scraped:{" "}
               <span className="text-white/60">
@@ -421,10 +421,10 @@ export default function AdminScraperPage() {
                   rel="noopener noreferrer"
                   className="flex-1 flex items-center gap-1 min-w-0 group"
                 >
-                  <span className="truncate font-mono text-[10px] text-white/40 group-hover:text-white/70 transition-colors">
+                  <span className="truncate font-mono text-[10px] text-white/70 group-hover:text-white/90 transition-colors">
                     {url}
                   </span>
-                  <ExternalLink className="h-2.5 w-2.5 shrink-0 text-white/20 group-hover:text-white/50" />
+                  <ExternalLink className="h-2.5 w-2.5 shrink-0 text-white/50 group-hover:text-white/70" />
                 </a>
                 <div className="flex items-center gap-1 shrink-0">
                   <button
@@ -432,7 +432,7 @@ export default function AdminScraperPage() {
                     disabled={
                       actionUrl === url || actionUrl === url + "__skip"
                     }
-                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium text-white/40 hover:bg-[#009B3A]/10 hover:text-[#009B3A] disabled:opacity-40 transition-colors"
+                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium text-white/70 hover:bg-[#009B3A]/10 hover:text-[#009B3A] disabled:opacity-40 transition-colors"
                     title="Clear failure counter — retry on next run"
                   >
                     {actionUrl === url ? (
@@ -447,7 +447,7 @@ export default function AdminScraperPage() {
                     disabled={
                       actionUrl === url || actionUrl === url + "__skip"
                     }
-                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium text-white/40 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-40 transition-colors"
+                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium text-white/70 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-40 transition-colors"
                     title="Add to permanent skip list"
                   >
                     {actionUrl === url + "__skip" ? (
@@ -470,13 +470,13 @@ export default function AdminScraperPage() {
           <h2 className="text-sm font-semibold text-white">
             Permanently Skipped PDFs
           </h2>
-          <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] font-semibold text-white/40">
+          <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] font-semibold text-white/70">
             {status?.pdf_skipped_count ?? 0}
           </span>
         </div>
 
         {!status || status.pdf_skipped.length === 0 ? (
-          <p className="text-xs text-white/25 py-6 text-center">
+          <p className="text-xs text-white/55 py-6 text-center">
             No skipped PDFs
           </p>
         ) : (
@@ -492,15 +492,15 @@ export default function AdminScraperPage() {
                   rel="noopener noreferrer"
                   className="flex-1 flex items-center gap-1 min-w-0 group"
                 >
-                  <span className="truncate font-mono text-[10px] text-white/40 group-hover:text-white/70 transition-colors">
+                  <span className="truncate font-mono text-[10px] text-white/70 group-hover:text-white/90 transition-colors">
                     {url}
                   </span>
-                  <ExternalLink className="h-2.5 w-2.5 shrink-0 text-white/20 group-hover:text-white/50" />
+                  <ExternalLink className="h-2.5 w-2.5 shrink-0 text-white/50 group-hover:text-white/70" />
                 </a>
                 <button
                   onClick={() => handleRetry(url)}
                   disabled={actionUrl === url}
-                  className="shrink-0 flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium text-white/30 hover:bg-[#009B3A]/10 hover:text-[#009B3A] disabled:opacity-40 transition-colors"
+                  className="shrink-0 flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium text-white/60 hover:bg-[#009B3A]/10 hover:text-[#009B3A] disabled:opacity-40 transition-colors"
                   title="Remove from skip list — retry on next run"
                 >
                   {actionUrl === url ? (
@@ -513,7 +513,7 @@ export default function AdminScraperPage() {
                 <button
                   onClick={() => handleRetry(url)}
                   disabled={actionUrl === url}
-                  className="shrink-0 rounded p-1.5 text-white/20 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-40 transition-colors"
+                  className="shrink-0 rounded p-1.5 text-white/50 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-40 transition-colors"
                   title="Remove from skip list"
                 >
                   {actionUrl === url ? (

@@ -101,7 +101,7 @@ export default function AdminUploadPage() {
         <Upload className="h-5 w-5 text-[#009B3A]" />
         <div>
           <h1 className="text-xl font-bold text-white">Upload PDF</h1>
-          <p className="text-xs text-white/40 mt-0.5">
+          <p className="text-xs text-white/70 mt-0.5">
             Manually upload a court PDF for OCR processing
           </p>
         </div>
@@ -139,7 +139,7 @@ export default function AdminUploadPage() {
               <p className="text-sm font-medium text-white truncate">
                 {file.name}
               </p>
-              <p className="text-xs text-white/35 mt-0.5">
+              <p className="text-xs text-white/65 mt-0.5">
                 {(file.size / 1024).toFixed(1)} KB
               </p>
             </div>
@@ -148,7 +148,7 @@ export default function AdminUploadPage() {
                 e.stopPropagation();
                 clearFile();
               }}
-              className="shrink-0 rounded-lg p-1.5 text-white/30 hover:bg-white/[0.07] hover:text-white transition-colors"
+              className="shrink-0 rounded-lg p-1.5 text-white/60 hover:bg-white/[0.07] hover:text-white transition-colors"
             >
               <X className="h-4 w-4" />
             </button>
@@ -156,12 +156,12 @@ export default function AdminUploadPage() {
         ) : (
           <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
             <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.05] ring-1 ring-white/[0.08]">
-              <Upload className="h-5 w-5 text-white/30" />
+              <Upload className="h-5 w-5 text-white/60" />
             </div>
             <p className="text-sm font-medium text-white/60">
               Drag & drop a PDF here
             </p>
-            <p className="mt-1 text-xs text-white/25">
+            <p className="mt-1 text-xs text-white/55">
               or{" "}
               <span className="text-[#009B3A] underline underline-offset-2">
                 browse files
@@ -179,7 +179,7 @@ export default function AdminUploadPage() {
       {/* Options */}
       <div className="mb-5 grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40 mb-1.5">
+          <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70 mb-1.5">
             Document Type
           </label>
           <select
@@ -195,7 +195,7 @@ export default function AdminUploadPage() {
           </select>
         </div>
         <div>
-          <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40 mb-1.5">
+          <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70 mb-1.5">
             Court
           </label>
           <select
@@ -259,7 +259,7 @@ export default function AdminUploadPage() {
         )}
       </button>
 
-      <p className="mt-3 text-center text-[11px] text-white/20">
+      <p className="mt-3 text-center text-[11px] text-white/50">
         PDF will be parsed using the existing OCR pipeline. Extracted records
         are upserted into the database.
       </p>

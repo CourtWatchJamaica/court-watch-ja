@@ -66,7 +66,7 @@ function VerifyEmailContent() {
         {status === "loading" && (
           <>
             <h1 className="text-xl font-bold text-white mb-2">Verifying your email…</h1>
-            <p className="text-sm text-white/40">Please wait a moment.</p>
+            <p className="text-sm text-white/70">Please wait a moment.</p>
           </>
         )}
 
@@ -76,7 +76,7 @@ function VerifyEmailContent() {
               Email verified!{" "}
               <span className="text-[#009B3A]">Welcome to CourtWatch JA.</span>
             </h1>
-            <p className="text-sm text-white/40">Redirecting you to the dashboard…</p>
+            <p className="text-sm text-white/70">Redirecting you to the dashboard…</p>
           </>
         )}
 
@@ -84,7 +84,7 @@ function VerifyEmailContent() {
           <>
             <h1 className="text-xl font-bold text-white mb-2">Verification failed</h1>
             <p className="text-sm text-white/50 mb-6">{errorMessage}</p>
-            <p className="text-sm text-white/40 mb-4">
+            <p className="text-sm text-white/70 mb-4">
               The link may have expired. Request a new one by signing up again with the same email.
             </p>
             <Link

@@ -107,7 +107,7 @@ const CATEGORY_CONFIG: Record<
   },
   Other: {
     label: "Other",
-    color: "text-gray-400",
+    color: "text-gray-500",
     bg: "bg-gray-500/10",
     border: "border-gray-500/30",
     Icon: Shield,
@@ -155,7 +155,7 @@ function TabToggle({
             "transition-all duration-200 active:scale-[0.97]",
             active === id
               ? "bg-[#CD7F32] text-white shadow-[0_4px_20px_rgba(205,127,50,0.35)]"
-              : "text-white/40 hover:text-white/70 hover:bg-white/[0.04]",
+              : "text-white/70 hover:text-white/90 hover:bg-white/[0.04]",
           ].join(" ")}
         >
           <Icon
@@ -166,7 +166,7 @@ function TabToggle({
             <p className="text-[14px] font-semibold leading-none">{label}</p>
             <p
               className={`mt-0.5 text-[10px] leading-none ${
-                active === id ? "text-white/60" : "text-white/25"
+                active === id ? "text-white/60" : "text-white/55"
               }`}
             >
               {sub}
@@ -332,7 +332,7 @@ function ParishCourtDashboard() {
               <h1 className="text-2xl font-bold text-white tracking-tight">
                 Parish Court
               </h1>
-              <p className="text-sm text-white/40">
+              <p className="text-sm text-white/70">
                 Jamaica&apos;s 14 Parishes · {total} case{total !== 1 ? "s" : ""} indexed
               </p>
             </div>
@@ -352,7 +352,7 @@ function ParishCourtDashboard() {
           <>
             {/* Offence Breakdown Cards */}
             <section>
-              <h2 className="text-xs font-semibold text-white/30 uppercase tracking-widest mb-3">
+              <h2 className="text-xs font-semibold text-white/60 uppercase tracking-widest mb-3">
                 Offence Breakdown
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -387,7 +387,7 @@ function ParishCourtDashboard() {
             {/* Parish Grid */}
             {summary.length > 0 && (
               <section>
-                <h2 className="text-xs font-semibold text-white/30 uppercase tracking-widest mb-3">
+                <h2 className="text-xs font-semibold text-white/60 uppercase tracking-widest mb-3">
                   By Parish
                 </h2>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -459,7 +459,7 @@ function ParishCourtDashboard() {
 
             {/* Cases Feed */}
             <section ref={casesFeedRef}>
-              <h2 className="text-xs font-semibold text-white/30 uppercase tracking-widest mb-3">
+              <h2 className="text-xs font-semibold text-white/60 uppercase tracking-widest mb-3">
                 Cases
               </h2>
 
@@ -474,7 +474,7 @@ function ParishCourtDashboard() {
                 </div>
               ) : cases.length === 0 ? (
                 <div className="rounded-2xl border border-white/[0.05] bg-white/[0.02] py-16 text-center">
-                  <p className="text-white/30 text-sm">No cases match your filters.</p>
+                  <p className="text-white/60 text-sm">No cases match your filters.</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -494,7 +494,7 @@ function ParishCourtDashboard() {
                           <p className="text-sm font-medium text-white/90 truncate">
                             {c.accused_name ?? "Unknown"}
                           </p>
-                          <p className="text-xs text-white/40 truncate">
+                          <p className="text-xs text-white/70 truncate">
                             {c.offence ?? "—"}
                           </p>
                         </div>
@@ -506,20 +506,20 @@ function ParishCourtDashboard() {
                           >
                             {cat}
                           </Badge>
-                          <span className="text-[10px] text-white/30 hidden sm:block">
+                          <span className="text-[10px] text-white/60 hidden sm:block">
                             {c.parish}
                           </span>
                           {statusLabel && (
-                            <span className="text-[10px] text-white/25 hidden md:block">
+                            <span className="text-[10px] text-white/55 hidden md:block">
                               {statusLabel}
                             </span>
                           )}
                           {c.week_of && (
-                            <span className="text-[10px] text-white/20 hidden lg:block">
+                            <span className="text-[10px] text-white/50 hidden lg:block">
                               {c.week_of}
                             </span>
                           )}
-                          <ChevronRight className="h-3.5 w-3.5 text-white/20 shrink-0" />
+                          <ChevronRight className="h-3.5 w-3.5 text-white/50 shrink-0" />
                         </div>
                       </button>
                     );

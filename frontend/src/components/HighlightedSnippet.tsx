@@ -10,7 +10,7 @@ interface Props {
 // matched terms as highlighted <mark> spans.
 export default function HighlightedSnippet({
   text,
-  className = "text-[11px] text-white/35 leading-relaxed",
+  className = "text-[11px] text-white/65 leading-relaxed",
   markClassName = "bg-[#009B3A]/20 text-[#009B3A] rounded px-0.5 not-italic font-medium",
 }: Props) {
   const parts = text.split(/(\[\[.*?\]\])/g);

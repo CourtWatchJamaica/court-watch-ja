@@ -125,7 +125,7 @@ function SignUpPopup({ onClose }: { onClose: () => void }) {
       <div className="relative w-full max-w-sm rounded-3xl border border-white/10 bg-[#0d0d1a]/95 backdrop-blur-xl p-6 shadow-2xl shadow-black/60">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-1.5 rounded-lg text-white/30 hover:text-white/70 hover:bg-white/5 transition-colors"
+          className="absolute top-4 right-4 p-1.5 rounded-lg text-white/60 hover:text-white/70 hover:bg-white/5 transition-colors"
           aria-label="Close"
         >
           <X className="h-4 w-4" />
@@ -209,18 +209,18 @@ function JudgmentPreviewCard({
             </span>
           )}
           {judgment.date && (
-            <span className="text-[10px] text-white/35">
+            <span className="text-[10px] text-white/65">
               {formatDate(judgment.date)}
             </span>
           )}
         </div>
-        <ArrowUpRight className="h-3.5 w-3.5 text-white/20 group-hover:text-[#009B3A]/60 transition-colors shrink-0" />
+        <ArrowUpRight className="h-3.5 w-3.5 text-white/50 group-hover:text-[#009B3A]/60 transition-colors shrink-0" />
       </div>
       <p className="text-sm font-medium text-white/80 line-clamp-2 leading-snug mb-2">
         {judgment.title || judgment.case_number}
       </p>
       {judgment.summary_text && (
-        <p className="text-xs text-white/35 line-clamp-2 leading-relaxed">
+        <p className="text-xs text-white/65 line-clamp-2 leading-relaxed">
           {judgment.summary_text}
         </p>
       )}
@@ -250,18 +250,18 @@ function SittingPreviewCard({
             </span>
           )}
           {sitting.event_type && (
-            <span className="text-[10px] text-white/35">
+            <span className="text-[10px] text-white/65">
               {sitting.event_type}
             </span>
           )}
         </div>
-        <ArrowUpRight className="h-3.5 w-3.5 text-white/20 group-hover:text-[#FED100]/60 transition-colors shrink-0" />
+        <ArrowUpRight className="h-3.5 w-3.5 text-white/50 group-hover:text-[#FED100]/60 transition-colors shrink-0" />
       </div>
       <p className="text-sm font-medium text-white/80 line-clamp-2 leading-snug mb-1">
         {sitting.title || sitting.case_number || "Untitled Sitting"}
       </p>
       {sitting.court_division && (
-        <p className="text-xs text-white/35">{sitting.court_division}</p>
+        <p className="text-xs text-white/65">{sitting.court_division}</p>
       )}
     </button>
   );
@@ -592,7 +592,7 @@ function LandingPage() {
                   </div>
                   <button
                     onClick={handleViewAll}
-                    className="flex items-center gap-1 text-[11px] text-white/35 hover:text-white/60 transition-colors"
+                    className="flex items-center gap-1 text-[11px] text-white/65 hover:text-white/80 transition-colors"
                   >
                     View All
                     <ArrowUpRight className="h-3 w-3" />
@@ -627,7 +627,7 @@ function LandingPage() {
                   </div>
                   <button
                     onClick={handleViewAll}
-                    className="flex items-center gap-1 text-[11px] text-white/35 hover:text-white/60 transition-colors"
+                    className="flex items-center gap-1 text-[11px] text-white/65 hover:text-white/80 transition-colors"
                   >
                     View All
                     <ArrowUpRight className="h-3 w-3" />
@@ -773,7 +773,7 @@ function LandingPage() {
         {/* ── Footer ── */}
         <footer className="border-t border-white/[0.05] py-10 px-6">
           <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-2 text-white/40">
+            <div className="flex items-center gap-2 text-white/70">
               <Scale className="h-4 w-4" />
               <span className="text-sm">
                 © 2026 CourtWatch JA. Made in Jamaica.
@@ -792,7 +792,7 @@ function LandingPage() {
                 <Link
                   key={href}
                   href={href}
-                  className="text-xs text-white/35 hover:text-white/65 transition-colors"
+                  className="text-xs text-white/65 hover:text-white/85 transition-colors"
                 >
                   {label}
                 </Link>

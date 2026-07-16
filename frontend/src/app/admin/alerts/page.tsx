@@ -100,7 +100,7 @@ export default function AdminAlertsPage() {
         <AlertTriangle className="h-5 w-5 text-amber-400" />
         <div>
           <h1 className="text-xl font-bold text-white">Service Alert Banner</h1>
-          <p className="text-xs text-white/40 mt-0.5">
+          <p className="text-xs text-white/70 mt-0.5">
             Show a dismissible banner at the top of every page
           </p>
         </div>
@@ -145,7 +145,7 @@ export default function AdminAlertsPage() {
       {/* Form */}
       <form onSubmit={handleSave} className="space-y-4">
         <div>
-          <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40 mb-1.5">
+          <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70 mb-1.5">
             Title (optional)
           </label>
           <input
@@ -158,7 +158,7 @@ export default function AdminAlertsPage() {
         </div>
 
         <div>
-          <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40 mb-1.5">
+          <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70 mb-1.5">
             Message <span className="text-red-400">*</span>
           </label>
           <textarea
@@ -169,13 +169,13 @@ export default function AdminAlertsPage() {
             placeholder="Brief message shown to all users…"
             maxLength={200}
           />
-          <p className="mt-1 text-right text-[10px] text-white/20">
+          <p className="mt-1 text-right text-[10px] text-white/50">
             {message.length}/200
           </p>
         </div>
 
         <div>
-          <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40 mb-2">
+          <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70 mb-2">
             Severity
           </label>
           <div className="flex gap-2">
@@ -189,7 +189,7 @@ export default function AdminAlertsPage() {
                   className={`flex-1 flex items-center justify-center gap-2 rounded-xl border py-3 text-sm font-semibold transition-colors ${
                     severity === s.value
                       ? `border-current ${s.color} bg-white/[0.05]`
-                      : "border-white/[0.1] text-white/35 hover:border-white/20 hover:text-white/55"
+                      : "border-white/[0.1] text-white/65 hover:border-white/20 hover:text-white/55"
                   }`}
                 >
                   <SIcon className="h-4 w-4" />
@@ -203,7 +203,7 @@ export default function AdminAlertsPage() {
         {/* Preview */}
         {message && (
           <div className="rounded-xl overflow-hidden">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/25 mb-2">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/55 mb-2">
               Preview
             </p>
             <div className={`${PREVIEW_STYLES[severity] ?? PREVIEW_STYLES.info} px-4 py-2.5 rounded-xl`}>

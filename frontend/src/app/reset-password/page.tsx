@@ -96,7 +96,7 @@ function ResetPasswordContent() {
       <p className="text-sm text-white/50 mb-1">Enter your new password below.</p>
 
       <div>
-        <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40 mb-1.5">
+        <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70 mb-1.5">
           New Password
         </label>
         <div className="relative">
@@ -113,7 +113,7 @@ function ResetPasswordContent() {
           <button
             type="button"
             onClick={() => setShowPassword((v) => !v)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 hover:text-white/60 transition-colors"
             tabIndex={-1}
           >
             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -122,7 +122,7 @@ function ResetPasswordContent() {
       </div>
 
       <div>
-        <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/40 mb-1.5">
+        <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70 mb-1.5">
           Confirm New Password
         </label>
         <input
@@ -165,7 +165,7 @@ function ResetPasswordContent() {
         )}
       </button>
 
-      <div className="text-center text-sm text-white/35">
+      <div className="text-center text-sm text-white/65">
         <Link
           href="/auth/login"
           className="font-medium text-[#009B3A] hover:text-[#009B3A]/80 transition-colors"
@@ -198,7 +198,7 @@ export default function ResetPasswordPage() {
               Court<span className="text-[#009B3A]">Watch</span>
               <span className="text-[#FED100]"> JA</span>
             </h1>
-            <p className="mt-1 text-sm text-white/40">Set a new password</p>
+            <p className="mt-1 text-sm text-white/70">Set a new password</p>
           </div>
         </div>
 

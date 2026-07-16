@@ -37,13 +37,13 @@ export default function DeleteConfirmModal({
           </div>
           <button
             onClick={() => { setValue(""); onClose(); }}
-            className="shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-white/30 hover:bg-white/[0.06] hover:text-white transition-colors"
+            className="shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-white/60 hover:bg-white/[0.06] hover:text-white transition-colors"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <p className="mb-2 text-xs text-white/40">
+        <p className="mb-2 text-xs text-white/70">
           Type <span className="font-mono font-semibold text-white/60">DELETE</span> to confirm:
         </p>
         <input
@@ -53,13 +53,13 @@ export default function DeleteConfirmModal({
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && confirmed) { setValue(""); onConfirm(); } }}
           placeholder="DELETE"
-          className="w-full rounded-xl border border-white/[0.08] bg-black/30 px-3 py-2.5 font-mono text-sm text-white placeholder:text-white/20 focus:border-red-500/40 focus:outline-none transition-colors mb-4"
+          className="w-full rounded-xl border border-white/[0.08] bg-black/30 px-3 py-2.5 font-mono text-sm text-white placeholder:text-white/50 focus:border-red-500/40 focus:outline-none transition-colors mb-4"
         />
 
         <div className="flex gap-2 justify-end">
           <button
             onClick={() => { setValue(""); onClose(); }}
-            className="min-h-[44px] rounded-xl px-4 text-sm text-white/40 hover:bg-white/[0.05] hover:text-white transition-colors"
+            className="min-h-[44px] rounded-xl px-4 text-sm text-white/70 hover:bg-white/[0.05] hover:text-white transition-colors"
           >
             Cancel
           </button>

@@ -99,7 +99,7 @@ export default function CourtPage() {
         <div className="min-h-screen bg-background">
           <Navbar />
           <main className="max-w-7xl mx-auto px-4 py-12 text-center">
-            <p className="text-white/40">Court not found.</p>
+            <p className="text-white/70">Court not found.</p>
           </main>
         </div>
       </AuthGuard>

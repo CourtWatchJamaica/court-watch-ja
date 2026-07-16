@@ -64,10 +64,10 @@ function ActivityTab() {
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
-        <p className="text-xs text-white/30">Recent notifications sent across the platform</p>
+        <p className="text-xs text-white/60">Recent notifications sent across the platform</p>
         <button
           onClick={fetchLogs}
-          className="flex items-center gap-1.5 text-xs text-white/30 hover:text-white/60 transition-colors h-[36px] px-2"
+          className="flex items-center gap-1.5 text-xs text-white/50 hover:text-white/60 transition-colors h-[36px] px-2"
         >
           <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
         </button>
@@ -100,10 +100,10 @@ function ActivityTab() {
 
       <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a] overflow-hidden">
         <div className="hidden md:grid grid-cols-[auto_1fr_auto_auto] items-center gap-4 px-4 py-3 border-b border-white/[0.06]">
-          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/30">Type</span>
-          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/30">User</span>
-          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/30">Case</span>
-          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/30">Time</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/60">Type</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/60">User</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/60">Case</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/60">Time</span>
         </div>
 
         {loading ? (
@@ -120,7 +120,7 @@ function ActivityTab() {
         ) : activity.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <Bell className="h-8 w-8 text-white/10 mb-3" />
-            <p className="text-sm text-white/30">No activity yet</p>
+            <p className="text-sm text-white/60">No activity yet</p>
           </div>
         ) : (
           <div className="divide-y divide-white/[0.04]">
@@ -137,8 +137,8 @@ function ActivityTab() {
                     {TYPE_LABELS[row.notification_type] ?? row.notification_type}
                   </span>
                   <span className="truncate text-sm text-white/60">{row.email}</span>
-                  <span className="font-mono text-[10px] text-white/30">#{row.case_id}</span>
-                  <span className="text-xs text-white/30 whitespace-nowrap">{formatTime(row.sent_at)}</span>
+                  <span className="font-mono text-[10px] text-white/60">#{row.case_id}</span>
+                  <span className="text-xs text-white/60 whitespace-nowrap">{formatTime(row.sent_at)}</span>
                 </div>
               );
             })}
@@ -147,7 +147,7 @@ function ActivityTab() {
       </div>
 
       {!loading && activity.length > 0 && (
-        <p className="mt-3 text-center text-[11px] text-white/20">
+        <p className="mt-3 text-center text-[11px] text-white/50">
           Showing the 100 most recent events
         </p>
       )}
@@ -267,14 +267,14 @@ function AuditTab() {
   return (
     <div>
       <div className="mb-4 flex items-center justify-between flex-wrap gap-3">
-        <p className="text-xs text-white/30">Actions taken by admin users</p>
+        <p className="text-xs text-white/60">Actions taken by admin users</p>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowFilters((v) => !v)}
             className={`flex items-center gap-1.5 h-[36px] px-3 rounded-lg border text-xs transition-colors ${
               filtersActive
                 ? "border-[#009B3A]/40 bg-[#009B3A]/10 text-[#009B3A]"
-                : "border-white/[0.08] text-white/40 hover:text-white/70"
+                : "border-white/[0.08] text-white/70 hover:text-white/90"
             }`}
           >
             <Filter className="h-3.5 w-3.5" />
@@ -283,14 +283,14 @@ function AuditTab() {
           <button
             onClick={() => exportCsv(logs)}
             disabled={logs.length === 0}
-            className="flex items-center gap-1.5 h-[36px] px-3 rounded-lg border border-white/[0.08] text-xs text-white/40 hover:text-white/70 transition-colors disabled:opacity-30"
+            className="flex items-center gap-1.5 h-[36px] px-3 rounded-lg border border-white/[0.08] text-xs text-white/70 hover:text-white/90 transition-colors disabled:opacity-30"
           >
             <Download className="h-3.5 w-3.5" />
             CSV
           </button>
           <button
             onClick={() => fetchLogs(page, fromDate, toDate, actionFilter)}
-            className="flex items-center gap-1.5 text-xs text-white/30 hover:text-white/60 transition-colors h-[36px] px-2"
+            className="flex items-center gap-1.5 text-xs text-white/50 hover:text-white/60 transition-colors h-[36px] px-2"
           >
             <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
           </button>
@@ -301,7 +301,7 @@ function AuditTab() {
         <div className="mb-5 rounded-2xl border border-white/[0.07] bg-[#0d0d1a] p-4">
           <div className="flex flex-wrap gap-3 items-end">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] text-white/40 uppercase tracking-wider">From date</label>
+              <label className="text-[10px] text-white/70 uppercase tracking-wider">From date</label>
               <input
                 type="date"
                 value={fromDate}
@@ -310,7 +310,7 @@ function AuditTab() {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] text-white/40 uppercase tracking-wider">To date</label>
+              <label className="text-[10px] text-white/70 uppercase tracking-wider">To date</label>
               <input
                 type="date"
                 value={toDate}
@@ -319,7 +319,7 @@ function AuditTab() {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] text-white/40 uppercase tracking-wider">Action type</label>
+              <label className="text-[10px] text-white/70 uppercase tracking-wider">Action type</label>
               <select
                 value={actionFilter}
                 onChange={(e) => setActionFilter(e.target.value)}
@@ -340,7 +340,7 @@ function AuditTab() {
             {filtersActive && (
               <button
                 onClick={clearFilters}
-                className="h-[36px] px-3 rounded-lg border border-white/[0.08] text-xs text-white/40 hover:text-white/70 transition-colors flex items-center gap-1.5"
+                className="h-[36px] px-3 rounded-lg border border-white/[0.08] text-xs text-white/70 hover:text-white/90 transition-colors flex items-center gap-1.5"
               >
                 <X className="h-3 w-3" />
                 Clear
@@ -357,7 +357,7 @@ function AuditTab() {
       )}
 
       {!loading && total > 0 && (
-        <div className="mb-4 flex items-center gap-3 text-xs text-white/30">
+        <div className="mb-4 flex items-center gap-3 text-xs text-white/60">
           <span>{total.toLocaleString()} log entr{total === 1 ? "y" : "ies"}</span>
           {filtersActive && <span className="text-[#009B3A]/60">• filtered</span>}
         </div>
@@ -365,12 +365,12 @@ function AuditTab() {
 
       <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a] overflow-hidden">
         <div className="hidden md:grid grid-cols-[auto_auto_1fr_auto_auto_auto] items-center gap-4 px-4 py-3 border-b border-white/[0.06]">
-          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/30">Time</span>
-          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/30">Action</span>
-          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/30">Admin</span>
-          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/30">Target</span>
-          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/30">Details</span>
-          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/30">IP</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/60">Time</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/60">Action</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/60">Admin</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/60">Target</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/60">Details</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/60">IP</span>
         </div>
 
         {loading ? (
@@ -389,7 +389,7 @@ function AuditTab() {
         ) : logs.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <ScrollText className="h-8 w-8 text-white/10 mb-3" />
-            <p className="text-sm text-white/30">No audit log entries yet</p>
+            <p className="text-sm text-white/60">No audit log entries yet</p>
             <p className="text-xs text-white/15 mt-1">Admin actions (deletes, etc.) will appear here</p>
           </div>
         ) : (
@@ -399,20 +399,20 @@ function AuditTab() {
                 key={log.id}
                 className="grid grid-cols-1 md:grid-cols-[auto_auto_1fr_auto_auto_auto] items-start md:items-center gap-2 md:gap-4 px-4 py-3.5 hover:bg-white/[0.02] transition-colors"
               >
-                <span className="text-xs text-white/30 whitespace-nowrap">
+                <span className="text-xs text-white/60 whitespace-nowrap">
                   {formatTs(log.created_at)}
                 </span>
                 <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold whitespace-nowrap ${ACTION_COLORS[log.action] ?? "bg-white/[0.07] text-white/50"}`}>
                   {ACTION_LABELS[log.action] ?? log.action}
                 </span>
                 <span className="truncate text-sm text-white/60">{log.admin_email}</span>
-                <span className="font-mono text-[10px] text-white/30 whitespace-nowrap">
+                <span className="font-mono text-[10px] text-white/60 whitespace-nowrap">
                   {log.target_type ? `${log.target_type} #${log.target_id ?? "–"}` : "–"}
                 </span>
-                <span className="font-mono text-[10px] text-white/25 max-w-[180px] truncate">
+                <span className="font-mono text-[10px] text-white/55 max-w-[180px] truncate">
                   {log.details ? JSON.stringify(log.details) : "–"}
                 </span>
-                <span className="font-mono text-[10px] text-white/20 whitespace-nowrap">
+                <span className="font-mono text-[10px] text-white/50 whitespace-nowrap">
                   {log.ip_address ?? "–"}
                 </span>
               </div>
@@ -430,7 +430,7 @@ function AuditTab() {
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
-          <span className="text-xs text-white/30">
+          <span className="text-xs text-white/60">
             Page {page} of {totalPages}
           </span>
           <button
@@ -459,7 +459,7 @@ export default function AdminLogsPage() {
         <ScrollText className="h-5 w-5 text-purple-400" />
         <div>
           <h1 className="text-xl font-bold text-white">Logs</h1>
-          <p className="text-xs text-white/40 mt-0.5">Platform activity and admin audit trail</p>
+          <p className="text-xs text-white/70 mt-0.5">Platform activity and admin audit trail</p>
         </div>
       </div>
 
@@ -469,7 +469,7 @@ export default function AdminLogsPage() {
             key={t}
             onClick={() => setTab(t)}
             className={`min-h-[36px] rounded-lg px-4 text-sm font-medium transition-colors ${
-              tab === t ? "bg-white/[0.07] text-white" : "text-white/40 hover:text-white/70"
+              tab === t ? "bg-white/[0.07] text-white" : "text-white/70 hover:text-white/90"
             }`}
           >
             {t === "activity" ? "Activity" : "Audit Log"}

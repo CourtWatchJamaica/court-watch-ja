@@ -126,7 +126,7 @@ function PdfPickerModal({
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-white/40 hover:text-white hover:bg-white/[0.07] transition-colors"
+            className="rounded-lg p-1.5 text-white/70 hover:text-white hover:bg-white/[0.07] transition-colors"
             aria-label="Close"
           >
             <X className="h-4 w-4" />
@@ -166,7 +166,7 @@ function PdfPickerModal({
             </div>
             <div className="flex-1 min-w-0 text-left">
               <p className="text-[13px] font-semibold text-white/80">Original Judgment</p>
-              <p className="text-[11px] text-white/40 mt-0.5">
+              <p className="text-[11px] text-white/70 mt-0.5">
                 {originalLoading ? "Checking court website…" : "Official court document (PDF)"}
               </p>
             </div>
@@ -216,7 +216,7 @@ export default function CaseDetailPage() {
         <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8 pb-32 md:pb-12">
           <button
             onClick={() => router.back()}
-            className="mb-7 flex items-center gap-1.5 text-[12px] font-medium text-white/40 hover:text-white/70 transition-colors"
+            className="mb-7 flex items-center gap-1.5 text-[12px] font-medium text-white/70 hover:text-white/90 transition-colors"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
             Back
@@ -234,7 +234,7 @@ export default function CaseDetailPage() {
                 <p className="text-sm font-semibold text-white/70">
                   Couldn&apos;t load this case
                 </p>
-                <p className="mt-1 text-xs text-white/35">
+                <p className="mt-1 text-xs text-white/65">
                   Check your connection and try again.
                 </p>
               </div>
@@ -248,7 +248,7 @@ export default function CaseDetailPage() {
             </div>
           ) : !judgment ? (
             <div className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.07] bg-[#0d0d1a] py-16 text-center">
-              <p className="text-sm text-white/40">Case not found.</p>
+              <p className="text-sm text-white/70">Case not found.</p>
             </div>
           ) : (
             <div className="rounded-2xl border-l-[3px] border-l-[#009B3A] border-t border-r border-b border-white/[0.08] bg-[#0d0d1a] overflow-hidden">
@@ -263,7 +263,7 @@ export default function CaseDetailPage() {
                           {judgment.court}
                         </span>
                       )}
-                      <Badge className="bg-white/[0.06] text-white/40 border border-white/[0.08] text-[10px] font-mono px-2.5 h-6 rounded-full">
+                      <Badge className="bg-white/[0.06] text-white/70 border border-white/[0.08] text-[10px] font-mono px-2.5 h-6 rounded-full">
                         Judgment
                       </Badge>
                     </div>
@@ -299,22 +299,22 @@ export default function CaseDetailPage() {
               <div className="p-6 grid sm:grid-cols-2 gap-6">
                 {judgment.judge_name && (
                   <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/25 mb-1.5">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/55 mb-1.5">
                       Judge
                     </p>
                     <div className="flex items-center gap-2 text-[13px] text-white/75">
-                      <User className="h-3.5 w-3.5 text-white/30 shrink-0" />
+                      <User className="h-3.5 w-3.5 text-white/60 shrink-0" />
                       {judgment.judge_name}
                     </div>
                   </div>
                 )}
                 {judgment.date && (
                   <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/25 mb-1.5">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/55 mb-1.5">
                       Date
                     </p>
                     <div className="flex items-center gap-2 text-[13px] text-white/75">
-                      <Calendar className="h-3.5 w-3.5 text-white/30 shrink-0" />
+                      <Calendar className="h-3.5 w-3.5 text-white/60 shrink-0" />
                       {new Date(judgment.date).toLocaleDateString("en-JM", {
                         weekday: "long",
                         year: "numeric",
@@ -326,11 +326,11 @@ export default function CaseDetailPage() {
                 )}
                 {judgment.court && (
                   <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/25 mb-1.5">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/55 mb-1.5">
                       Court
                     </p>
                     <div className="flex items-center gap-2 text-[13px] text-white/75">
-                      <Building2 className="h-3.5 w-3.5 text-white/30 shrink-0" />
+                      <Building2 className="h-3.5 w-3.5 text-white/60 shrink-0" />
                       {judgment.court}
                     </div>
                   </div>
@@ -343,7 +343,7 @@ export default function CaseDetailPage() {
                   <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
                     <div className="flex items-center gap-2 mb-3">
                       <FileText className="h-3.5 w-3.5 text-[#009B3A]" />
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/25">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/55">
                         Summary
                       </p>
                     </div>
@@ -370,7 +370,7 @@ export default function CaseDetailPage() {
 
               {/* Footer */}
               <div className="px-6 py-4 border-t border-white/[0.05]">
-                <p className="text-[10px] text-white/20">
+                <p className="text-[10px] text-white/50">
                   Created {new Date(judgment.created_at).toLocaleDateString("en-JM")} · Updated{" "}
                   {new Date(judgment.updated_at).toLocaleDateString("en-JM")}
                 </p>
