@@ -8,7 +8,8 @@ node_modules/
 .yarn/install-state.gz
 
 # ─── Next.js build output ──────────────────────────────────────────────────────
-/.next/
+# No trailing slash: also matches .next when it's a symlink (see scripts/setup-local-cache.sh)
+/.next
 /out/
 /build/
 
