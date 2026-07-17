@@ -995,7 +995,159 @@ pub async fn seed_judges_from_judgments(pool: &PgPool) -> sqlx::Result<u64> {
         "Seed result — judges table: SC={sc_now}, CoA={coa_now}, Parish={parish_now}"
     );
 
+    // Merge spelling variants of the same judge ("Frank Williams" /
+    // "F Williams JA" / "F Williams JA (AG)").  Must run after every seed:
+    // the insert above re-creates variant rows from judgment spellings.
+    match dedupe_judges_table(pool).await {
+        Ok(0) => {}
+        Ok(n) => tracing::info!("Seed: merged {n} duplicate judge row(s)"),
+        Err(e) => tracing::warn!("Seed: judge dedupe failed: {e}"),
+    }
+
     Ok(rows)
+}
+
+/// One planned merge: every judge in `losers` is the same person as `keeper`.
+#[derive(Debug)]
+pub struct JudgeMerge {
+    pub keeper: usize,
+    pub losers: Vec<usize>,
+}
+
+/// Group judge rows that are spelling variants of the same person.
+///
+/// A pair merges only when [`judge_names_match`] accepts it AND neither row is
+/// *ambiguous*.  A row is ambiguous when its matches are not all the same
+/// person (e.g. a bare "Williams J" matches both "F Williams JA" and
+/// "P Williams JA", which do not match each other) — such rows are left
+/// untouched rather than risk chaining two real judges into one.
+///
+/// Keeper choice per group: most judgments under that exact spelling, then a
+/// row with a court assigned, then the shortest name, then the oldest id.
+/// Judgment counts use exact-name matching, so keeping the highest-count
+/// spelling preserves the caseload numbers shown in the app.
+pub fn plan_judge_merges(rows: &[JudgeWithCount]) -> Vec<JudgeMerge> {
+    let n = rows.len();
+    let tokens: Vec<(Vec<char>, Vec<String>)> =
+        rows.iter().map(|r| judge_name_tokens(&r.name)).collect();
+
+    let pair_matches = |a: usize, b: usize| -> bool {
+        judge_tokens_match(&tokens[a], &tokens[b])
+    };
+
+    // Candidate lists.
+    let mut matches: Vec<Vec<usize>> = vec![Vec::new(); n];
+    for a in 0..n {
+        for b in (a + 1)..n {
+            if pair_matches(a, b) {
+                matches[a].push(b);
+                matches[b].push(a);
+            }
+        }
+    }
+
+    // Ambiguity: a row whose candidates are not all pairwise-matching.
+    let ambiguous: Vec<bool> = (0..n)
+        .map(|i| {
+            let c = &matches[i];
+            c.iter().enumerate().any(|(x, &a)| {
+                c[x + 1..].iter().any(|&b| !pair_matches(a, b))
+            })
+        })
+        .collect();
+
+    // Union-find over unambiguous matching pairs.
+    let mut parent: Vec<usize> = (0..n).collect();
+    fn find(parent: &mut Vec<usize>, mut x: usize) -> usize {
+        while parent[x] != x {
+            parent[x] = parent[parent[x]];
+            x = parent[x];
+        }
+        x
+    }
+    for a in 0..n {
+        if ambiguous[a] {
+            continue;
+        }
+        for &b in &matches[a] {
+            if ambiguous[b] {
+                continue;
+            }
+            let (ra, rb) = (find(&mut parent, a), find(&mut parent, b));
+            if ra != rb {
+                parent[ra] = rb;
+            }
+        }
+    }
+
+    let mut groups: std::collections::HashMap<usize, Vec<usize>> =
+        std::collections::HashMap::new();
+    for i in 0..n {
+        let root = find(&mut parent, i);
+        groups.entry(root).or_default().push(i);
+    }
+
+    let mut plans: Vec<JudgeMerge> = groups
+        .into_values()
+        .filter(|g| g.len() > 1)
+        .map(|mut g| {
+            g.sort_by(|&a, &b| {
+                rows[b]
+                    .total_cases
+                    .cmp(&rows[a].total_cases)
+                    .then_with(|| rows[b].court.is_some().cmp(&rows[a].court.is_some()))
+                    .then_with(|| rows[a].name.len().cmp(&rows[b].name.len()))
+                    .then_with(|| rows[a].id.cmp(&rows[b].id))
+            });
+            JudgeMerge {
+                keeper: g[0],
+                losers: g[1..].to_vec(),
+            }
+        })
+        .collect();
+    plans.sort_by_key(|p| rows[p.keeper].id);
+    plans
+}
+
+/// Merge duplicate judge rows in place; returns how many rows were deleted.
+pub async fn dedupe_judges_table(pool: &PgPool) -> sqlx::Result<u64> {
+    let rows = list_judges(pool, None).await?;
+    let plans = plan_judge_merges(&rows);
+    let mut deleted = 0u64;
+
+    for plan in &plans {
+        let keeper = &rows[plan.keeper];
+        let loser_ids: Vec<i32> = plan.losers.iter().map(|&i| rows[i].id).collect();
+        let loser_names: Vec<&str> =
+            plan.losers.iter().map(|&i| rows[i].name.as_str()).collect();
+
+        // Inherit a court assignment from a variant if the keeper lacks one.
+        if keeper.court.is_none() {
+            if let Some(court) = plan.losers.iter().find_map(|&i| rows[i].court.clone()) {
+                sqlx::query(
+                    "UPDATE judges SET court = $1, updated_at = NOW()
+                     WHERE id = $2 AND court IS NULL",
+                )
+                .bind(&court)
+                .bind(keeper.id)
+                .execute(pool)
+                .await?;
+            }
+        }
+
+        let res = sqlx::query("DELETE FROM judges WHERE id = ANY($1)")
+            .bind(&loser_ids)
+            .execute(pool)
+            .await?;
+        deleted += res.rows_affected();
+        tracing::info!(
+            "[JudgeDedupe] merged {loser_names:?} into '{}' (id {})",
+            keeper.name,
+            keeper.id
+        );
+    }
+
+    Ok(deleted)
 }
 
 pub async fn list_judge_connections(pool: &PgPool) -> sqlx::Result<Vec<JudgeConnection>> {
@@ -1068,10 +1220,19 @@ fn judge_name_tokens(name: &str) -> (Vec<char>, Vec<String>) {
         }
     }
 
+    // Known court-website misspellings, normalised before comparison.
+    const SPELLING_ALIASES: &[(&str, &str)] = &[("shelley", "shelly")];
+
     let mut toks: Vec<String> = cleaned
         .split_whitespace()
         .filter(|t| !JUDGE_STOPWORDS.contains(t))
-        .map(str::to_string)
+        .map(|t| {
+            SPELLING_ALIASES
+                .iter()
+                .find(|(from, _)| *from == t)
+                .map(|(_, to)| to.to_string())
+                .unwrap_or_else(|| t.to_string())
+        })
         .collect();
 
     // Trailing single-word rank suffixes are titles, not part of the name.
@@ -1096,15 +1257,22 @@ fn judge_name_tokens(name: &str) -> (Vec<char>, Vec<String>) {
 /// initials must be compatible ("P Williams" ≠ "F Williams", but
 /// "S. Wolfe Reece" = "Simone Wolfe-Reece").
 fn judge_names_match(a: &str, b: &str) -> bool {
-    let (ia, sa) = judge_name_tokens(a);
-    let (ib, sb) = judge_name_tokens(b);
+    judge_tokens_match(&judge_name_tokens(a), &judge_name_tokens(b))
+}
+
+/// Token-level form of [`judge_names_match`] for callers that compare many
+/// names and precompute [`judge_name_tokens`] once per name.
+fn judge_tokens_match(
+    (ia, sa): &(Vec<char>, Vec<String>),
+    (ib, sb): &(Vec<char>, Vec<String>),
+) -> bool {
     if sa.is_empty() || sb.is_empty() {
         return false;
     }
     let (short, long, i_short, i_long) = if sa.len() <= sb.len() {
-        (&sa, &sb, &ia, &ib)
+        (sa, sb, ia, ib)
     } else {
-        (&sb, &sa, &ib, &ia)
+        (sb, sa, ib, ia)
     };
     if !long.ends_with(short.as_slice()) {
         return false;
@@ -3731,5 +3899,145 @@ mod judge_match_tests {
             "Mcdonald-bishop JA, Foster-pusey JA and Brown JA",
             "Edwards JA",
         ));
+    }
+}
+
+#[cfg(test)]
+mod judge_dedupe_tests {
+    use super::plan_judge_merges;
+    use crate::db::models::JudgeWithCount;
+
+    fn judge(id: i32, name: &str, court: Option<&str>, total_cases: i64) -> JudgeWithCount {
+        JudgeWithCount {
+            id,
+            name: name.to_string(),
+            court: court.map(str::to_string),
+            total_cases,
+        }
+    }
+
+    /// Real duplicate families observed in the production judges table.
+    #[test]
+    fn merges_spelling_variants_and_keeps_highest_count() {
+        let rows = vec![
+            judge(1, "F Williams JA", Some("Court of Appeal"), 40),
+            judge(2, "F Williams JA (AG)", Some("Court of Appeal"), 5),
+            judge(3, "Frank Williams", Some("Court of Appeal"), 2),
+            judge(4, "P Williams JA", Some("Court of Appeal"), 50),
+            judge(5, "Paulette Williams", Some("Court of Appeal"), 1),
+            judge(6, "Lorna Shelly-Williams", Some("Supreme Court"), 3),
+            judge(7, "Shelly Williams JA (AG)", Some("Court of Appeal"), 4),
+            judge(8, "The Hon. Mrs. Justice Lorna Shelly-Williams", Some("Supreme Court"), 0),
+            judge(9, "Simone Wolfe-Reece", Some("Supreme Court"), 10),
+            judge(10, "The Hon. Mrs. Justice Simone Wolfe-Reece", Some("Supreme Court"), 0),
+            judge(11, "D Fraser JA", Some("Court of Appeal"), 12),
+        ];
+        let plans = plan_judge_merges(&rows);
+
+        let mut merged: Vec<(i32, Vec<i32>)> = plans
+            .iter()
+            .map(|p| {
+                let mut l: Vec<i32> = p.losers.iter().map(|&i| rows[i].id).collect();
+                l.sort();
+                (rows[p.keeper].id, l)
+            })
+            .collect();
+        merged.sort();
+
+        assert_eq!(
+            merged,
+            vec![
+                (1, vec![2, 3]),      // F Williams JA ← (AG) variant + Frank
+                (4, vec![5]),         // P Williams JA ← Paulette
+                (7, vec![6, 8]),      // Shelly Williams ← Lorna variants
+                (9, vec![10]),        // Simone Wolfe-Reece ← honorific variant
+            ],
+        );
+    }
+
+    /// A bare surname matching several distinct judges must not chain-merge
+    /// them into one person.
+    #[test]
+    fn ambiguous_bare_surname_is_left_alone() {
+        let rows = vec![
+            judge(1, "F Williams JA", Some("Court of Appeal"), 40),
+            judge(2, "Frank Williams", Some("Court of Appeal"), 2),
+            judge(3, "P Williams JA", Some("Court of Appeal"), 50),
+            judge(4, "Williams J", None, 1),
+        ];
+        let plans = plan_judge_merges(&rows);
+
+        let merged: Vec<Vec<i32>> = plans
+            .iter()
+            .map(|p| {
+                let mut ids: Vec<i32> = p.losers.iter().map(|&i| rows[i].id).collect();
+                ids.push(rows[p.keeper].id);
+                ids.sort();
+                ids
+            })
+            .collect();
+
+        // Only the F pair merges; P and the bare "Williams J" stay separate.
+        assert_eq!(merged, vec![vec![1, 2]]);
+    }
+
+    #[test]
+    fn distinct_judges_never_merge() {
+        let rows = vec![
+            judge(1, "D Batts", Some("Supreme Court"), 30),
+            judge(2, "B Morrison", Some("Court of Appeal"), 20),
+            judge(3, "K Anderson", Some("Supreme Court"), 25),
+            judge(4, "D Fraser JA", Some("Court of Appeal"), 12),
+            judge(5, "G Fraser (AG)", Some("Court of Appeal"), 3),
+        ];
+        assert!(plan_judge_merges(&rows).is_empty());
+    }
+
+    /// Apply the merge plan to a live database.  Run manually with:
+    ///   DATABASE_URL=… cargo test dedupe_apply -- --ignored --nocapture
+    /// (Also runs automatically after every judge seed; this is for
+    /// cleaning a database on demand.)
+    #[tokio::test]
+    #[ignore]
+    async fn dedupe_apply_against_database() {
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL not set");
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .max_connections(2)
+            .connect(&url)
+            .await
+            .expect("db connect");
+        let deleted = super::dedupe_judges_table(&pool).await.expect("dedupe");
+        println!("deleted {deleted} duplicate judge row(s)");
+    }
+
+    /// Dry run against a live database: prints the merge plan without
+    /// touching any rows.  Run manually with:
+    ///   DATABASE_URL=… cargo test dedupe_dry_run -- --ignored --nocapture
+    #[tokio::test]
+    #[ignore]
+    async fn dedupe_dry_run_against_database() {
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL not set");
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .max_connections(2)
+            .connect(&url)
+            .await
+            .expect("db connect");
+        let rows = super::list_judges(&pool, None).await.expect("list_judges");
+        let plans = plan_judge_merges(&rows);
+        println!("── {} merge group(s) across {} judges ──", plans.len(), rows.len());
+        for p in &plans {
+            let k = &rows[p.keeper];
+            println!(
+                "KEEP  '{}' (id {}, {:?}, {} cases)",
+                k.name, k.id, k.court, k.total_cases
+            );
+            for &l in &p.losers {
+                let r = &rows[l];
+                println!(
+                    "  drop '{}' (id {}, {:?}, {} cases)",
+                    r.name, r.id, r.court, r.total_cases
+                );
+            }
+        }
     }
 }
