@@ -14,6 +14,7 @@ import * as THREE from "three";
 import { useRouter } from "next/navigation";
 import { Judge, JudgeConnection, Judgment, CourtSitting } from "@/lib/types";
 import { apiClient } from "@/lib/api";
+import { todayJamaica } from "@/lib/dates";
 import {
   Search,
   X,
@@ -25,6 +26,7 @@ import {
   Globe,
   Sparkles,
   Link2,
+  LayoutGrid,
 } from "lucide-react";
 
 /* ── Court colour palette ── */
@@ -43,6 +45,7 @@ const COURT_COLORS: Record<string, string> = {
 
 const LS_VIEW_KEY = "cw-constellation-view";
 const LS_CONNECTIONS_KEY = "cw-constellation-connections";
+const LS_LAYOUT_KEY = "cw-constellation-layout";
 
 /* ── Chief Justice detection ── */
 
@@ -361,9 +364,11 @@ function Nebula() {
 function ConstellationEdge({
   posA,
   posB,
+  opacity,
 }: {
   posA: [number, number, number];
   posB: [number, number, number];
+  opacity: number;
 }) {
   const lineObj = useMemo(() => {
     // Slight upward arc at the midpoint keeps the curve above star bodies
@@ -383,10 +388,10 @@ function ConstellationEdge({
     const mat = new THREE.LineBasicMaterial({
       color: "#FED100",
       transparent: true,
-      opacity: 0.2,
+      opacity,
     });
     return new THREE.Line(geo, mat);
-  }, [posA, posB]);
+  }, [posA, posB, opacity]);
 
   useEffect(
     () => () => {
@@ -631,6 +636,11 @@ function ConstellationScene({
 
   const sizes = useMemo(() => computeStarSizes(judges), [judges]);
 
+  const maxConnectionCount = useMemo(
+    () => Math.max(1, ...connections.map((c) => c.count ?? 1)),
+    [connections],
+  );
+
   const isSearchActive = searchQuery.trim().length > 0;
   const searchLower = searchQuery.toLowerCase();
 
@@ -649,13 +659,23 @@ function ConstellationScene({
       <Nebula />
       <ParticleField />
 
-      {/* Edges rendered only when the user has opted in */}
+      {/* Real co-sitting edges — brightness scales with shared-case count.
+          Positions must track the active view or lines detach in Galactic. */}
       {showConnections &&
         connections.map((conn, i) => {
-          const posA = scatterPositions.get(conn.judge_a_id);
-          const posB = scatterPositions.get(conn.judge_b_id);
+          const positions = isGalactic ? galacticPositions : scatterPositions;
+          const posA = positions.get(conn.judge_a_id);
+          const posB = positions.get(conn.judge_b_id);
           if (!posA || !posB) return null;
-          return <ConstellationEdge key={i} posA={posA} posB={posB} />;
+          const weight = Math.sqrt((conn.count ?? 1) / maxConnectionCount);
+          return (
+            <ConstellationEdge
+              key={i}
+              posA={posA}
+              posB={posB}
+              opacity={0.08 + 0.34 * weight}
+            />
+          );
         })}
 
       {judges.map((judge) => {
@@ -721,7 +741,7 @@ function JudgeInfoCard({
 }) {
   const router = useRouter();
   const color = courtColor(judge.court);
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayJamaica();
   const recentJudgments = judgments.slice(0, 3);
   const upcomingSittings = sittings
     .filter((s) => (s.event_date ?? "") >= today)
@@ -901,7 +921,7 @@ function MobileSheet({
   const color = courtColor(judge.court);
   const touchStartY = useRef(0);
   const [dragY, setDragY] = useState(0);
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayJamaica();
   const recentJudgments = judgments.slice(0, 3);
   const upcomingSittings = sittings
     .filter((s) => (s.event_date ?? "") >= today)
@@ -1072,6 +1092,13 @@ function MobileSheet({
 
 function StaticFallback({ judges }: { judges: Judge[] }) {
   const router = useRouter();
+  if (judges.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <p className="text-[13px] text-white/50">No judges match your search</p>
+      </div>
+    );
+  }
   return (
     <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 py-4">
       {judges.map((j) => {
@@ -1091,15 +1118,18 @@ function StaticFallback({ judges }: { judges: Judge[] }) {
             >
               ⭐
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-[13px] font-semibold text-white leading-snug">
                 {j.name}
               </p>
-              {j.court && (
-                <p className="mt-1 text-[11px]" style={{ color }}>
-                  {j.court}
-                </p>
-              )}
+              <div className="mt-1 flex items-center gap-2 text-[11px]">
+                {j.court && <span style={{ color }}>{j.court}</span>}
+                {j.total_cases != null && (
+                  <span className="text-white/50">
+                    {j.total_cases} case{j.total_cases !== 1 ? "s" : ""}
+                  </span>
+                )}
+              </div>
             </div>
           </button>
         );
@@ -1193,6 +1223,36 @@ function ConnectionsToggle({
   );
 }
 
+/* ── List-view toggle pill ── */
+
+function LayoutToggle({
+  isList,
+  onToggle,
+}: {
+  isList: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      aria-pressed={isList}
+      aria-label={isList ? "Switch to 3D view" : "Switch to list view"}
+      className={[
+        "flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2.5 text-[13px] font-medium",
+        "transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30",
+        isList
+          ? "border-white/30 bg-white/[0.1] text-white/90"
+          : "border-white/[0.1] bg-white/[0.05] text-white/55 hover:border-white/20 hover:text-white/80",
+      ].join(" ")}
+    >
+      <LayoutGrid className="h-4 w-4 shrink-0" />
+      <span className="hidden sm:block whitespace-nowrap">
+        {isList ? "3D View" : "List View"}
+      </span>
+    </button>
+  );
+}
+
 /* ── Main export ── */
 
 interface Props {
@@ -1213,10 +1273,16 @@ export default function JudicialConstellation({ judges, connections }: Props) {
     return localStorage.getItem(LS_VIEW_KEY) === "galactic";
   });
 
-  // Connections default OFF; opt-in persisted.
+  // Connections default ON (real co-sitting pairs only); opt-out persisted.
   const [showConnections, setShowConnections] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem(LS_CONNECTIONS_KEY) !== "off";
+  });
+
+  // Simple card-grid alternative to the 3D canvas; persisted.
+  const [isListView, setIsListView] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
-    return localStorage.getItem(LS_CONNECTIONS_KEY) === "on";
+    return localStorage.getItem(LS_LAYOUT_KEY) === "list";
   });
 
   const [selectedJudge, setSelectedJudge] = useState<Judge | null>(null);
@@ -1262,7 +1328,17 @@ export default function JudicialConstellation({ judges, connections }: Props) {
     });
   }, []);
 
-  /* Fetch judge-specific data whenever selection changes */
+  const handleToggleLayout = useCallback(() => {
+    setIsListView((prev) => {
+      const next = !prev;
+      localStorage.setItem(LS_LAYOUT_KEY, next ? "list" : "3d");
+      return next;
+    });
+  }, []);
+
+  /* Fetch judge-specific data whenever selection changes.  The detail
+     endpoint matches sittings server-side (court-list name spellings differ
+     from judgment spellings), so one call covers both lists. */
   useEffect(() => {
     if (!selectedJudge) {
       setJudgeJudgments([]);
@@ -1270,17 +1346,15 @@ export default function JudicialConstellation({ judges, connections }: Props) {
       return;
     }
     setDataLoading(true);
-    Promise.allSettled([
-      apiClient.getJudgments({ judge: selectedJudge.name }),
-      apiClient.getCourtSittings({ judge: selectedJudge.name }),
-    ])
-      .then(([jRes, sRes]) => {
-        setJudgeJudgments(
-          jRes.status === "fulfilled" ? jRes.value.judgments : [],
-        );
-        setJudgeSittings(
-          sRes.status === "fulfilled" ? sRes.value.sittings : [],
-        );
+    apiClient
+      .getJudge(String(selectedJudge.id))
+      .then((res) => {
+        setJudgeJudgments(res.judgments ?? []);
+        setJudgeSittings(res.sittings ?? []);
+      })
+      .catch(() => {
+        setJudgeJudgments([]);
+        setJudgeSittings([]);
       })
       .finally(() => setDataLoading(false));
   }, [selectedJudge]);
@@ -1306,6 +1380,16 @@ export default function JudicialConstellation({ judges, connections }: Props) {
       setSelectedJudge(matches[0]);
     }
   }, [searchQuery, filteredJudges]);
+
+  const searchFilteredJudges = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return filteredJudges;
+    return filteredJudges.filter(
+      (j) =>
+        j.name.toLowerCase().includes(q) ||
+        (j.court ?? "").toLowerCase().includes(q),
+    );
+  }, [filteredJudges, searchQuery]);
 
   const scatterPositions = useMemo(
     () => computePositions(filteredJudges),
@@ -1371,57 +1455,70 @@ export default function JudicialConstellation({ judges, connections }: Props) {
           )}
         </div>
 
-        <ViewToggle isGalactic={isGalactic} onToggle={handleToggleView} />
-        <ConnectionsToggle
-          showConnections={showConnections}
-          onToggle={handleToggleConnections}
-        />
-      </div>
-
-      {/* Canvas container */}
-      <div className="relative flex-1 rounded-2xl overflow-hidden border border-white/[0.05]">
-        <Canvas
-          camera={{ position: [0, 2.5, 10], fov: 50 }}
-          onPointerMissed={handleCanvasClick}
-          gl={{ antialias: true, powerPreference: "high-performance" }}
-          dpr={[1, 1.5]}
-        >
-          <Suspense fallback={null}>
-            <ConstellationScene
-              judges={filteredJudges}
-              connections={connections}
-              scatterPositions={scatterPositions}
-              galacticPositions={galacticPositions}
-              isGalactic={isGalactic}
+        {!isListView && (
+          <>
+            <ViewToggle isGalactic={isGalactic} onToggle={handleToggleView} />
+            <ConnectionsToggle
               showConnections={showConnections}
-              selectedJudge={selectedJudge}
-              onSelect={handleSelect}
-              searchQuery={searchQuery}
+              onToggle={handleToggleConnections}
             />
-          </Suspense>
-        </Canvas>
-
-        {selectedJudge && !isMobile && (
-          <JudgeInfoCard
-            key={selectedJudge.id}
-            judge={selectedJudge}
-            judgments={judgeJudgments}
-            sittings={judgeSittings}
-            dataLoading={dataLoading}
-            onClose={clearSelection}
-          />
+          </>
         )}
-
-        {!selectedJudge && filteredJudges.length > 0 && (
-          <p className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 text-[10px] text-white/50 whitespace-nowrap">
-            Tap a star to explore · Drag to rotate
-          </p>
-        )}
+        <LayoutToggle isList={isListView} onToggle={handleToggleLayout} />
       </div>
 
-      <Legend />
+      {isListView ? (
+        <div className="flex-1 overflow-y-auto rounded-2xl border border-white/[0.05] px-4">
+          <StaticFallback judges={searchFilteredJudges} />
+        </div>
+      ) : (
+        <>
+          {/* Canvas container */}
+          <div className="relative flex-1 rounded-2xl overflow-hidden border border-white/[0.05]">
+            <Canvas
+              camera={{ position: [0, 2.5, 10], fov: 50 }}
+              onPointerMissed={handleCanvasClick}
+              gl={{ antialias: true, powerPreference: "high-performance" }}
+              dpr={[1, 1.5]}
+            >
+              <Suspense fallback={null}>
+                <ConstellationScene
+                  judges={filteredJudges}
+                  connections={connections}
+                  scatterPositions={scatterPositions}
+                  galacticPositions={galacticPositions}
+                  isGalactic={isGalactic}
+                  showConnections={showConnections}
+                  selectedJudge={selectedJudge}
+                  onSelect={handleSelect}
+                  searchQuery={searchQuery}
+                />
+              </Suspense>
+            </Canvas>
 
-      {selectedJudge && isMobile && (
+            {selectedJudge && !isMobile && (
+              <JudgeInfoCard
+                key={selectedJudge.id}
+                judge={selectedJudge}
+                judgments={judgeJudgments}
+                sittings={judgeSittings}
+                dataLoading={dataLoading}
+                onClose={clearSelection}
+              />
+            )}
+
+            {!selectedJudge && filteredJudges.length > 0 && (
+              <p className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 text-[10px] text-white/50 whitespace-nowrap">
+                Tap a star to explore · Drag to rotate
+              </p>
+            )}
+          </div>
+
+          <Legend />
+        </>
+      )}
+
+      {selectedJudge && isMobile && !isListView && (
         <>
           <div
             className="md:hidden fixed inset-0 z-[65] bg-black/40"

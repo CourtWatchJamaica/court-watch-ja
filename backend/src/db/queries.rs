@@ -999,6 +999,9 @@ pub async fn seed_judges_from_judgments(pool: &PgPool) -> sqlx::Result<u64> {
 }
 
 pub async fn list_judge_connections(pool: &PgPool) -> sqlx::Result<Vec<JudgeConnection>> {
+    // Only real co-sittings: judges who appeared together on the same case.
+    // (An earlier version padded this with every same-court pair, which turned
+    // the constellation into a hairball once connections rendered by default.)
     sqlx::query_as::<_, JudgeConnection>(
         "WITH jc AS (
              -- Expand each judgment's judge_name into individual judge IDs.
@@ -1016,36 +1019,183 @@ pub async fn list_judge_connections(pool: &PgPool) -> sqlx::Result<Vec<JudgeConn
              JOIN judges j ON j.name = TRIM(raw_name)
              WHERE jm.judge_name IS NOT NULL
                AND TRIM(jm.judge_name) <> ''
-         ),
-         case_pairs AS (
-             -- Judges who co-appear on the same case_number.
-             SELECT
-                 LEAST(a.judge_id, b.judge_id)         AS judge_a_id,
-                 GREATEST(a.judge_id, b.judge_id)      AS judge_b_id,
-                 COUNT(DISTINCT a.case_number)::bigint  AS count
-             FROM jc a
-             JOIN jc b ON a.case_number = b.case_number AND a.judge_id < b.judge_id
-             GROUP BY 1, 2
-         ),
-         court_pairs AS (
-             -- Same-court pairs ensure visual connectivity when case co-authorship is sparse.
-             SELECT
-                 j1.id     AS judge_a_id,
-                 j2.id     AS judge_b_id,
-                 1::bigint AS count
-             FROM judges j1
-             JOIN judges j2 ON j1.court = j2.court AND j1.id < j2.id
-             WHERE j1.court IS NOT NULL
          )
-         SELECT judge_a_id, judge_b_id, MAX(count) AS count
-         FROM (
-             SELECT * FROM case_pairs
-             UNION ALL
-             SELECT * FROM court_pairs
-         ) combined
-         GROUP BY judge_a_id, judge_b_id
-         ORDER BY judge_a_id, judge_b_id",
+         SELECT
+             LEAST(a.judge_id, b.judge_id)         AS judge_a_id,
+             GREATEST(a.judge_id, b.judge_id)      AS judge_b_id,
+             COUNT(DISTINCT a.case_number)::bigint AS count
+         FROM jc a
+         JOIN jc b ON a.case_number = b.case_number AND a.judge_id < b.judge_id
+         GROUP BY 1, 2
+         ORDER BY 1, 2",
     )
+    .fetch_all(pool)
+    .await
+}
+
+// ── Judge ↔ sitting name matching ──────────────────────────────────────────
+//
+// Judgment-derived judge names look like "P Williams JA" or "Simone
+// Wolfe-Reece", while court lists write "Hon. Justice THE HON MISS JUSTICE
+// P WILLIAMS JA" or "Hon. Justice S. Wong-Small".  Exact equality matches
+// almost nothing, so names are reduced to (initials, surname tokens) and
+// compared structurally.
+
+/// Words that are titles/honorifics anywhere in a judge name.
+const JUDGE_STOPWORDS: &[&str] = &[
+    "hon", "honourable", "the", "justice", "justices", "judge", "master",
+    "mr", "mrs", "miss", "ms", "madam", "sir", "dame", "chief", "his", "her",
+    "lordship", "ladyship",
+];
+
+/// Trailing rank suffixes (JA = Appeal, P = President, CJ = Chief Justice…).
+const JUDGE_SUFFIXES: &[&str] = &["ja", "j", "p", "cj", "ag", "actg", "acting", "snr", "jnr"];
+
+/// Reduce a judge name to (single-letter initials, multi-letter name tokens).
+fn judge_name_tokens(name: &str) -> (Vec<char>, Vec<String>) {
+    // Drop parenthetical segments ("(Ag.)"), lowercase, hyphens → spaces,
+    // strip punctuation.
+    let mut cleaned = String::with_capacity(name.len());
+    let mut depth = 0u32;
+    for ch in name.chars() {
+        match ch {
+            '(' => depth += 1,
+            ')' => depth = depth.saturating_sub(1),
+            _ if depth > 0 => {}
+            '-' | '/' => cleaned.push(' '),
+            c if c.is_alphabetic() => cleaned.push(c.to_ascii_lowercase()),
+            _ => cleaned.push(' '),
+        }
+    }
+
+    let mut toks: Vec<String> = cleaned
+        .split_whitespace()
+        .filter(|t| !JUDGE_STOPWORDS.contains(t))
+        .map(str::to_string)
+        .collect();
+
+    // Trailing single-word rank suffixes are titles, not part of the name.
+    while toks
+        .last()
+        .is_some_and(|t| JUDGE_SUFFIXES.contains(&t.as_str()))
+    {
+        toks.pop();
+    }
+
+    let initials = toks
+        .iter()
+        .filter(|t| t.len() == 1)
+        .filter_map(|t| t.chars().next())
+        .collect();
+    let sig = toks.into_iter().filter(|t| t.len() > 1).collect();
+    (initials, sig)
+}
+
+/// True when two judge-name spellings plausibly refer to the same person:
+/// the shorter surname sequence must be a suffix of the longer one, and any
+/// initials must be compatible ("P Williams" ≠ "F Williams", but
+/// "S. Wolfe Reece" = "Simone Wolfe-Reece").
+fn judge_names_match(a: &str, b: &str) -> bool {
+    let (ia, sa) = judge_name_tokens(a);
+    let (ib, sb) = judge_name_tokens(b);
+    if sa.is_empty() || sb.is_empty() {
+        return false;
+    }
+    let (short, long, i_short, i_long) = if sa.len() <= sb.len() {
+        (&sa, &sb, &ia, &ib)
+    } else {
+        (&sb, &sa, &ib, &ia)
+    };
+    if !long.ends_with(short.as_slice()) {
+        return false;
+    }
+    let extra = &long[..long.len() - short.len()];
+    if let Some(&init) = i_short.first() {
+        if let Some(first_extra) = extra.first() {
+            // "S." must agree with the spelled-out first name ("Simone").
+            if !first_extra.starts_with(init) {
+                return false;
+            }
+        } else if let Some(&other) = i_long.first() {
+            // Same surnames on both sides — initials must not conflict.
+            if init != other {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+/// True when any comma/"and"-separated segment of a sitting's judge_name
+/// field matches the given judge.
+fn sitting_field_matches_judge(field: &str, judge_name: &str) -> bool {
+    field
+        .to_lowercase()
+        .replace(" and ", ",")
+        .split(',')
+        .any(|seg| judge_names_match(seg, judge_name))
+}
+
+/// All sittings (past and upcoming) attributable to a judge, newest first.
+pub async fn get_sittings_by_judge(
+    pool: &PgPool,
+    judge_name: &str,
+) -> sqlx::Result<Vec<CourtSitting>> {
+    let (_, sig) = judge_name_tokens(judge_name);
+    let Some(surname) = sig.last() else {
+        return Ok(vec![]);
+    };
+
+    // Cheap SQL prefilter on the primary surname, exact matching in Rust.
+    let candidates = sqlx::query_as::<_, CourtSitting>(
+        "SELECT * FROM court_sittings
+         WHERE judge_name IS NOT NULL AND judge_name ILIKE $1
+         ORDER BY event_date DESC NULLS LAST, event_time ASC
+         LIMIT 500",
+    )
+    .bind(format!("%{surname}%"))
+    .fetch_all(pool)
+    .await?;
+
+    Ok(candidates
+        .into_iter()
+        .filter(|s| {
+            s.judge_name
+                .as_deref()
+                .is_some_and(|n| sitting_field_matches_judge(n, judge_name))
+        })
+        .collect())
+}
+
+/// Judges who co-appeared on cases with the given judge, most frequent first.
+pub async fn get_co_judges(pool: &PgPool, judge_id: i32) -> sqlx::Result<Vec<CoJudge>> {
+    sqlx::query_as::<_, CoJudge>(
+        "WITH jc AS (
+             SELECT
+                 jm.case_number,
+                 j.id AS judge_id
+             FROM judgments jm
+             CROSS JOIN LATERAL unnest(
+                 string_to_array(
+                     regexp_replace(COALESCE(jm.judge_name, ''), ' and ', ',', 'ig'),
+                     ','
+                 )
+             ) AS raw_name
+             JOIN judges j ON j.name = TRIM(raw_name)
+             WHERE jm.judge_name IS NOT NULL
+               AND TRIM(jm.judge_name) <> ''
+         )
+         SELECT j.id, j.name, j.court,
+                COUNT(DISTINCT a.case_number)::bigint AS shared_cases
+         FROM jc a
+         JOIN jc b ON a.case_number = b.case_number AND b.judge_id <> a.judge_id
+         JOIN judges j ON j.id = b.judge_id
+         WHERE a.judge_id = $1
+         GROUP BY j.id, j.name, j.court
+         ORDER BY shared_cases DESC, j.name
+         LIMIT 8",
+    )
+    .bind(judge_id)
     .fetch_all(pool)
     .await
 }
@@ -3542,4 +3692,44 @@ pub async fn log_broadcast_email(
     .bind(recipient_count)
     .fetch_one(pool)
     .await
+}
+
+#[cfg(test)]
+mod judge_match_tests {
+    use super::{judge_names_match, sitting_field_matches_judge};
+
+    #[test]
+    fn matches_initial_against_full_first_name() {
+        assert!(judge_names_match("Hon. Justice S. Wolfe-Reece", "Simone Wolfe-Reece"));
+        assert!(judge_names_match("Hon. Justice L. Pusey", "Leighton Pusey"));
+    }
+
+    #[test]
+    fn matches_honorific_heavy_court_list_spelling() {
+        assert!(judge_names_match(
+            "Hon. Justice THE HON MISS JUSTICE P WILLIAMS JA",
+            "P Williams JA",
+        ));
+        assert!(judge_names_match("Master C. Thomas", "C Thomas"));
+        assert!(judge_names_match("Hon. Justice A. Martin Swaby (ag.)", "A Martin Swaby"));
+    }
+
+    #[test]
+    fn rejects_conflicting_initials_and_different_surnames() {
+        assert!(!judge_names_match("Hon. Justice F. Williams", "P Williams JA"));
+        assert!(!judge_names_match("Hon. Justice S. Wong-Small", "Simone Wolfe-Reece"));
+        assert!(!judge_names_match("Hon. Justice :", "P Williams JA"));
+    }
+
+    #[test]
+    fn matches_any_segment_of_a_panel_listing() {
+        assert!(sitting_field_matches_judge(
+            "Mcdonald-bishop JA, Foster-pusey JA and Brown JA",
+            "Foster-Pusey JA",
+        ));
+        assert!(!sitting_field_matches_judge(
+            "Mcdonald-bishop JA, Foster-pusey JA and Brown JA",
+            "Edwards JA",
+        ));
+    }
 }

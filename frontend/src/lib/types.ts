@@ -178,6 +178,16 @@ export interface UserCase {
 export interface JudgeConnection {
   judge_a_id: number;
   judge_b_id: number;
+  /** Number of cases the two judges appeared on together. */
+  count: number;
+}
+
+/** A judge who co-appeared on cases with another judge. */
+export interface CoJudge {
+  id: number;
+  name: string;
+  court: string | null;
+  shared_cases: number;
 }
 
 export interface DocketListItem {

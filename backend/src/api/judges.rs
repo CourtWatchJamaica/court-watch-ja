@@ -6,7 +6,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     api::errors::AppError,
-    db::{models::{Judge, JudgeWithCount, Judgment}, queries},
+    db::{
+        models::{CoJudge, CourtSitting, Judge, JudgeWithCount, Judgment},
+        queries,
+    },
     AppState,
 };
 
@@ -34,6 +37,10 @@ pub struct JudgesResponse {
 pub struct JudgeDetailResponse {
     pub judge: Judge,
     pub judgments: Vec<Judgment>,
+    /// Past and upcoming court sittings attributed to this judge, newest first.
+    pub sittings: Vec<CourtSitting>,
+    /// Judges who co-appeared on cases with this judge, most frequent first.
+    pub co_judges: Vec<CoJudge>,
 }
 
 pub async fn list_judges(
@@ -64,6 +71,15 @@ pub async fn get_judge(
         .await?
         .ok_or(AppError::NotFound)?;
 
-    let judgments = queries::get_judgments_by_judge(&state.db, &judge.name).await?;
-    Ok(Json(JudgeDetailResponse { judge, judgments }))
+    let (judgments, sittings, co_judges) = tokio::try_join!(
+        queries::get_judgments_by_judge(&state.db, &judge.name),
+        queries::get_sittings_by_judge(&state.db, &judge.name),
+        queries::get_co_judges(&state.db, judge.id),
+    )?;
+    Ok(Json(JudgeDetailResponse {
+        judge,
+        judgments,
+        sittings,
+        co_judges,
+    }))
 }

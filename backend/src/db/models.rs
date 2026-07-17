@@ -42,6 +42,15 @@ pub struct JudgeConnection {
     pub count: i64,
 }
 
+/// A judge who co-appeared on cases with another judge ("frequently sits with").
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct CoJudge {
+    pub id: i32,
+    pub name: String,
+    pub court: Option<String>,
+    pub shared_cases: i64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Judgment {
     pub id: i32,

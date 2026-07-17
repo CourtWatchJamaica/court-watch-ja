@@ -10,6 +10,7 @@ import {
   NotifDebugResult,
   ScraperSourceHealth,
   CaseLookupResult,
+  CoJudge,
   CourtSitting,
   DocketDetail,
   DocketListItem,
@@ -252,7 +253,12 @@ export const apiClient = {
     return request("/judges");
   },
 
-  async getJudge(id: string): Promise<{ judge: Judge; judgments: Judgment[] }> {
+  async getJudge(id: string): Promise<{
+    judge: Judge;
+    judgments: Judgment[];
+    sittings: CourtSitting[];
+    co_judges: CoJudge[];
+  }> {
     return request(`/judges/${id}`);
   },
 
