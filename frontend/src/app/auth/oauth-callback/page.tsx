@@ -5,9 +5,6 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Scale, Loader2 } from "lucide-react";
 
-const BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
-
 export default function OAuthCallbackPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -21,16 +18,10 @@ export default function OAuthCallbackPage() {
     }
 
     if (status === "authenticated" && session?.user?.email) {
-      // Exchange the NextAuth OAuth session for a backend JWT
-      fetch(`${BASE_URL}/auth/oauth`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          provider: (session as unknown as Record<string, unknown>).provider ?? "google",
-          email: session.user.email,
-          name: session.user.name ?? null,
-        }),
-      })
+      // Exchange the NextAuth session for a backend JWT via our own server
+      // route — the server reads the session cookie and calls the backend
+      // with a shared secret, so the browser never supplies the email.
+      fetch("/api/oauth-exchange", { method: "POST" })
         .then((res) => res.json())
         .then((data) => {
           if (data.token) {

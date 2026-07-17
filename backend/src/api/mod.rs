@@ -48,7 +48,7 @@ pub fn router(state: AppState) -> Router {
         .route("/api/auth/signup", post(auth::signup))
         .route("/api/auth/login", post(auth::login))
         .route("/api/auth/oauth", post(auth::oauth_login))
-        .route("/api/auth/verify-email", get(auth::verify_email))
+        .route("/api/auth/verify-email", post(auth::verify_email))
         .route("/api/auth/confirm-password-change", post(auth::confirm_password_change))
         .route("/api/auth/forgot-password", post(auth::forgot_password))
         .route("/api/auth/reset-password", post(auth::reset_password))

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { apiClient } from "@/lib/api";
+import { formatDateOnly, isPastDateOnly, parseDateOnly } from "@/lib/dates";
 import { CourtSitting, Judgment } from "@/lib/types";
 import { useTracking } from "@/lib/tracking-context";
 import {
@@ -24,8 +25,7 @@ import {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function formatDateShort(s: string | null | undefined): string {
-  if (!s) return "—";
-  return new Date(s).toLocaleDateString("en-JM", {
+  return formatDateOnly(s, {
     weekday: "short",
     year: "numeric",
     month: "short",
@@ -52,12 +52,10 @@ function SittingsTimeline({ sittings }: { sittings: CourtSitting[] }) {
     );
   }
 
-  const today = new Date(new Date().toDateString());
-
   return (
     <div className="rounded-2xl border border-border bg-card overflow-hidden">
       {sittings.map((s, i) => {
-        const isPast = !s.event_date || new Date(s.event_date) < today;
+        const isPast = isPastDateOnly(s.event_date);
         return (
           <div
             key={s.id}
@@ -70,10 +68,10 @@ function SittingsTimeline({ sittings }: { sittings: CourtSitting[] }) {
               {s.event_date ? (
                 <>
                   <p className={`text-sm font-bold ${isPast ? "text-foreground/60" : "text-[#009B3A]"}`}>
-                    {new Date(s.event_date).toLocaleDateString("en-JM", { month: "short", day: "numeric" })}
+                    {formatDateOnly(s.event_date, { month: "short", day: "numeric" })}
                   </p>
                   <p className="text-[11px] text-muted-foreground/60">
-                    {new Date(s.event_date).getFullYear()}
+                    {parseDateOnly(s.event_date).getFullYear()}
                   </p>
                 </>
               ) : (
@@ -249,7 +247,7 @@ export default function CaseHistoryPage({
   };
 
   const upcomingCount = sittings.filter(
-    (s) => s.event_date && new Date(s.event_date) >= new Date(new Date().toDateString()),
+    (s) => s.event_date && !isPastDateOnly(s.event_date),
   ).length;
 
   return (

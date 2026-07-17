@@ -122,11 +122,22 @@ pub async fn update_user_profile(
     new_email: Option<&str>,
     new_password_hash: Option<&str>,
 ) -> sqlx::Result<Option<User>> {
+    // Changing the email un-verifies the account (the new address must prove
+    // ownership before it can be used to sign in) and any credential change
+    // bumps token_version to revoke all outstanding sessions.
     sqlx::query_as::<_, User>(
         "UPDATE users
-         SET display_name  = $2,
-             email         = COALESCE($3, email),
-             password_hash = COALESCE($4, password_hash)
+         SET display_name   = $2,
+             email          = COALESCE($3, email),
+             password_hash  = COALESCE($4, password_hash),
+             email_verified = CASE
+                 WHEN $3 IS NOT NULL AND $3 IS DISTINCT FROM email THEN FALSE
+                 ELSE email_verified
+             END,
+             token_version  = token_version + CASE
+                 WHEN ($3 IS NOT NULL AND $3 IS DISTINCT FROM email) OR $4 IS NOT NULL THEN 1
+                 ELSE 0
+             END
          WHERE id = $1
          RETURNING id, email, password_hash, role, display_name, created_at, email_verified",
     )
@@ -1336,7 +1347,7 @@ pub async fn list_court_sittings(
 pub async fn get_today_sittings(pool: &PgPool) -> sqlx::Result<Vec<CourtSitting>> {
     let sql = format!(
         "SELECT {S} FROM court_sittings
-         WHERE event_date = CURRENT_DATE ORDER BY event_time NULLS LAST"
+         WHERE event_date = (NOW() AT TIME ZONE 'America/Jamaica')::date ORDER BY event_time NULLS LAST"
     );
     sqlx::query_as::<_, CourtSitting>(&sql).fetch_all(pool).await
 }
@@ -1450,14 +1461,18 @@ pub async fn count_sittings_by_division(pool: &PgPool, division: &str) -> sqlx::
         .await
 }
 
-/// Returns true if there is at least one 'Civil' row for this URL.
-/// Unlike `has_only_civil_sittings_for_url`, this fires even when the URL has a
-/// mix of Civil and non-Civil rows (e.g. a backfill migration fixed some entries
-/// but left others as 'Civil').
+/// Returns true if there is at least one *current-or-future* 'Civil' row for
+/// this URL.  Unlike `has_only_civil_sittings_for_url`, this fires even when
+/// the URL has a mix of Civil and non-Civil rows (e.g. a backfill migration
+/// fixed some entries but left others as 'Civil').
+///
+/// Past-dated rows are ignored: they are retained as docket history and must
+/// never trigger (or be destroyed by) an eviction sweep.
 pub async fn has_any_civil_sittings_for_url(pool: &PgPool, url: &str) -> sqlx::Result<bool> {
     let count: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM court_sittings \
-         WHERE pdf_source_url = $1 AND court_division = 'Civil'",
+         WHERE pdf_source_url = $1 AND court_division = 'Civil' \
+           AND (event_date IS NULL OR event_date >= (NOW() AT TIME ZONE 'America/Jamaica')::date)",
     )
     .bind(url)
     .fetch_one(pool)
@@ -1465,14 +1480,20 @@ pub async fn has_any_civil_sittings_for_url(pool: &PgPool, url: &str) -> sqlx::R
     Ok(count > 0)
 }
 
-/// Deletes all court_sittings rows that came from `url` and have
+/// Deletes current-or-future court_sittings rows that came from `url` and have
 /// `court_division = 'Civil'`.  Called before re-scraping a URL whose
 /// division was wrong on the previous parse run, so that `sitting_exists`
 /// (which checks by case_number/event_date/event_type, not division) does
 /// not treat the old wrong-division rows as already-processed duplicates.
+///
+/// Past-dated rows are preserved — they are the sitting history shown in the
+/// docket, and the source PDFs for past weeks are often no longer published,
+/// so a deleted historical row can never be re-scraped.
 pub async fn delete_civil_sittings_for_url(pool: &PgPool, url: &str) -> sqlx::Result<u64> {
     sqlx::query(
-        "DELETE FROM court_sittings WHERE pdf_source_url = $1 AND court_division = 'Civil'",
+        "DELETE FROM court_sittings \
+         WHERE pdf_source_url = $1 AND court_division = 'Civil' \
+           AND (event_date IS NULL OR event_date >= (NOW() AT TIME ZONE 'America/Jamaica')::date)",
     )
     .bind(url)
     .execute(pool)
@@ -1480,24 +1501,31 @@ pub async fn delete_civil_sittings_for_url(pool: &PgPool, url: &str) -> sqlx::Re
     .map(|r| r.rows_affected())
 }
 
-/// Deletes ALL court_sittings rows that came from `url`, regardless of division.
-/// Use before re-scraping a URL so that `sitting_exists` (which checks
-/// case_number/event_date/event_type without a division filter) does not treat
-/// previously-inserted rows as duplicates and silently skip re-insertion.
+/// Deletes current-or-future court_sittings rows that came from `url`,
+/// regardless of division.  Use before re-scraping a URL so that
+/// `sitting_exists` (which checks case_number/event_date/event_type without a
+/// division filter) does not treat previously-inserted rows as duplicates and
+/// silently skip re-insertion.  Past-dated rows are preserved as history.
 pub async fn delete_sittings_for_url(pool: &PgPool, url: &str) -> sqlx::Result<u64> {
-    sqlx::query("DELETE FROM court_sittings WHERE pdf_source_url = $1")
-        .bind(url)
-        .execute(pool)
-        .await
-        .map(|r| r.rows_affected())
+    sqlx::query(
+        "DELETE FROM court_sittings WHERE pdf_source_url = $1 \
+           AND (event_date IS NULL OR event_date >= (NOW() AT TIME ZONE 'America/Jamaica')::date)",
+    )
+    .bind(url)
+    .execute(pool)
+    .await
+    .map(|r| r.rows_affected())
 }
 
-/// Deletes Civil sittings for every URL whose `pdf_source_url` contains `domain`.
-/// Used as a domain-wide sweep when the processed-URL list is empty and we cannot
-/// enumerate individual URLs (e.g. CoA nuclear eviction with an already-clear list).
+/// Deletes current-or-future Civil sittings for every URL whose
+/// `pdf_source_url` contains `domain`.  Used as a domain-wide sweep when the
+/// processed-URL list is empty and we cannot enumerate individual URLs
+/// (e.g. CoA nuclear eviction with an already-clear list).
 pub async fn delete_civil_sittings_for_domain(pool: &PgPool, domain: &str) -> sqlx::Result<u64> {
     sqlx::query(
-        "DELETE FROM court_sittings WHERE pdf_source_url ILIKE $1 AND court_division = 'Civil'",
+        "DELETE FROM court_sittings \
+         WHERE pdf_source_url ILIKE $1 AND court_division = 'Civil' \
+           AND (event_date IS NULL OR event_date >= (NOW() AT TIME ZONE 'America/Jamaica')::date)",
     )
     .bind(format!("%{domain}%"))
     .execute(pool)
@@ -1505,13 +1533,15 @@ pub async fn delete_civil_sittings_for_domain(pool: &PgPool, domain: &str) -> sq
     .map(|r| r.rows_affected())
 }
 
-/// Returns true iff there is at least one court_sitting for this URL AND every
-/// sitting has court_division = 'Civil' — indicating a PDF parsed before
-/// detect_division_header() was implemented.
+/// Returns true iff there is at least one current-or-future court_sitting for
+/// this URL AND every such sitting has court_division = 'Civil' — indicating a
+/// PDF parsed before detect_division_header() was implemented.  Past-dated
+/// rows are excluded so retained history can't re-trigger eviction forever.
 pub async fn has_only_civil_sittings_for_url(pool: &PgPool, url: &str) -> sqlx::Result<bool> {
     let (total, non_civil): (i64, i64) = sqlx::query_as(
         "SELECT COUNT(*), COUNT(*) FILTER (WHERE court_division <> 'Civil') \
-         FROM court_sittings WHERE pdf_source_url = $1",
+         FROM court_sittings WHERE pdf_source_url = $1 \
+           AND (event_date IS NULL OR event_date >= (NOW() AT TIME ZONE 'America/Jamaica')::date)",
     )
     .bind(url)
     .fetch_one(pool)
@@ -1596,8 +1626,8 @@ pub async fn get_court_stats(pool: &PgPool, court: &str) -> sqlx::Result<CourtSt
 
     let week_sql = format!(
         "SELECT COUNT(*) FROM court_sittings
-         WHERE event_date >= CURRENT_DATE
-           AND event_date <= CURRENT_DATE + INTERVAL '7 days'
+         WHERE event_date >= (NOW() AT TIME ZONE 'America/Jamaica')::date
+           AND event_date <= (NOW() AT TIME ZONE 'America/Jamaica')::date + INTERVAL '7 days'
            AND {filter}"
     );
     let sittings_this_week: i64 = sqlx::query_scalar(&week_sql)
@@ -1635,7 +1665,9 @@ pub async fn check_notifications(pool: &PgPool) {
         "SELECT uc.user_id, uc.case_id
          FROM user_cases uc
          JOIN judgments j ON j.id = uc.case_id
+         LEFT JOIN user_case_settings ucs ON ucs.user_case_id = uc.id
          WHERE uc.case_type = 'judgment'
+           AND COALESCE(ucs.notify_immediately, TRUE)
            AND NOT EXISTS (
                SELECT 1 FROM notifications n
                WHERE n.user_id = uc.user_id
@@ -1699,7 +1731,9 @@ pub async fn check_notifications(pool: &PgPool) {
                 cs.event_time
          FROM user_cases uc
          JOIN court_sittings cs ON cs.id = uc.case_id
+         LEFT JOIN user_case_settings ucs ON ucs.user_case_id = uc.id
          WHERE uc.case_type = 'sitting'
+           AND COALESCE(ucs.notify_immediately, TRUE)
            AND (uc.last_event_date IS DISTINCT FROM cs.event_date
                 OR uc.last_event_time IS DISTINCT FROM cs.event_time)
            AND NOT EXISTS (
@@ -1721,35 +1755,36 @@ pub async fn check_notifications(pool: &PgPool) {
     };
 
     for row in &changed {
-        if let Err(e) = sqlx::query(
-            "INSERT INTO notifications (user_id, case_id, type)
-             VALUES ($1, $2, 'sitting_changed')
-             ON CONFLICT DO NOTHING",
-        )
-        .bind(row.user_id)
-        .bind(row.case_id)
-        .execute(pool)
-        .await
-        {
-            tracing::warn!(
-                "[Notifications] failed to insert sitting_changed for user {}: {e}",
-                row.user_id
-            );
-            continue;
+        // Insert + state update are atomic: either the user is notified AND the
+        // last-known event values advance, or neither happens and the next run
+        // retries cleanly.
+        let result: sqlx::Result<()> = async {
+            let mut tx = pool.begin().await?;
+            sqlx::query(
+                "INSERT INTO notifications (user_id, case_id, type)
+                 VALUES ($1, $2, 'sitting_changed')
+                 ON CONFLICT DO NOTHING",
+            )
+            .bind(row.user_id)
+            .bind(row.case_id)
+            .execute(&mut *tx)
+            .await?;
+            sqlx::query(
+                "UPDATE user_cases SET last_event_date = $1, last_event_time = $2 WHERE id = $3",
+            )
+            .bind(row.event_date)
+            .bind(row.event_time)
+            .bind(row.uc_id)
+            .execute(&mut *tx)
+            .await?;
+            tx.commit().await
         }
+        .await;
 
-        if let Err(e) = sqlx::query(
-            "UPDATE user_cases SET last_event_date = $1, last_event_time = $2 WHERE id = $3",
-        )
-        .bind(row.event_date)
-        .bind(row.event_time)
-        .bind(row.uc_id)
-        .execute(pool)
-        .await
-        {
+        if let Err(e) = result {
             tracing::warn!(
-                "[Notifications] failed to update last_event for uc_id {}: {e}",
-                row.uc_id
+                "[Notifications] sitting_changed tx failed for user {}: {e}",
+                row.user_id
             );
         }
     }
@@ -1775,9 +1810,11 @@ pub async fn check_notifications(pool: &PgPool) {
         "SELECT uc.user_id, uc.case_id
          FROM user_cases uc
          JOIN court_sittings cs ON cs.id = uc.case_id
+         LEFT JOIN user_case_settings ucs ON ucs.user_case_id = uc.id
          WHERE uc.case_type = 'sitting'
            AND uc.case_id IS NOT NULL
-           AND cs.event_date = CURRENT_DATE + 1
+           AND COALESCE(ucs.notify_day_before, TRUE)
+           AND cs.event_date = (NOW() AT TIME ZONE 'America/Jamaica')::date + 1
            AND NOT EXISTS (
                SELECT 1
                FROM   notifications n
@@ -1828,9 +1865,11 @@ pub async fn check_notifications(pool: &PgPool) {
         "SELECT uc.user_id, uc.case_id
          FROM user_cases uc
          JOIN court_sittings cs ON cs.id = uc.case_id
+         LEFT JOIN user_case_settings ucs ON ucs.user_case_id = uc.id
          WHERE uc.case_type = 'sitting'
            AND uc.case_id IS NOT NULL
-           AND cs.event_date = CURRENT_DATE
+           AND COALESCE(ucs.notify_morning_of, TRUE)
+           AND cs.event_date = (NOW() AT TIME ZONE 'America/Jamaica')::date
            AND NOT EXISTS (
                SELECT 1
                FROM   notifications n
@@ -1896,8 +1935,10 @@ pub async fn check_notifications(pool: &PgPool) {
                 cs.id  AS sitting_id
          FROM   user_cases uc
          JOIN   court_sittings cs ON cs.case_number = uc.case_number
+         LEFT JOIN user_case_settings ucs ON ucs.user_case_id = uc.id
          WHERE  uc.case_id IS NULL
            AND  uc.case_number IS NOT NULL
+           AND  COALESCE(ucs.notify_immediately, TRUE)
            AND  NOT EXISTS (
                     SELECT 1
                     FROM   notifications n
@@ -1919,30 +1960,40 @@ pub async fn check_notifications(pool: &PgPool) {
     };
 
     for row in &listed {
-        if let Err(e) = sqlx::query(
-            "INSERT INTO notifications (user_id, case_id, type)
-             VALUES ($1, $2, 'case_listed')
-             ON CONFLICT DO NOTHING",
-        )
-        .bind(row.user_id)
-        .bind(row.sitting_id)
-        .execute(pool)
-        .await
-        {
+        // Upgrade the case_number-only entry to a real case_id so it stops
+        // matching, and — critically — flip case_type to 'sitting': the id now
+        // points into court_sittings, so leaving the default 'judgment' type
+        // would (a) make the new_judgment query join it against an unrelated
+        // judgment that happens to share the id, and (b) exclude the row from
+        // every sitting-reminder query, which filter on case_type = 'sitting'.
+        let result: sqlx::Result<()> = async {
+            let mut tx = pool.begin().await?;
+            sqlx::query(
+                "INSERT INTO notifications (user_id, case_id, type)
+                 VALUES ($1, $2, 'case_listed')
+                 ON CONFLICT DO NOTHING",
+            )
+            .bind(row.user_id)
+            .bind(row.sitting_id)
+            .execute(&mut *tx)
+            .await?;
+            sqlx::query(
+                "UPDATE user_cases SET case_id = $1, case_type = 'sitting' WHERE id = $2",
+            )
+            .bind(row.sitting_id)
+            .bind(row.uc_id)
+            .execute(&mut *tx)
+            .await?;
+            tx.commit().await
+        }
+        .await;
+
+        if let Err(e) = result {
             tracing::warn!(
-                "[Notifications] failed to insert case_listed for user {}: {e}",
+                "[Notifications] case_listed tx failed for user {}: {e}",
                 row.user_id
             );
-            continue;
         }
-        // Upgrade the case_number-only entry to a real case_id so it stops matching.
-        let _ = sqlx::query(
-            "UPDATE user_cases SET case_id = $1 WHERE id = $2",
-        )
-        .bind(row.sitting_id)
-        .bind(row.uc_id)
-        .execute(pool)
-        .await;
     }
     if !listed.is_empty() {
         tracing::info!(
@@ -1972,8 +2023,10 @@ pub async fn check_notifications(pool: &PgPool) {
          FROM user_cases uc
          JOIN judgments j ON j.case_number = uc.case_number
          JOIN users u ON u.id = uc.user_id
+         LEFT JOIN user_case_settings ucs ON ucs.user_case_id = uc.id
          WHERE uc.case_id IS NULL
            AND uc.case_number IS NOT NULL
+           AND COALESCE(ucs.notify_immediately, TRUE)
            AND NOT EXISTS (
                SELECT 1 FROM notifications n
                WHERE n.user_id = uc.user_id
@@ -1996,30 +2049,36 @@ pub async fn check_notifications(pool: &PgPool) {
             .j_title
             .as_deref()
             .unwrap_or("Case Available");
-        if let Err(e) = sqlx::query(
-            "INSERT INTO notifications (user_id, case_id, type, title, message)
-             VALUES ($1, $2, 'case_available', $3, 'Your tracked case has been published as a judgment.')
-             ON CONFLICT DO NOTHING",
-        )
-        .bind(row.user_id)
-        .bind(row.judgment_id)
-        .bind(notif_title)
-        .execute(pool)
-        .await
-        {
+        let result: sqlx::Result<()> = async {
+            let mut tx = pool.begin().await?;
+            sqlx::query(
+                "INSERT INTO notifications (user_id, case_id, type, title, message)
+                 VALUES ($1, $2, 'case_available', $3, 'Your tracked case has been published as a judgment.')
+                 ON CONFLICT DO NOTHING",
+            )
+            .bind(row.user_id)
+            .bind(row.judgment_id)
+            .bind(notif_title)
+            .execute(&mut *tx)
+            .await?;
+            sqlx::query(
+                "UPDATE user_cases SET case_id = $1, case_type = 'judgment' WHERE id = $2",
+            )
+            .bind(row.judgment_id)
+            .bind(row.uc_id)
+            .execute(&mut *tx)
+            .await?;
+            tx.commit().await
+        }
+        .await;
+
+        if let Err(e) = result {
             tracing::warn!(
-                "[Notifications] failed to insert case_available for user {}: {e}",
+                "[Notifications] case_available tx failed for user {}: {e}",
                 row.user_id
             );
             continue;
         }
-        let _ = sqlx::query(
-            "UPDATE user_cases SET case_id = $1, case_type = 'judgment' WHERE id = $2",
-        )
-        .bind(row.judgment_id)
-        .bind(row.uc_id)
-        .execute(pool)
-        .await;
 
         tracing::info!(
             "[Email stub] case_available → user_id={} email={} case_number={} judgment_id={}",
@@ -2171,12 +2230,24 @@ pub async fn update_user_password(
     user_id: i32,
     password_hash: &str,
 ) -> sqlx::Result<()> {
-    sqlx::query("UPDATE users SET password_hash = $1 WHERE id = $2")
-        .bind(password_hash)
-        .bind(user_id)
-        .execute(pool)
-        .await?;
+    // token_version bump revokes every outstanding JWT for this user — a
+    // password change must sign out any session an attacker may hold.
+    sqlx::query(
+        "UPDATE users SET password_hash = $1, token_version = token_version + 1 WHERE id = $2",
+    )
+    .bind(password_hash)
+    .bind(user_id)
+    .execute(pool)
+    .await?;
     Ok(())
+}
+
+/// Current token_version for a user — embedded in freshly-issued JWTs.
+pub async fn get_token_version(pool: &PgPool, user_id: i32) -> sqlx::Result<i32> {
+    sqlx::query_scalar("SELECT token_version FROM users WHERE id = $1")
+        .bind(user_id)
+        .fetch_one(pool)
+        .await
 }
 
 // ── Password reset (unauthenticated) ──────────────────────────────────────
@@ -2257,7 +2328,7 @@ pub async fn get_docket_list(pool: &PgPool, user_id: i32) -> sqlx::Result<Vec<Do
                SELECT event_date, event_type, court_division
                FROM court_sittings
                WHERE case_number = COALESCE(uc.case_number, j.case_number, cs_src.case_number)
-                 AND event_date >= CURRENT_DATE
+                 AND event_date >= (NOW() AT TIME ZONE 'America/Jamaica')::date
                ORDER BY event_date ASC
                LIMIT 1
            ) ns ON TRUE
@@ -2343,39 +2414,72 @@ pub struct PendingEmailRow {
     pub court_division: Option<String>,
 }
 
-/// Returns notifications inserted in the last 15 minutes that should trigger
-/// an outbound email.  Called once per scraper run immediately after
-/// `check_notifications` populates the table.
-pub async fn recent_notifications_for_email(
+/// Atomically claims notifications that still need an outbound email and
+/// returns them with the data needed to render it.  Called after every
+/// `check_notifications` run.
+///
+/// Claiming = setting `emailed_at` under FOR UPDATE SKIP LOCKED, so two
+/// dispatchers running concurrently (overlapping cron + manual trigger, or a
+/// re-deploy mid-run) can never both pick up the same notification — this is
+/// what guarantees a user gets each email exactly once.
+///
+/// The 48-hour window is a safety valve: if the dispatcher was down for
+/// longer than that, stale reminders are quietly retired rather than sent
+/// late (a "your case is tomorrow" email two weeks later would be worse than
+/// no email).
+pub async fn claim_notifications_for_email(
     pool: &PgPool,
 ) -> sqlx::Result<Vec<PendingEmailRow>> {
     sqlx::query_as::<_, PendingEmailRow>(
-        r#"SELECT u.email,
-                  n.type        AS notification_type,
-                  n.title,
-                  n.message,
+        r#"WITH claimed AS (
+               UPDATE notifications n
+               SET    emailed_at = NOW()
+               WHERE  n.id IN (
+                   SELECT id
+                   FROM   notifications
+                   WHERE  emailed_at IS NULL
+                     AND  sent_at > NOW() - INTERVAL '48 hours'
+                     AND  type IN (
+                            'case_available',
+                            'case_listed',
+                            'sitting_reminder_1d',
+                            'sitting_reminder_morning'
+                          )
+                   FOR UPDATE SKIP LOCKED
+               )
+               RETURNING n.id, n.user_id, n.case_id, n.type, n.title, n.message
+           )
+           SELECT u.email,
+                  c.type        AS notification_type,
+                  c.title,
+                  c.message,
                   COALESCE(cs.case_number, j.case_number) AS case_number,
                   cs.event_date,
                   cs.event_type,
                   cs.court_division
-           FROM   notifications n
-           JOIN   users u ON u.id = n.user_id
+           FROM   claimed c
+           JOIN   users u ON u.id = c.user_id
            LEFT JOIN court_sittings cs
-                  ON cs.id = n.case_id
-                 AND n.type IN ('case_listed', 'sitting_reminder_1d', 'sitting_reminder_morning')
+                  ON cs.id = c.case_id
+                 AND c.type IN ('case_listed', 'sitting_reminder_1d', 'sitting_reminder_morning')
            LEFT JOIN judgments j
-                  ON j.id = n.case_id
-                 AND n.type IN ('case_available')
-           WHERE  n.sent_at > NOW() - INTERVAL '15 minutes'
-             AND  n.type IN (
-                    'case_available',
-                    'case_listed',
-                    'sitting_reminder_1d',
-                    'sitting_reminder_morning'
-                  )"#,
+                  ON j.id = c.case_id
+                 AND c.type IN ('case_available')"#,
     )
     .fetch_all(pool)
     .await
+}
+
+/// Retire any never-emailed notifications that fell outside the 48-hour
+/// dispatch window so the unemailed partial index stays small.
+pub async fn retire_stale_unemailed_notifications(pool: &PgPool) -> sqlx::Result<u64> {
+    sqlx::query(
+        "UPDATE notifications SET emailed_at = sent_at
+         WHERE emailed_at IS NULL AND sent_at <= NOW() - INTERVAL '48 hours'",
+    )
+    .execute(pool)
+    .await
+    .map(|r| r.rows_affected())
 }
 
 // ── Legal News ─────────────────────────────────────────────────────────────
@@ -2532,7 +2636,7 @@ pub async fn list_parish_cases(
 pub async fn count_upcoming_sittings_for_court(pool: &PgPool, court: &str) -> sqlx::Result<i64> {
     let filter = sitting_court_filter(court);
     let sql = format!(
-        "SELECT COUNT(*) FROM court_sittings WHERE event_date >= CURRENT_DATE AND {filter}"
+        "SELECT COUNT(*) FROM court_sittings WHERE event_date >= (NOW() AT TIME ZONE 'America/Jamaica')::date AND {filter}"
     );
     sqlx::query_scalar(&sql).fetch_one(pool).await
 }
@@ -2709,7 +2813,7 @@ pub async fn get_preview_sittings(pool: &PgPool) -> sqlx::Result<Vec<CourtSittin
     let cs: Vec<CourtSitting> = sqlx::query_as(
         &format!(
             "SELECT {S} FROM court_sittings \
-             WHERE event_date >= CURRENT_DATE ORDER BY event_date ASC, id ASC LIMIT 3"
+             WHERE event_date >= (NOW() AT TIME ZONE 'America/Jamaica')::date ORDER BY event_date ASC, id ASC LIMIT 3"
         ),
     )
     .fetch_all(pool)
@@ -2723,7 +2827,7 @@ pub async fn get_preview_sittings(pool: &PgPool) -> sqlx::Result<Vec<CourtSittin
     let parish_rows = sqlx::query(
         "SELECT id, parish, status, week_of, pdf_source_url, accused_name, created_at \
          FROM parish_court_cases \
-         WHERE week_of >= date_trunc('week', CURRENT_DATE) \
+         WHERE week_of >= date_trunc('week', (NOW() AT TIME ZONE 'America/Jamaica')::date) \
          ORDER BY week_of ASC, id ASC LIMIT $1",
     )
     .bind(remaining)

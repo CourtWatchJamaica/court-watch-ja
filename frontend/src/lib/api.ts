@@ -99,9 +99,12 @@ export const apiClient = {
   },
 
   async verifyEmail(token: string): Promise<{ token: string }> {
-    return request<{ token: string }>(
-      `/auth/verify-email?token=${encodeURIComponent(token)}`
-    );
+    // POST, not GET: email link-scanners prefetch GETs and were consuming the
+    // one-shot token before the user clicked.
+    return request<{ token: string }>("/auth/verify-email", {
+      method: "POST",
+      body: JSON.stringify({ token }),
+    });
   },
 
   async login(email: string, password: string): Promise<{ token: string }> {
@@ -121,11 +124,17 @@ export const apiClient = {
     email?: string;
     current_password?: string;
     new_password?: string;
-  }): Promise<User> {
-    return request("/user/profile", {
+  }): Promise<User & { token?: string }> {
+    const res = await request<User & { token?: string }>("/user/profile", {
       method: "PUT",
       body: JSON.stringify(body),
     });
+    // Credential changes revoke the old token; the backend returns a
+    // replacement so this session keeps working.
+    if (res.token && typeof window !== "undefined") {
+      localStorage.setItem("token", res.token);
+    }
+    return res;
   },
 
   async deleteAccount(): Promise<{ message: string }> {

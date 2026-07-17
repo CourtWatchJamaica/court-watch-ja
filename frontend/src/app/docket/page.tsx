@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import Navbar from "@/components/Navbar";
 import { apiClient } from "@/lib/api";
+import { formatDateOnly, isPastDateOnly } from "@/lib/dates";
 import { DocketListItem } from "@/lib/types";
 import {
   FolderOpen,
@@ -18,18 +19,15 @@ import {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatDate(s: string | null): string {
-  if (!s) return "";
-  return new Date(s).toLocaleDateString("en-JM", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  return formatDateOnly(
+    s,
+    { weekday: "short", month: "short", day: "numeric", year: "numeric" },
+    "",
+  );
 }
 
 function isUpcoming(dateStr: string | null): boolean {
-  if (!dateStr) return false;
-  return new Date(dateStr) >= new Date(new Date().toDateString());
+  return !isPastDateOnly(dateStr);
 }
 
 // ── Case card ─────────────────────────────────────────────────────────────────

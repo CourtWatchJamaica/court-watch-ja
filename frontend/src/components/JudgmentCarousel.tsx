@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, Building2, Calendar, ArrowRight, Scale, Bookmark, BookmarkCheck } from "lucide-react";
+import { formatDateOnly } from "@/lib/dates";
 import { Judgment } from "@/lib/types";
 import { useTracking } from "@/lib/tracking-context";
 
@@ -36,7 +37,7 @@ function CarouselCard({ judgment }: { judgment: Judgment }) {
           <div className="flex items-center gap-1 shrink-0">
             <Calendar className="h-3 w-3 text-white/55" />
             <span className="text-[10px] text-white/65">
-              {new Date(judgment.date).toLocaleDateString("en-JM", {
+              {formatDateOnly(judgment.date, {
                 month: "short",
                 day: "numeric",
                 year: "numeric",

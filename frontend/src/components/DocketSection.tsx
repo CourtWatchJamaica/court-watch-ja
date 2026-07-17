@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Bell, X, ArrowRight, Scale, Building2, Plus, Loader2, Calendar, FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { formatDateOnly } from "@/lib/dates";
 import { CaseLookupResult, Judgment, UserCase, CourtSitting } from "@/lib/types";
 import { apiClient } from "@/lib/api";
 
@@ -572,7 +573,7 @@ export function AddByNumberForm({ onRefresh }: { onRefresh: () => void }) {
                       {j.date && (
                         <span className="flex items-center gap-1 text-[10px] text-foreground/25">
                           <Calendar className="h-2.5 w-2.5" />
-                          {new Date(j.date).toLocaleDateString("en-JM", { year: "numeric", month: "short", day: "numeric" })}
+                          {formatDateOnly(j.date, { year: "numeric", month: "short", day: "numeric" })}
                         </span>
                       )}
                     </div>

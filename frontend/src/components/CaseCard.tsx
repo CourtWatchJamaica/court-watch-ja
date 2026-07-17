@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateOnly } from "@/lib/dates";
 import { Judgment } from "@/lib/types";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Calendar, User, Building2, ArrowUpRight, Bookmark, BookmarkCheck } from "lucide-react";
@@ -83,7 +84,7 @@ export default function CaseCard({ judgment, onClick, isTracked, onTrack }: Case
             <div className="flex items-center gap-1.5 text-[11px] text-foreground/40">
               <Calendar className="h-3 w-3 text-foreground/20 shrink-0" />
               <span>
-                {new Date(judgment.date).toLocaleDateString("en-JM", {
+                {formatDateOnly(judgment.date, {
                   year: "numeric",
                   month: "short",
                   day: "numeric",

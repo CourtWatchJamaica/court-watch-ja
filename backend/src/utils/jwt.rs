@@ -9,11 +9,21 @@ pub struct Claims {
     pub sub: i32,
     pub email: String,
     pub role: String,
+    /// Token version — must match users.token_version or the token is revoked.
+    /// Defaults to 0 for tokens issued before the claim existed.
+    #[serde(default)]
+    pub ver: i32,
     pub exp: usize,
     pub iat: usize,
 }
 
-pub fn encode_token(user_id: i32, email: &str, role: &str, secret: &str) -> Result<String, AppError> {
+pub fn encode_token(
+    user_id: i32,
+    email: &str,
+    role: &str,
+    token_version: i32,
+    secret: &str,
+) -> Result<String, AppError> {
     let now = Utc::now();
     let exp = (now + Duration::days(7)).timestamp() as usize;
     let iat = now.timestamp() as usize;
@@ -22,6 +32,7 @@ pub fn encode_token(user_id: i32, email: &str, role: &str, secret: &str) -> Resu
         sub: user_id,
         email: email.to_string(),
         role: role.to_string(),
+        ver: token_version,
         exp,
         iat,
     };

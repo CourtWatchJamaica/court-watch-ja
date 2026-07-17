@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 use std::time::Instant;
 
 use axum::{
-    extract::{ConnectInfo, Query, State},
+    extract::{ConnectInfo, State},
     http::HeaderMap,
     Extension, Json,
 };
@@ -30,15 +30,33 @@ fn check_rate_limit(state: &AppState, ip: &str) -> Result<(), AppError> {
     Ok(())
 }
 
-fn client_ip(headers: &HeaderMap, addr: &SocketAddr) -> String {
-    headers
-        .get("x-forwarded-for")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|s| s.split(',').next())
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| addr.ip().to_string())
+/// Resolve the client IP for rate limiting.
+///
+/// X-Forwarded-For is attacker-controlled unless a trusted proxy sits in
+/// front of us, so it is only honored when TRUST_PROXY is set — and then we
+/// take the LAST entry (appended by our own proxy) rather than the first
+/// (supplied by the client), so a spoofed header can't rotate buckets to
+/// bypass the limit.
+fn client_ip(state: &AppState, headers: &HeaderMap, addr: &SocketAddr) -> String {
+    if state.config.trust_proxy {
+        if let Some(ip) = headers
+            .get("x-forwarded-for")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| s.split(',').next_back())
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+        {
+            return ip;
+        }
+    }
+    addr.ip().to_string()
 }
+
+/// A real bcrypt hash of a random throwaway password.  Verified against when
+/// login hits an unknown email so the response time matches the known-email
+/// path — otherwise the timing difference leaks which emails have accounts.
+const DUMMY_BCRYPT_HASH: &str =
+    "$2y$12$c50uT1eOfBmwBnV3/04lMuJsL8bVVIG/UkqnQqEfNT1bGmvRYq.cC";
 
 #[derive(Deserialize)]
 pub struct AuthRequest {
@@ -65,11 +83,10 @@ pub struct MeResponse {
     pub display_name: Option<String>,
     pub created_at: String,
     pub email_verified: bool,
-}
-
-#[derive(Deserialize)]
-pub struct VerifyTokenQuery {
-    pub token: String,
+    /// Present only when a credential change revoked the old token — the
+    /// client must replace its stored token with this one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token: Option<String>,
 }
 
 pub async fn signup(
@@ -78,7 +95,7 @@ pub async fn signup(
     headers: HeaderMap,
     Json(body): Json<AuthRequest>,
 ) -> Result<Json<SignupResponse>, AppError> {
-    check_rate_limit(&state, &client_ip(&headers, &addr))?;
+    check_rate_limit(&state, &client_ip(&state, &headers, &addr))?;
     if body.email.is_empty() || body.password.is_empty() {
         return Err(AppError::BadRequest("Email and password are required".into()));
     }
@@ -165,13 +182,20 @@ pub async fn login(
     headers: HeaderMap,
     Json(body): Json<AuthRequest>,
 ) -> Result<Json<AuthResponse>, AppError> {
-    check_rate_limit(&state, &client_ip(&headers, &addr))?;
-    let user = queries::find_user_by_email(&state.db, &body.email)
-        .await?
-        .ok_or(AppError::Unauthorized)?;
+    check_rate_limit(&state, &client_ip(&state, &headers, &addr))?;
+    let user = match queries::find_user_by_email(&state.db, &body.email).await? {
+        Some(u) => u,
+        None => {
+            // Burn the same bcrypt cost as the found-user path so response
+            // timing doesn't reveal whether the email is registered.
+            let _ = bcrypt::verify(&body.password, DUMMY_BCRYPT_HASH);
+            return Err(AppError::Unauthorized);
+        }
+    };
 
-    let valid = bcrypt::verify(&body.password, &user.password_hash)
-        .map_err(|e| AppError::Internal(e.to_string()))?;
+    // OAuth-only accounts store a sentinel that is not a valid bcrypt hash;
+    // verify() errors on it, which simply means "no password login".
+    let valid = bcrypt::verify(&body.password, &user.password_hash).unwrap_or(false);
 
     if !valid {
         return Err(AppError::Unauthorized);
@@ -181,15 +205,25 @@ pub async fn login(
         return Err(AppError::EmailNotVerified);
     }
 
-    let token = jwt::encode_token(user.id, &user.email, &user.role, &state.config.jwt_secret)?;
+    let ver = queries::get_token_version(&state.db, user.id).await?;
+    let token =
+        jwt::encode_token(user.id, &user.email, &user.role, ver, &state.config.jwt_secret)?;
     Ok(Json(AuthResponse { token }))
 }
 
+#[derive(Deserialize)]
+pub struct VerifyEmailBody {
+    pub token: String,
+}
+
+/// POST (not GET): email link-scanners prefetch GET URLs, which used to
+/// consume the one-shot token before the user ever clicked.  The frontend
+/// page now submits the token from the URL via POST instead.
 pub async fn verify_email(
     State(state): State<AppState>,
-    Query(params): Query<VerifyTokenQuery>,
+    Json(body): Json<VerifyEmailBody>,
 ) -> Result<Json<AuthResponse>, AppError> {
-    let user_id = queries::consume_verification_token(&state.db, &params.token)
+    let user_id = queries::consume_verification_token(&state.db, &body.token)
         .await?
         .ok_or_else(|| AppError::BadRequest("Invalid or expired verification token".into()))?;
 
@@ -200,7 +234,9 @@ pub async fn verify_email(
         .await?
         .ok_or(AppError::NotFound)?;
 
-    let token = jwt::encode_token(user.id, &user.email, &user.role, &state.config.jwt_secret)?;
+    let ver = queries::get_token_version(&state.db, user.id).await?;
+    let token =
+        jwt::encode_token(user.id, &user.email, &user.role, ver, &state.config.jwt_secret)?;
     Ok(Json(AuthResponse { token }))
 }
 
@@ -219,6 +255,7 @@ pub async fn me(
         display_name: user.display_name,
         created_at: user.created_at.to_string(),
         email_verified: user.email_verified,
+        token: None,
     }))
 }
 
@@ -239,10 +276,47 @@ pub struct OAuthRequest {
     pub name: Option<String>,
 }
 
+/// Exchange a NextAuth server session for a backend JWT.
+///
+/// SECURITY: this endpoint mints a token for whatever email it is told, so it
+/// must only be callable by the Next.js *server* (which has already verified
+/// the OAuth code exchange with Google/Apple) — never by browsers.  That is
+/// enforced with a shared secret sent in X-OAuth-Exchange-Secret; requests
+/// without the exact secret are rejected, and the endpoint is disabled
+/// entirely when OAUTH_EXCHANGE_SECRET is not configured.
 pub async fn oauth_login(
     State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
     Json(body): Json<OAuthRequest>,
 ) -> Result<Json<AuthResponse>, AppError> {
+    let Some(ref expected) = state.config.oauth_exchange_secret else {
+        return Err(AppError::BadRequest(
+            "OAuth sign-in is not configured on this server.".into(),
+        ));
+    };
+    let provided = headers
+        .get("x-oauth-exchange-secret")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    // Constant-time comparison — a byte-by-byte == short-circuits on the
+    // first mismatch and leaks how much of the secret was correct.
+    let matches = provided.len() == expected.len()
+        && provided
+            .bytes()
+            .zip(expected.bytes())
+            .fold(0u8, |acc, (a, b)| acc | (a ^ b))
+            == 0;
+    if !matches {
+        // Only failures are rate-limited: legitimate exchanges all arrive
+        // from the Next.js server's IP, so a blanket per-IP limit here would
+        // throttle real sign-ins globally.  Failures, on the other hand, are
+        // secret-guessing attempts and get clamped hard.
+        check_rate_limit(&state, &format!("oauth:{}", client_ip(&state, &headers, &addr)))?;
+        tracing::warn!("[OAuth] exchange rejected — bad or missing shared secret");
+        return Err(AppError::Unauthorized);
+    }
+
     if body.email.is_empty() {
         return Err(AppError::BadRequest("Email is required".into()));
     }
@@ -278,7 +352,9 @@ pub async fn oauth_login(
         }
     }
 
-    let token = jwt::encode_token(user.id, &user.email, &user.role, &state.config.jwt_secret)?;
+    let ver = queries::get_token_version(&state.db, user.id).await?;
+    let token =
+        jwt::encode_token(user.id, &user.email, &user.role, ver, &state.config.jwt_secret)?;
     Ok(Json(AuthResponse { token }))
 }
 
@@ -411,7 +487,7 @@ pub async fn forgot_password(
     Json(body): Json<ForgotPasswordRequest>,
 ) -> Result<Json<SignupResponse>, AppError> {
     // Separate rate-limit bucket from login/signup
-    check_rate_limit(&state, &format!("fp:{}", client_ip(&headers, &addr)))?;
+    check_rate_limit(&state, &format!("fp:{}", client_ip(&state, &headers, &addr)))?;
 
     if body.email.is_empty() {
         return Err(AppError::BadRequest("Email is required".into()));
@@ -473,7 +549,7 @@ pub async fn reset_password(
     headers: HeaderMap,
     Json(body): Json<ResetPasswordRequest>,
 ) -> Result<Json<SignupResponse>, AppError> {
-    check_rate_limit(&state, &client_ip(&headers, &addr))?;
+    check_rate_limit(&state, &client_ip(&state, &headers, &addr))?;
 
     if body.token.is_empty() {
         return Err(AppError::BadRequest("Token is required".into()));
@@ -564,6 +640,13 @@ pub async fn update_profile(
         None => user.display_name.clone(),
     };
 
+    let email_changing = body
+        .email
+        .as_deref()
+        .map(|e| !e.trim().is_empty() && e != user.email)
+        .unwrap_or(false);
+    let old_email = user.email.clone();
+
     let updated = queries::update_user_profile(
         &state.db,
         user_id,
@@ -574,6 +657,84 @@ pub async fn update_profile(
     .await?
     .ok_or(AppError::NotFound)?;
 
+    if email_changing {
+        // The new address is unverified until it proves ownership — issue a
+        // fresh verification token and email it to the NEW address.
+        queries::delete_verification_tokens_for_user(&state.db, user_id).await?;
+        let raw_token = Uuid::new_v4().to_string();
+        let expires_at = chrono::Utc::now().naive_utc() + chrono::Duration::hours(24);
+        queries::create_verification_token(&state.db, user_id, &raw_token, expires_at).await?;
+
+        if let Some(ref api_key) = state.config.resend_api_key {
+            let client = reqwest::Client::new();
+            let key = api_key.clone();
+            let new_to = updated.email.clone();
+            let old_to = old_email.clone();
+            let token = raw_token.clone();
+            tokio::spawn(async move {
+                let app_url = std::env::var("APP_URL")
+                    .unwrap_or_else(|_| "https://courtwatchjamaica.com".into());
+                let app_url = app_url.trim_end_matches('/');
+
+                let verify_url = format!("{app_url}/verify-email?token={token}");
+                let html = format!(
+                    r#"<p>The email address on your CourtWatch JA account was changed to this one.</p>
+<p>Click the link below to verify it:</p>
+<p><a href="{verify_url}">Verify Email Address</a></p>
+<p>This link expires in 24 hours.</p>"#
+                );
+                if let Err(e) = crate::notifications::email::send_email(
+                    &client,
+                    &key,
+                    crate::notifications::email::EmailSender::Auth,
+                    &new_to,
+                    "Verify your new CourtWatch JA email",
+                    &html,
+                )
+                .await
+                {
+                    tracing::error!("[Profile] Verification email FAILED for {new_to}: {e}");
+                }
+
+                // Security notice to the OLD address so a hijacked account
+                // can't be silently re-pointed.
+                let notice = format!(
+                    r#"<p>The email address on your CourtWatch JA account was just changed from this address to <strong>{new_to}</strong>.</p>
+<p>If you made this change, no action is needed.</p>
+<p>If you did NOT make this change, your account may be compromised — reset your password immediately at <a href="{app_url}/auth/forgot-password">{app_url}/auth/forgot-password</a>.</p>"#
+                );
+                if let Err(e) = crate::notifications::email::send_email(
+                    &client,
+                    &key,
+                    crate::notifications::email::EmailSender::Auth,
+                    &old_to,
+                    "Your CourtWatch JA email address was changed",
+                    &notice,
+                )
+                .await
+                {
+                    tracing::error!("[Profile] Change notice FAILED for {old_to}: {e}");
+                }
+            });
+        }
+    }
+
+    // Credential changes bump token_version (revoking every existing session,
+    // including this one) — issue a replacement token so THIS session
+    // continues seamlessly.
+    let fresh_token = if email_changing || new_hash.is_some() {
+        let ver = queries::get_token_version(&state.db, user_id).await?;
+        Some(jwt::encode_token(
+            updated.id,
+            &updated.email,
+            &updated.role,
+            ver,
+            &state.config.jwt_secret,
+        )?)
+    } else {
+        None
+    };
+
     Ok(Json(MeResponse {
         id: updated.id,
         email: updated.email,
@@ -581,5 +742,6 @@ pub async fn update_profile(
         display_name: updated.display_name,
         created_at: updated.created_at.to_string(),
         email_verified: updated.email_verified,
+        token: fresh_token,
     }))
 }

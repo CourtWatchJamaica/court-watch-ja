@@ -1,5 +1,8 @@
-/// Scheduler — runs scrapers on Mon / Wed / Fri at 06:00 UTC.
-/// Judgment + court-list scrapers: Mon, Wed, Fri.
+/// Scheduler — all times UTC; Jamaica is UTC-5 year-round (no DST).
+/// Full scrape (judgments + court lists): Mon / Wed / Fri 11:00 UTC (6:00 am Jamaica).
+/// Court-lists refresh: Tue / Thu 11:00 UTC plus Mon–Fri 15:00 & 19:00 UTC,
+/// so the first notification-generating run of EVERY weekday is 6:00 am
+/// Jamaica — reminder emails land at breakfast, not 1:00 am.
 /// Judges scraper: Monday only (once per week is sufficient).
 use chrono::{Duration, NaiveDate, Utc};
 use sqlx::PgPool;
@@ -16,12 +19,12 @@ use crate::{config::Config, db::queries};
 pub async fn start(pool: PgPool, config: Arc<Config>) -> anyhow::Result<()> {
     let sched = JobScheduler::new().await?;
 
-    // ── Mon / Wed / Fri at 06:00 UTC — full scrape (judgments + court lists) ─
+    // ── Mon / Wed / Fri at 11:00 UTC (6 am Jamaica) — full scrape ────────────
     {
         let pool = pool.clone();
         let config = config.clone();
 
-        let job = Job::new_async("0 0 6 * * Mon,Wed,Fri", move |_uuid, _lock| {
+        let job = Job::new_async("0 0 11 * * Mon,Wed,Fri", move |_uuid, _lock| {
             let pool = pool.clone();
             let config = config.clone();
             Box::pin(async move {
@@ -35,14 +38,35 @@ pub async fn start(pool: PgPool, config: Arc<Config>) -> anyhow::Result<()> {
         sched.add(job).await?;
     }
 
-    // ── Court-lists-only refresh at 10:00, 14:00, 18:00 UTC Mon–Fri ──────────
-    // Catches addenda and amended lists published after the 06:00 full run.
+    // ── Court-lists refresh, Tue / Thu at 11:00 UTC (6 am Jamaica) ───────────
+    // The full scrape covers Mon/Wed/Fri at this hour; this fills in Tue/Thu
+    // so reminders are generated at 6 am Jamaica every weekday.
+    {
+        let pool = pool.clone();
+        let config = config.clone();
+
+        let job = Job::new_async("0 0 11 * * Tue,Thu", move |_uuid, _lock| {
+            let pool = pool.clone();
+            let config = config.clone();
+            Box::pin(async move {
+                info!("=== Court-lists refresh starting ===");
+                if let Err(e) = run_court_lists(&pool, &config).await {
+                    error!("Court-lists refresh failed: {e}");
+                }
+            })
+        })?;
+
+        sched.add(job).await?;
+    }
+
+    // ── Court-lists refresh at 15:00 & 19:00 UTC (10 am & 2 pm Jamaica) ──────
+    // Catches addenda and amended lists published after the morning run.
     {
         let pool = pool.clone();
         let config = config.clone();
 
         let job = Job::new_async(
-            "0 0 10,14,18 * * Mon,Tue,Wed,Thu,Fri",
+            "0 0 15,19 * * Mon,Tue,Wed,Thu,Fri",
             move |_uuid, _lock| {
                 let pool = pool.clone();
                 let config = config.clone();
@@ -75,14 +99,14 @@ pub async fn start(pool: PgPool, config: Arc<Config>) -> anyhow::Result<()> {
 
     sched.start().await?;
     info!(
-        "Cron scheduler started — full scrape Mon/Wed/Fri 06:00 UTC, \
-         court-lists refresh Mon–Fri 10:00/14:00/18:00 UTC, news daily 08:00 UTC"
+        "Cron scheduler started — full scrape Mon/Wed/Fri 11:00 UTC (6am Jamaica), \
+         court-lists refresh Tue/Thu 11:00 + Mon–Fri 15:00/19:00 UTC, news daily 08:00 UTC"
     );
     Ok(())
 }
 
-/// Court-lists-only refresh — runs every 4 h on weekdays to catch addenda
-/// published after the main morning scrape.
+/// Court-lists-only refresh — runs Tue/Thu mornings and every weekday
+/// afternoon to catch addenda published after the main morning scrape.
 async fn run_court_lists(pool: &PgPool, config: &Config) -> anyhow::Result<()> {
     let client = super::http_client()?;
     let mut state = ScraperState::load_from_db(pool, &config.scraper_state_path).await;
@@ -629,10 +653,16 @@ async fn dispatch_notification_emails(
 ) {
     use crate::notifications::email;
 
-    let rows = match queries::recent_notifications_for_email(pool).await {
+    // Retire anything too old to email, then atomically claim the rest.
+    // Claiming marks emailed_at under SKIP LOCKED, so concurrent dispatchers
+    // (overlapping cron runs, manual triggers) can never double-send.
+    if let Err(e) = queries::retire_stale_unemailed_notifications(pool).await {
+        warn!("[Email] failed to retire stale notifications: {e}");
+    }
+    let rows = match queries::claim_notifications_for_email(pool).await {
         Ok(r) => r,
         Err(e) => {
-            warn!("[Email] failed to query recent notifications: {e}");
+            warn!("[Email] failed to claim pending notifications: {e}");
             return;
         }
     };
@@ -649,6 +679,13 @@ async fn dispatch_notification_emails(
 
     for row in rows {
         let case_ref = row.case_number.as_deref().unwrap_or("your tracked case");
+        // Deep-link to the case's docket page when we know the case number
+        // (slashes are fine — the docket route is a catch-all segment).
+        let cta_url = match row.case_number.as_deref() {
+            Some(num) => format!("{app_url}/docket/{}", num.replace(' ', "%20")),
+            None => format!("{app_url}/cases"),
+        };
+        let cta_url = cta_url.as_str();
 
         let (subject, html) = match row.notification_type.as_str() {
             "case_available" => {
@@ -661,7 +698,7 @@ async fn dispatch_notification_emails(
   <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Title</td><td style="padding:4px 0">{title}</td></tr>
 </table>
 <p>{}</p>
-<p style="margin-top:24px"><a href="{app_url}/cases" style="background:#1d4ed8;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600">View Judgment →</a></p>"#,
+<p style="margin-top:24px"><a href="{cta_url}" style="background:#1d4ed8;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600">View Judgment →</a></p>"#,
                     row.message.as_deref().unwrap_or("The judgment has been published. Click below to read the full decision.")
                 );
                 (subj, body)
@@ -681,7 +718,7 @@ async fn dispatch_notification_emails(
   <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Court</td><td style="padding:4px 0">{court}</td></tr>
   <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="padding:4px 0">{date_str}</td></tr>
 </table>
-<p style="margin-top:24px"><a href="{app_url}/cases" style="background:#1d4ed8;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600">View on CourtWatch JA →</a></p>"#
+<p style="margin-top:24px"><a href="{cta_url}" style="background:#1d4ed8;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600">View on CourtWatch JA →</a></p>"#
                 );
                 (subj, body)
             }
@@ -700,7 +737,7 @@ async fn dispatch_notification_emails(
   <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Court</td><td style="padding:4px 0">{court}</td></tr>
   <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="padding:4px 0">{date_str}</td></tr>
 </table>
-<p style="margin-top:24px"><a href="{app_url}/cases" style="background:#1d4ed8;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600">View on CourtWatch JA →</a></p>"#
+<p style="margin-top:24px"><a href="{cta_url}" style="background:#1d4ed8;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600">View on CourtWatch JA →</a></p>"#
                 );
                 (subj, body)
             }
@@ -719,7 +756,7 @@ async fn dispatch_notification_emails(
   <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Court</td><td style="padding:4px 0">{court}</td></tr>
   <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="padding:4px 0">{date_str}</td></tr>
 </table>
-<p style="margin-top:24px"><a href="{app_url}/cases" style="background:#1d4ed8;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600">View on CourtWatch JA →</a></p>"#
+<p style="margin-top:24px"><a href="{cta_url}" style="background:#1d4ed8;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600">View on CourtWatch JA →</a></p>"#
                 );
                 (subj, body)
             }

@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import Navbar from "@/components/Navbar";
 import { apiClient } from "@/lib/api";
+import { formatDateOnly } from "@/lib/dates";
 import { Judgment } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { useTracking } from "@/lib/tracking-context";
@@ -315,7 +316,7 @@ export default function CaseDetailPage() {
                     </p>
                     <div className="flex items-center gap-2 text-[13px] text-white/75">
                       <Calendar className="h-3.5 w-3.5 text-white/60 shrink-0" />
-                      {new Date(judgment.date).toLocaleDateString("en-JM", {
+                      {formatDateOnly(judgment.date, {
                         weekday: "long",
                         year: "numeric",
                         month: "long",

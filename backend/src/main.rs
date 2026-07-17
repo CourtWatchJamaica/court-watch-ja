@@ -178,7 +178,10 @@ async fn main() -> anyhow::Result<()> {
             Method::DELETE,
             Method::OPTIONS,
         ])
-        .allow_headers(tower_http::cors::Any);
+        .allow_headers([
+            axum::http::header::AUTHORIZATION,
+            axum::http::header::CONTENT_TYPE,
+        ]);
 
     // ── Router ────────────────────────────────────────────────────────────
     let app = api::router(state)

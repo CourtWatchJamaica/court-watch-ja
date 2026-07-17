@@ -1,0 +1,11 @@
+-- Token revocation support.
+--
+-- `token_version` is embedded in every JWT (`ver` claim) and checked on each
+-- authenticated request.  Bumping it invalidates all outstanding tokens for
+-- the user — done on password change, email change, and role change, so a
+-- stolen or stale token stops working immediately instead of living out its
+-- full 7-day expiry.
+--
+-- Existing tokens carry no `ver` claim and deserialize as 0, which matches
+-- the column default, so current sessions remain valid.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INT NOT NULL DEFAULT 0;
