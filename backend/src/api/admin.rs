@@ -201,6 +201,30 @@ pub async fn deep_scrape(State(state): State<AppState>) -> Result<Json<Value>, A
         {
             tracing::error!("[DeepScrape] Failed to lower cutoff: {e}");
         }
+
+        // Reset the listing-page cursors and retry list so the scrape re-walks
+        // EVERY listing page from the start.  The judgment upsert refills any
+        // missing pdf_url on conflict, so this re-discovers PDF links for
+        // judgments whose PDFs were nullified or never captured.
+        {
+            let mut s =
+                ScraperState::load_from_db(&pool, &config.scraper_state_path).await;
+            s.next_judgment_page = 0;
+            s.next_appeal_page = 0;
+            s.next_appeal_criminal_page = 0;
+            s.next_parish_page = 0;
+            let skipped = s.pdf_skipped.len();
+            s.pdf_skipped.clear();
+            s.pdf_download_failures.clear();
+            if let Err(e) = s.save_to_db(&pool).await {
+                tracing::error!("[DeepScrape] Failed to reset scraper state: {e}");
+            } else {
+                tracing::info!(
+                    "[DeepScrape] Page cursors reset to 0; {skipped} permanently-skipped \
+                     PDF(s) requeued for retry"
+                );
+            }
+        }
         tracing::info!("[DeepScrape] Cutoff set to 2020-01-01 — starting full backfill");
 
         if let Err(e) = crate::scraper::runner::run_all(&pool, &config).await {

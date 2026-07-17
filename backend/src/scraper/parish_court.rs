@@ -54,6 +54,15 @@ pub async fn run(
                     break;
                 }
             },
+            Ok(r) if r.status() == reqwest::StatusCode::NOT_FOUND => {
+                warn!(
+                    "[Parish] judgments listing returned 404 — the judgments section \
+                     appears to have been removed from parishcourt.gov.jm. Scraper is \
+                     dormant until the court publishes judgments again (watch the \
+                     parish_judgments source on /admin/health)."
+                );
+                return Ok(());
+            }
             Ok(r) => {
                 warn!(
                     "[Parish] listing page unavailable — skipping (status {})",
