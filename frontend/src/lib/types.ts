@@ -294,3 +294,77 @@ export interface LegalNewsItem {
   category: string;
   created_at: string;
 }
+
+// ── Admin: Health / observability ──────────────────────────────────────────
+
+export interface ScraperSourceHealth {
+  source: string;
+  total_rows: number;
+  last_data_at: string | null;
+  stale_after_days: number;
+  stale: boolean;
+  last_run_at: string | null;
+  last_run_success: boolean | null;
+  last_run_rows: number | null;
+  last_run_error: string | null;
+  consecutive_zero_runs: number;
+}
+
+export interface AdminEmailStats {
+  sent_today: number;
+  sent_7d: number;
+  pending: number;
+  retired_7d: number;
+}
+
+export interface DataQualityCheck {
+  key: string;
+  label: string;
+  count: number;
+}
+
+export interface NotifDebugTracked {
+  id: number;
+  case_type: string;
+  case_id: number | null;
+  case_number: string | null;
+  resolved_case_number: string | null;
+  created_at: string;
+  notify_immediately: boolean | null;
+  notify_day_before: boolean | null;
+  notify_morning_of: boolean | null;
+}
+
+export interface NotifDebugResult {
+  found: boolean;
+  user?: {
+    id: number;
+    email: string;
+    role: string;
+    email_verified: boolean;
+    created_at: string;
+  };
+  tracked?: NotifDebugTracked[];
+  matching_sittings?: {
+    id: number;
+    case_number: string | null;
+    event_date: string | null;
+    event_type: string | null;
+    court_division: string | null;
+  }[];
+  matching_judgments?: {
+    id: number;
+    case_number: string;
+    title: string | null;
+    date: string | null;
+  }[];
+  notifications?: {
+    id: number;
+    type: string | null;
+    case_id: number | null;
+    resolved_case_number: string | null;
+    sent_at: string | null;
+    emailed_at: string | null;
+    read_at: string | null;
+  }[];
+}

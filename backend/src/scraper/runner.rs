@@ -89,7 +89,7 @@ pub async fn start(pool: PgPool, config: Arc<Config>) -> anyhow::Result<()> {
             let pool = pool.clone();
             Box::pin(async move {
                 info!("[News] Daily RSS scrape starting");
-                if let Err(e) = super::news::run(&pool).await {
+                if let Err(e) = instrument(&pool, "news", super::news::run(&pool)).await {
                     error!("[News] RSS scrape failed: {e}");
                 }
             })
@@ -116,10 +116,22 @@ async fn run_court_lists(pool: &PgPool, config: &Config) -> anyhow::Result<()> {
         state.save_to_db(pool).await.ok();
     }
 
-    if let Err(e) = court_lists::run(pool, &mut state, &client, &config.pdf_dir).await {
+    if let Err(e) = instrument(
+        pool,
+        "sc_court_lists",
+        court_lists::run(pool, &mut state, &client, &config.pdf_dir),
+    )
+    .await
+    {
         error!("Court-lists refresh (SC) error: {e}");
     }
-    if let Err(e) = appeal_court_lists::run(pool, &mut state, &client, &config.pdf_dir).await {
+    if let Err(e) = instrument(
+        pool,
+        "coa_court_lists",
+        appeal_court_lists::run(pool, &mut state, &client, &config.pdf_dir),
+    )
+    .await
+    {
         error!("Court-lists refresh (CoA) error: {e}");
     }
 
@@ -493,7 +505,9 @@ pub async fn run_all(pool: &PgPool, config: &Config) -> anyhow::Result<()> {
         "-- Starting Supreme Court judgment scraper (page {})",
         state.next_judgment_page
     );
-    if let Err(e) = judgments::run(pool, &mut state, cutoff, &client).await {
+    if let Err(e) =
+        instrument(pool, "sc_judgments", judgments::run(pool, &mut state, cutoff, &client)).await
+    {
         error!("SC judgment scraper error: {e}");
     }
     state.save_to_db(pool).await.ok();
@@ -516,7 +530,13 @@ pub async fn run_all(pool: &PgPool, config: &Config) -> anyhow::Result<()> {
     }
 
     info!("-- Starting Supreme Court court-lists scraper");
-    if let Err(e) = court_lists::run(pool, &mut state, &client, &config.pdf_dir).await {
+    if let Err(e) = instrument(
+        pool,
+        "sc_court_lists",
+        court_lists::run(pool, &mut state, &client, &config.pdf_dir),
+    )
+    .await
+    {
         error!("SC court-lists scraper error: {e}");
     }
     state.save_to_db(pool).await.ok();
@@ -542,7 +562,12 @@ pub async fn run_all(pool: &PgPool, config: &Config) -> anyhow::Result<()> {
         "-- Starting Court of Appeal judgment scraper (civil pg {}, criminal pg {})",
         state.next_appeal_page, state.next_appeal_criminal_page
     );
-    let (coa_civil, coa_criminal) = match appeal_court::run(pool, &mut state, cutoff, &client).await
+    let (coa_civil, coa_criminal) = match instrument(
+        pool,
+        "coa_judgments",
+        appeal_court::run(pool, &mut state, cutoff, &client),
+    )
+    .await
     {
         Ok(counts) => counts,
         Err(e) => {
@@ -570,14 +595,19 @@ pub async fn run_all(pool: &PgPool, config: &Config) -> anyhow::Result<()> {
 
     // 7. Court of Appeal court lists (PDFs)
     info!("-- Starting Court of Appeal court-lists scraper");
-    let coa_hearings =
-        match appeal_court_lists::run(pool, &mut state, &client, &config.pdf_dir).await {
-            Ok(n) => n,
-            Err(e) => {
-                error!("[CoA] Court-lists scraper error: {e}");
-                0
-            }
-        };
+    let coa_hearings = match instrument(
+        pool,
+        "coa_court_lists",
+        appeal_court_lists::run(pool, &mut state, &client, &config.pdf_dir),
+    )
+    .await
+    {
+        Ok(n) => n,
+        Err(e) => {
+            error!("[CoA] Court-lists scraper error: {e}");
+            0
+        }
+    };
     state.save_to_db(pool).await.ok();
 
     info!(
@@ -603,8 +633,12 @@ pub async fn run_all(pool: &PgPool, config: &Config) -> anyhow::Result<()> {
 
     // 9. Parish Court case scraper (replaces defunct parish judges scraper)
     info!("-- Starting Parish Court case scraper");
-    if let Err(e) =
-        parish_court_judges::run(pool, &mut state, cutoff, &client, &config.pdf_dir).await
+    if let Err(e) = instrument(
+        pool,
+        "parish_cases",
+        parish_court_judges::run(pool, &mut state, cutoff, &client, &config.pdf_dir),
+    )
+    .await
     {
         error!("[Parish] Case scraper error: {e}");
     }
@@ -615,7 +649,13 @@ pub async fn run_all(pool: &PgPool, config: &Config) -> anyhow::Result<()> {
         "-- Starting Parish Court judgment scraper (page {})",
         state.next_parish_page
     );
-    if let Err(e) = parish_court::run(pool, &mut state, cutoff, &client).await {
+    if let Err(e) = instrument(
+        pool,
+        "parish_judgments",
+        parish_court::run(pool, &mut state, cutoff, &client),
+    )
+    .await
+    {
         error!("[Parish] Judgment scraper error: {e}");
     }
     state.save_to_db(pool).await.ok();
@@ -640,8 +680,114 @@ pub async fn run_all(pool: &PgPool, config: &Config) -> anyhow::Result<()> {
         });
     }
 
+    // Alert the admin if any source has gone silent past its threshold.
+    check_and_send_health_alerts(pool, &client, config).await;
+
     info!("=== Scheduled scrape complete ===");
     Ok(())
+}
+
+// ── Scraper telemetry ─────────────────────────────────────────────────────────
+
+/// Wrap one scraper step: counts the source's rows before and after, then
+/// records a scraper_runs row (source, duration, rows added, success/error)
+/// for the /admin/health dashboard.  Passes the inner result through
+/// unchanged so call sites keep their existing error handling.
+async fn instrument<T, Fut>(pool: &PgPool, source: &str, fut: Fut) -> anyhow::Result<T>
+where
+    Fut: std::future::Future<Output = anyhow::Result<T>>,
+{
+    let started = Utc::now().naive_utc();
+    let before = queries::source_row_count(pool, source).await;
+    let result = fut.await;
+    let after = queries::source_row_count(pool, source).await;
+    let (success, error) = match &result {
+        Ok(_) => (true, None),
+        Err(e) => (false, Some(e.to_string())),
+    };
+    queries::record_scraper_run(
+        pool,
+        source,
+        started,
+        (after - before).max(0),
+        success,
+        error.as_deref(),
+    )
+    .await;
+    result
+}
+
+/// Emails the ADMIN_EMAIL when any scraper source has produced no new rows
+/// for longer than its staleness threshold — the silent-breakage detector for
+/// court websites changing their markup.  Throttled to one email per 72 h.
+async fn check_and_send_health_alerts(
+    pool: &PgPool,
+    client: &reqwest::Client,
+    config: &Config,
+) {
+    let Some(ref api_key) = config.resend_api_key else { return };
+    let Ok(admin_email) = std::env::var("ADMIN_EMAIL") else { return };
+
+    let stale: Vec<_> = queries::scraper_health(pool)
+        .await
+        .into_iter()
+        .filter(|s| s.stale)
+        .collect();
+    if stale.is_empty() {
+        return;
+    }
+
+    if let Ok(Some(last)) = queries::get_system_config(pool, "health_alert_last_sent").await {
+        if let Ok(t) = chrono::NaiveDateTime::parse_from_str(&last, "%Y-%m-%dT%H:%M:%S") {
+            if (Utc::now().naive_utc() - t).num_hours() < 72 {
+                return;
+            }
+        }
+    }
+
+    let rows: String = stale
+        .iter()
+        .map(|s| {
+            format!(
+                r#"<tr><td style="padding:4px 12px 4px 0;font-weight:600">{}</td><td style="padding:4px 12px 4px 0">{}</td><td style="padding:4px 0;color:#6b7280">threshold: {} days</td></tr>"#,
+                s.source,
+                s.last_data_at
+                    .map(|t| t.format("%Y-%m-%d %H:%M").to_string())
+                    .unwrap_or_else(|| "never".into()),
+                s.stale_after_days,
+            )
+        })
+        .collect();
+    let html = format!(
+        r#"<p>The following scraper source(s) have not produced new rows past their staleness threshold. The court website's markup may have changed, or the source may be unavailable.</p>
+<table style="border-collapse:collapse;margin:16px 0">
+<tr><th style="text-align:left;padding:4px 12px 4px 0;color:#6b7280;font-size:12px">Source</th><th style="text-align:left;padding:4px 12px 4px 0;color:#6b7280;font-size:12px">Last new data</th><th></th></tr>
+{rows}
+</table>
+<p>See the Health page in the admin dashboard for details.</p>"#
+    );
+
+    match crate::notifications::email::send_email(
+        client,
+        api_key,
+        crate::notifications::email::EmailSender::Alerts,
+        &admin_email,
+        "CourtWatch JA: scraper source(s) look stale",
+        &html,
+    )
+    .await
+    {
+        Ok(_) => {
+            info!("[Health] Stale-source alert sent for {} source(s)", stale.len());
+            let _ = queries::set_system_config(
+                pool,
+                "health_alert_last_sent",
+                &Utc::now().naive_utc().format("%Y-%m-%dT%H:%M:%S").to_string(),
+            )
+            .await;
+        }
+        Err(e) => warn!("[Health] Failed to send stale-source alert: {e}"),
+    }
 }
 
 // ── Notification email dispatch ───────────────────────────────────────────────

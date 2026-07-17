@@ -182,17 +182,61 @@ pub async fn admin_list_judgments(
     pool: &PgPool,
     page: i64,
     limit: i64,
+    search: Option<&str>,
+    court: Option<&str>,
+    date_from: Option<chrono::NaiveDate>,
+    date_to: Option<chrono::NaiveDate>,
+    oldest_first: bool,
 ) -> sqlx::Result<(Vec<Judgment>, i64)> {
     let offset = (page - 1).max(0) * limit;
-    let sql = format!("SELECT {J} FROM judgments ORDER BY created_at DESC LIMIT $1 OFFSET $2");
+    let pattern = search
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| format!("%{s}%"));
+
+    // Sort direction is a bool, never user text, so the format! is safe.
+    let direction = if oldest_first { "ASC" } else { "DESC" };
+    let filter = "($3::TEXT IS NULL
+             OR case_number ILIKE $3
+             OR title      ILIKE $3
+             OR judge_name ILIKE $3)
+          AND ($4::TEXT IS NULL OR court = $4)
+          AND ($5::DATE IS NULL OR date >= $5)
+          AND ($6::DATE IS NULL OR date <= $6)";
+
+    let sql = format!(
+        "SELECT {J} FROM judgments
+         WHERE {filter}
+         ORDER BY date {direction} NULLS LAST, created_at {direction}
+         LIMIT $1 OFFSET $2"
+    );
     let rows = sqlx::query_as::<_, Judgment>(&sql)
         .bind(limit)
         .bind(offset)
+        .bind(&pattern)
+        .bind(court)
+        .bind(date_from)
+        .bind(date_to)
         .fetch_all(pool)
         .await?;
-    let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM judgments")
-        .fetch_one(pool)
-        .await?;
+
+    let total: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM judgments
+         WHERE ($1::TEXT IS NULL
+                OR case_number ILIKE $1
+                OR title      ILIKE $1
+                OR judge_name ILIKE $1)
+           AND ($2::TEXT IS NULL OR court = $2)
+           AND ($3::DATE IS NULL OR date >= $3)
+           AND ($4::DATE IS NULL OR date <= $4)",
+    )
+    .bind(&pattern)
+    .bind(court)
+    .bind(date_from)
+    .bind(date_to)
+    .fetch_one(pool)
+    .await?;
+
     Ok((rows, total))
 }
 
@@ -241,20 +285,61 @@ pub async fn admin_list_sittings(
     pool: &PgPool,
     page: i64,
     limit: i64,
+    search: Option<&str>,
+    division: Option<&str>,
+    date_from: Option<chrono::NaiveDate>,
+    date_to: Option<chrono::NaiveDate>,
+    oldest_first: bool,
 ) -> sqlx::Result<(Vec<CourtSitting>, i64)> {
     let offset = (page - 1).max(0) * limit;
+    let pattern = search
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| format!("%{s}%"));
+
+    // Sort direction is a bool, never user text, so the format! is safe.
+    let direction = if oldest_first { "ASC" } else { "DESC" };
     let sql = format!(
-        "SELECT {S} FROM court_sittings ORDER BY event_date DESC NULLS LAST, created_at DESC
+        "SELECT {S} FROM court_sittings
+         WHERE ($3::TEXT IS NULL
+                OR case_number ILIKE $3
+                OR title      ILIKE $3
+                OR judge_name ILIKE $3
+                OR lawyers    ILIKE $3)
+           AND ($4::TEXT IS NULL OR court_division = $4)
+           AND ($5::DATE IS NULL OR event_date >= $5)
+           AND ($6::DATE IS NULL OR event_date <= $6)
+         ORDER BY event_date {direction} NULLS LAST, created_at {direction}
          LIMIT $1 OFFSET $2"
     );
     let rows = sqlx::query_as::<_, CourtSitting>(&sql)
         .bind(limit)
         .bind(offset)
+        .bind(&pattern)
+        .bind(division)
+        .bind(date_from)
+        .bind(date_to)
         .fetch_all(pool)
         .await?;
-    let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM court_sittings")
-        .fetch_one(pool)
-        .await?;
+
+    let total: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM court_sittings
+         WHERE ($1::TEXT IS NULL
+                OR case_number ILIKE $1
+                OR title      ILIKE $1
+                OR judge_name ILIKE $1
+                OR lawyers    ILIKE $1)
+           AND ($2::TEXT IS NULL OR court_division = $2)
+           AND ($3::DATE IS NULL OR event_date >= $3)
+           AND ($4::DATE IS NULL OR event_date <= $4)",
+    )
+    .bind(&pattern)
+    .bind(division)
+    .bind(date_from)
+    .bind(date_to)
+    .fetch_one(pool)
+    .await?;
+
     Ok((rows, total))
 }
 
@@ -3138,45 +3223,253 @@ pub async fn admin_emails_per_day(pool: &PgPool) -> sqlx::Result<Vec<DailyCount>
 
 // ── Admin: Users (filtered + paginated) ────────────────────────────────────
 
+/// Sort orders accepted by the admin user list.  Mapped from the query-string
+/// `sort` param; anything unrecognised falls back to newest-first.
+pub enum UserSort {
+    NewestFirst,
+    OldestFirst,
+    MostCases,
+    EmailAz,
+}
+
+impl UserSort {
+    pub fn from_param(s: Option<&str>) -> Self {
+        match s {
+            Some("oldest") => Self::OldestFirst,
+            Some("cases") => Self::MostCases,
+            Some("email") => Self::EmailAz,
+            _ => Self::NewestFirst,
+        }
+    }
+
+    fn order_clause(&self) -> &'static str {
+        match self {
+            Self::NewestFirst => "u.created_at DESC",
+            Self::OldestFirst => "u.created_at ASC",
+            Self::MostCases => "case_count DESC, u.created_at DESC",
+            Self::EmailAz => "u.email ASC",
+        }
+    }
+}
+
 pub async fn admin_list_users_filtered(
     pool: &PgPool,
     q: Option<&str>,
     role: Option<&str>,
+    verified: Option<bool>,
+    sort: UserSort,
     page: i64,
     limit: i64,
 ) -> sqlx::Result<(Vec<AdminUserRow>, i64)> {
     let offset = (page - 1) * limit;
-    let search = q.map(|s| format!("%{}%", s.to_lowercase()));
+    let search = q
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| format!("%{}%", s.to_lowercase()));
 
-    let rows = sqlx::query_as::<_, AdminUserRow>(
+    // order_clause() returns a fixed &'static str, never user input.
+    let sql = format!(
         "SELECT u.id, u.email, u.display_name, u.role, u.created_at, u.email_verified,
                 COUNT(uc.id) AS case_count
          FROM users u
          LEFT JOIN user_cases uc ON uc.user_id = u.id
          WHERE ($1::TEXT IS NULL OR LOWER(u.email) LIKE $1 OR LOWER(COALESCE(u.display_name,'')) LIKE $1)
            AND ($2::TEXT IS NULL OR u.role = $2)
+           AND ($3::BOOLEAN IS NULL OR u.email_verified = $3)
          GROUP BY u.id
-         ORDER BY u.created_at DESC
-         LIMIT $3 OFFSET $4",
-    )
-    .bind(&search)
-    .bind(role)
-    .bind(limit)
-    .bind(offset)
-    .fetch_all(pool)
-    .await?;
+         ORDER BY {}
+         LIMIT $4 OFFSET $5",
+        sort.order_clause()
+    );
+    let rows = sqlx::query_as::<_, AdminUserRow>(&sql)
+        .bind(&search)
+        .bind(role)
+        .bind(verified)
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(pool)
+        .await?;
 
     let total: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM users u
          WHERE ($1::TEXT IS NULL OR LOWER(u.email) LIKE $1 OR LOWER(COALESCE(u.display_name,'')) LIKE $1)
-           AND ($2::TEXT IS NULL OR u.role = $2)",
+           AND ($2::TEXT IS NULL OR u.role = $2)
+           AND ($3::BOOLEAN IS NULL OR u.email_verified = $3)",
     )
     .bind(&search)
     .bind(role)
+    .bind(verified)
     .fetch_one(pool)
     .await?;
 
     Ok((rows, total))
+}
+
+// ── Scraper health telemetry ───────────────────────────────────────────────
+
+/// Every scraper source we track, with the SQL that counts its rows, the SQL
+/// for its most recent row-insertion time, and how many days of silence count
+/// as "stale" (used by both the health endpoint and the alert email).
+pub const SCRAPER_SOURCES: &[(&str, &str, i64)] = &[
+    ("sc_judgments", "judgments WHERE court = 'Supreme Court'", 14),
+    ("coa_judgments", "judgments WHERE court = 'Court of Appeal'", 21),
+    ("parish_judgments", "judgments WHERE court = 'Parish Court'", 60),
+    (
+        "sc_court_lists",
+        "court_sittings WHERE court_division NOT IN ('Court of Appeal', 'Parish Court')",
+        7,
+    ),
+    (
+        "coa_court_lists",
+        "court_sittings WHERE court_division = 'Court of Appeal'",
+        14,
+    ),
+    ("parish_cases", "parish_court_cases", 60),
+    ("news", "legal_news", 3),
+];
+
+pub async fn record_scraper_run(
+    pool: &PgPool,
+    source: &str,
+    started_at: chrono::NaiveDateTime,
+    rows_added: i64,
+    success: bool,
+    error: Option<&str>,
+) {
+    if let Err(e) = sqlx::query(
+        "INSERT INTO scraper_runs (source, started_at, finished_at, rows_added, success, error)
+         VALUES ($1, $2, NOW(), $3, $4, $5)",
+    )
+    .bind(source)
+    .bind(started_at)
+    .bind(rows_added)
+    .bind(success)
+    .bind(error)
+    .execute(pool)
+    .await
+    {
+        tracing::warn!("[Health] failed to record scraper run for {source}: {e}");
+    }
+}
+
+/// Row count for a source's table+filter.  The FROM/WHERE fragment comes from
+/// the SCRAPER_SOURCES constant, never from user input.
+pub async fn source_row_count(pool: &PgPool, source: &str) -> i64 {
+    let Some((_, fragment, _)) = SCRAPER_SOURCES.iter().find(|(s, _, _)| *s == source) else {
+        return 0;
+    };
+    sqlx::query_scalar(&format!("SELECT COUNT(*) FROM {fragment}"))
+        .fetch_one(pool)
+        .await
+        .unwrap_or(0)
+}
+
+#[derive(serde::Serialize)]
+pub struct SourceHealth {
+    pub source: String,
+    pub total_rows: i64,
+    /// Most recent row insertion (created_at) for this source's data.
+    pub last_data_at: Option<chrono::NaiveDateTime>,
+    /// Days of silence before this source is flagged stale.
+    pub stale_after_days: i64,
+    pub stale: bool,
+    pub last_run_at: Option<chrono::NaiveDateTime>,
+    pub last_run_success: Option<bool>,
+    pub last_run_rows: Option<i64>,
+    pub last_run_error: Option<String>,
+    /// Consecutive most-recent successful runs that added 0 rows.
+    pub consecutive_zero_runs: i64,
+}
+
+pub async fn scraper_health(pool: &PgPool) -> Vec<SourceHealth> {
+    let mut out = Vec::with_capacity(SCRAPER_SOURCES.len());
+    for (source, fragment, stale_days) in SCRAPER_SOURCES {
+        let total_rows: i64 = sqlx::query_scalar(&format!("SELECT COUNT(*) FROM {fragment}"))
+            .fetch_one(pool)
+            .await
+            .unwrap_or(0);
+        let last_data_at: Option<chrono::NaiveDateTime> =
+            sqlx::query_scalar(&format!("SELECT MAX(created_at) FROM {fragment}"))
+                .fetch_one(pool)
+                .await
+                .unwrap_or(None);
+
+        let last_run: Option<(chrono::NaiveDateTime, bool, i64, Option<String>)> =
+            sqlx::query_as(
+                "SELECT started_at, success, rows_added, error
+                 FROM scraper_runs WHERE source = $1
+                 ORDER BY started_at DESC LIMIT 1",
+            )
+            .bind(source)
+            .fetch_optional(pool)
+            .await
+            .unwrap_or(None);
+
+        let zero_streak: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM (
+                 SELECT rows_added FROM scraper_runs
+                 WHERE source = $1 AND success
+                 ORDER BY started_at DESC LIMIT 10
+             ) recent
+             WHERE rows_added = 0",
+        )
+        .bind(source)
+        .fetch_one(pool)
+        .await
+        .unwrap_or(0);
+
+        let stale = last_data_at
+            .map(|t| (chrono::Utc::now().naive_utc() - t).num_days() >= *stale_days)
+            .unwrap_or(total_rows == 0);
+
+        out.push(SourceHealth {
+            source: source.to_string(),
+            total_rows,
+            last_data_at,
+            stale_after_days: *stale_days,
+            stale,
+            last_run_at: last_run.as_ref().map(|r| r.0),
+            last_run_success: last_run.as_ref().map(|r| r.1),
+            last_run_rows: last_run.as_ref().map(|r| r.2),
+            last_run_error: last_run.and_then(|r| r.3),
+            consecutive_zero_runs: zero_streak,
+        });
+    }
+    out
+}
+
+// ── Email delivery stats ───────────────────────────────────────────────────
+
+#[derive(serde::Serialize)]
+pub struct EmailStats {
+    /// Actually dispatched (claimed by the sender) today, Jamaica time.
+    pub sent_today: i64,
+    pub sent_7d: i64,
+    /// Awaiting dispatch on the next scraper run.
+    pub pending: i64,
+    /// Fell outside the 48-hour window and were retired unsent (last 7 days).
+    pub retired_7d: i64,
+}
+
+/// `emailed_at > sent_at` means the row was claimed by the dispatcher;
+/// `emailed_at = sent_at` means it was backfilled or retired without sending.
+pub async fn email_stats(pool: &PgPool) -> sqlx::Result<EmailStats> {
+    let (sent_today, sent_7d, pending, retired_7d): (i64, i64, i64, i64) = sqlx::query_as(
+        "SELECT
+             COUNT(*) FILTER (WHERE emailed_at > sent_at
+                 AND ((emailed_at AT TIME ZONE 'UTC') AT TIME ZONE 'America/Jamaica')::date
+                     = (NOW() AT TIME ZONE 'America/Jamaica')::date),
+             COUNT(*) FILTER (WHERE emailed_at > sent_at
+                 AND emailed_at > NOW() - INTERVAL '7 days'),
+             COUNT(*) FILTER (WHERE emailed_at IS NULL),
+             COUNT(*) FILTER (WHERE emailed_at = sent_at
+                 AND emailed_at > NOW() - INTERVAL '7 days'
+                 AND type IN ('case_available','case_listed','sitting_reminder_1d','sitting_reminder_morning'))
+         FROM notifications",
+    )
+    .fetch_one(pool)
+    .await?;
+    Ok(EmailStats { sent_today, sent_7d, pending, retired_7d })
 }
 
 pub async fn admin_get_user_detail(

@@ -1,10 +1,14 @@
 import {
   ActivityLogRow,
   AdminDashboardStats,
+  AdminEmailStats,
   AdminLog,
   AdminUser,
   AdminUserDetail,
   AdminUserRow,
+  DataQualityCheck,
+  NotifDebugResult,
+  ScraperSourceHealth,
   CaseLookupResult,
   CourtSitting,
   DocketDetail,
@@ -355,12 +359,16 @@ export const apiClient = {
   async adminListUsersFiltered(opts?: {
     q?: string;
     role?: string;
+    verified?: "verified" | "unverified";
+    sort?: "newest" | "oldest" | "cases" | "email";
     page?: number;
     limit?: number;
   }): Promise<{ users: AdminUserRow[]; total: number; page: number; limit: number }> {
     const params = new URLSearchParams();
     if (opts?.q) params.set("q", opts.q);
     if (opts?.role) params.set("role", opts.role);
+    if (opts?.verified) params.set("verified", opts.verified);
+    if (opts?.sort) params.set("sort", opts.sort);
     if (opts?.page) params.set("page", String(opts.page));
     if (opts?.limit) params.set("limit", String(opts.limit));
     return request(`/admin/users?${params}`);
@@ -436,15 +444,24 @@ export const apiClient = {
     });
   },
 
-  async adminListJudgments(
-    page = 1,
-    limit = 50,
-    search?: string,
-    court?: string,
-  ): Promise<{ judgments: Judgment[]; total: number }> {
-    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
-    if (search) params.set("search", search);
-    if (court) params.set("court", court);
+  async adminListJudgments(opts: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    court?: string;
+    date_from?: string;
+    date_to?: string;
+    sort?: "newest" | "oldest";
+  } = {}): Promise<{ judgments: Judgment[]; total: number }> {
+    const params = new URLSearchParams({
+      page: String(opts.page ?? 1),
+      limit: String(opts.limit ?? 50),
+    });
+    if (opts.search) params.set("search", opts.search);
+    if (opts.court) params.set("court", opts.court);
+    if (opts.date_from) params.set("date_from", opts.date_from);
+    if (opts.date_to) params.set("date_to", opts.date_to);
+    if (opts.sort) params.set("sort", opts.sort);
     return request(`/admin/data/judgments?${params}`);
   },
 
@@ -463,15 +480,24 @@ export const apiClient = {
   },
 
   // ── Admin: Data — Sittings ───────────────────────────────────────────────
-  async adminListSittings(
-    page = 1,
-    limit = 50,
-    search?: string,
-    division?: string,
-  ): Promise<{ sittings: CourtSitting[]; total: number }> {
-    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
-    if (search) params.set("search", search);
-    if (division) params.set("division", division);
+  async adminListSittings(opts: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    division?: string;
+    date_from?: string;
+    date_to?: string;
+    sort?: "newest" | "oldest";
+  } = {}): Promise<{ sittings: CourtSitting[]; total: number }> {
+    const params = new URLSearchParams({
+      page: String(opts.page ?? 1),
+      limit: String(opts.limit ?? 50),
+    });
+    if (opts.search) params.set("search", opts.search);
+    if (opts.division) params.set("division", opts.division);
+    if (opts.date_from) params.set("date_from", opts.date_from);
+    if (opts.date_to) params.set("date_to", opts.date_to);
+    if (opts.sort) params.set("sort", opts.sort);
     return request(`/admin/data/sittings?${params}`);
   },
 
@@ -487,6 +513,43 @@ export const apiClient = {
 
   async adminDeleteSitting(id: number): Promise<{ deleted: boolean }> {
     return request(`/admin/data/sittings/${id}`, { method: "DELETE" });
+  },
+
+  async adminBulkDeleteJudgments(ids: number[]): Promise<{ deleted: number }> {
+    return request("/admin/data/judgments/bulk-delete", {
+      method: "POST",
+      body: JSON.stringify({ ids }),
+    });
+  },
+
+  async adminBulkDeleteSittings(ids: number[]): Promise<{ deleted: number }> {
+    return request("/admin/data/sittings/bulk-delete", {
+      method: "POST",
+      body: JSON.stringify({ ids }),
+    });
+  },
+
+  // ── Admin: Health / observability ────────────────────────────────────────
+
+  async adminScraperHealth(): Promise<{ sources: ScraperSourceHealth[] }> {
+    return request("/admin/scraper/health");
+  },
+
+  async adminEmailStats(): Promise<{ stats: AdminEmailStats }> {
+    return request("/admin/email-stats");
+  },
+
+  async adminDataQuality(): Promise<{ checks: DataQualityCheck[] }> {
+    return request("/admin/data-quality");
+  },
+
+  async adminDebugNotifications(
+    email: string,
+    caseNumber?: string,
+  ): Promise<NotifDebugResult> {
+    const params = new URLSearchParams({ email });
+    if (caseNumber) params.set("case_number", caseNumber);
+    return request(`/admin/debug/notifications?${params}`);
   },
 
   // ── Admin: Logs ──────────────────────────────────────────────────────────

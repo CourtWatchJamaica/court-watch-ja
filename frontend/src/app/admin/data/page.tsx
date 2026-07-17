@@ -3,8 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiClient } from "@/lib/api";
 import { CourtSitting, Judgment } from "@/lib/types";
+import { downloadCsv } from "@/lib/csv";
 import {
+  ArrowDownWideNarrow,
+  ArrowUpNarrowWide,
   Database,
+  Download,
   Pencil,
   Trash2,
   Check,
@@ -17,16 +21,31 @@ import {
 } from "lucide-react";
 import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 
+/** Debounce a fast-changing value (e.g. search keystrokes) by `ms`. */
+function useDebounced<T>(value: T, ms: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), ms);
+    return () => clearTimeout(t);
+  }, [value, ms]);
+  return debounced;
+}
+
+type SortOrder = "newest" | "oldest";
+
 type Tab = "judgments" | "sittings";
 const PAGE_SIZE = 50;
 const COURTS = ["Supreme Court", "Court of Appeal", "Parish Court"];
+// Must match court_sittings.court_division values in the database exactly —
+// the admin filter is an exact match, and the Add form writes these verbatim.
 const DIVISIONS = [
-  "Commercial Division",
-  "Civil Division",
+  "Civil",
+  "Criminal",
+  "Gun Court",
+  "Commercial",
+  "Probate and Family",
   "Court of Appeal",
   "Parish Court",
-  "Family Division",
-  "Revenue Court",
 ];
 
 // ── Field ────────────────────────────────────────────────────────────────
@@ -189,7 +208,7 @@ function AddSittingModal({
     case_number: "",
     title: "",
     judge_name: "",
-    court_division: "Civil Division",
+    court_division: "Civil",
     event_type: "",
     event_date: "",
     event_time: "",
@@ -359,53 +378,234 @@ function Pagination({
   );
 }
 
+// ── Filter bar (shared by both tabs) ───────────────────────────────────────
+
+function FilterBar({
+  searchInput,
+  onSearchInput,
+  searchPlaceholder,
+  selectValue,
+  onSelectValue,
+  selectPlaceholder,
+  selectOptions,
+  dateFrom,
+  onDateFrom,
+  dateTo,
+  onDateTo,
+  sort,
+  onToggleSort,
+}: {
+  searchInput: string;
+  onSearchInput: (v: string) => void;
+  searchPlaceholder: string;
+  selectValue: string;
+  onSelectValue: (v: string) => void;
+  selectPlaceholder: string;
+  selectOptions: string[];
+  dateFrom: string;
+  onDateFrom: (v: string) => void;
+  dateTo: string;
+  onDateTo: (v: string) => void;
+  sort: SortOrder;
+  onToggleSort: () => void;
+}) {
+  const hasFilters = searchInput || selectValue || dateFrom || dateTo;
+  const dateCls =
+    "h-[44px] rounded-xl border border-white/[0.08] bg-[#0d0d1a] px-3 text-sm text-white/70 focus:outline-none focus:border-[#009B3A]/50 transition-colors [color-scheme:dark]";
+  return (
+    <div className="mb-3 flex flex-wrap items-center gap-2">
+      <div className="relative flex-1 min-w-[200px]">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/55 pointer-events-none" />
+        <input
+          value={searchInput}
+          onChange={(e) => onSearchInput(e.target.value)}
+          placeholder={searchPlaceholder}
+          className="h-[44px] w-full rounded-xl border border-white/[0.08] bg-[#0d0d1a] pl-9 pr-8 text-sm text-white placeholder-white/20 focus:outline-none focus:border-[#009B3A]/50 transition-colors"
+        />
+        {searchInput && (
+          <button
+            onClick={() => onSearchInput("")}
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-white/50 hover:text-white transition-colors"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+      <select
+        value={selectValue}
+        onChange={(e) => onSelectValue(e.target.value)}
+        className="h-[44px] rounded-xl border border-white/[0.08] bg-[#0d0d1a] px-3 text-sm text-white/60 focus:outline-none focus:border-[#009B3A]/50 transition-colors"
+      >
+        <option value="">{selectPlaceholder}</option>
+        {selectOptions.map((c) => (
+          <option key={c} value={c}>
+            {c}
+          </option>
+        ))}
+      </select>
+      <div className="flex items-center gap-1.5">
+        <input
+          type="date"
+          value={dateFrom}
+          onChange={(e) => onDateFrom(e.target.value)}
+          title="From date"
+          className={dateCls}
+        />
+        <span className="text-white/40 text-xs">→</span>
+        <input
+          type="date"
+          value={dateTo}
+          onChange={(e) => onDateTo(e.target.value)}
+          title="To date"
+          className={dateCls}
+        />
+      </div>
+      <button
+        onClick={onToggleSort}
+        title="Toggle sort order"
+        className="h-[44px] flex items-center gap-1.5 rounded-xl border border-white/[0.08] bg-[#0d0d1a] px-3 text-xs font-medium text-white/70 hover:text-white hover:border-white/20 transition-colors"
+      >
+        {sort === "newest" ? (
+          <ArrowDownWideNarrow className="h-3.5 w-3.5" />
+        ) : (
+          <ArrowUpNarrowWide className="h-3.5 w-3.5" />
+        )}
+        {sort === "newest" ? "Newest first" : "Oldest first"}
+      </button>
+      {hasFilters && (
+        <button
+          onClick={() => {
+            onSearchInput("");
+            onSelectValue("");
+            onDateFrom("");
+            onDateTo("");
+          }}
+          className="h-[44px] rounded-xl px-3 text-xs text-white/50 hover:text-white transition-colors"
+        >
+          Clear
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ── Judgments tab ──────────────────────────────────────────────────────────
 
 function JudgmentsTab() {
   const [judgments, setJudgments] = useState<Judgment[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const search = useDebounced(searchInput, 350);
   const [courtFilter, setCourtFilter] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [sort, setSort] = useState<SortOrder>("newest");
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<{ id: number; label: string } | null>(null);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [confirmBulk, setConfirmBulk] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
-  const load = useCallback(
-    async (p: number, q: string, court: string) => {
-      setLoading(true);
-      try {
-        const { judgments: rows, total: t } = await apiClient.adminListJudgments(
-          p,
-          PAGE_SIZE,
-          q || undefined,
-          court || undefined,
-        );
-        setJudgments(rows);
-        setTotal(t);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Load failed");
-      } finally {
-        setLoading(false);
-      }
-    },
-    [],
+  // Any filter change lands back on page 1.
+  useEffect(() => {
+    setPage(1);
+  }, [search, courtFilter, dateFrom, dateTo, sort]);
+
+  const filterOpts = useCallback(
+    () => ({
+      search: search || undefined,
+      court: courtFilter || undefined,
+      date_from: dateFrom || undefined,
+      date_to: dateTo || undefined,
+      sort,
+    }),
+    [search, courtFilter, dateFrom, dateTo, sort],
   );
 
-  useEffect(() => {
-    load(page, search, courtFilter);
-  }, [load, page, search, courtFilter]);
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { judgments: rows, total: t } = await apiClient.adminListJudgments({
+        page,
+        limit: PAGE_SIZE,
+        ...filterOpts(),
+      });
+      setJudgments(rows);
+      setTotal(t);
+      setSelected(new Set());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Load failed");
+    } finally {
+      setLoading(false);
+    }
+  }, [page, filterOpts]);
 
-  const handleSearchChange = (v: string) => {
-    setSearch(v);
-    setPage(1);
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const toggleSelect = (id: number) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const toggleSelectAll = () =>
+    setSelected((prev) =>
+      prev.size === judgments.length ? new Set() : new Set(judgments.map((j) => j.id)),
+    );
+
+  const handleBulkDelete = async () => {
+    setConfirmBulk(false);
+    setBulkBusy(true);
+    try {
+      await apiClient.adminBulkDeleteJudgments([...selected]);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Bulk delete failed");
+    } finally {
+      setBulkBusy(false);
+    }
   };
 
-  const handleCourtChange = (v: string) => {
-    setCourtFilter(v);
-    setPage(1);
+  const handleExportCsv = async () => {
+    setExporting(true);
+    try {
+      // Pull the full filtered set (capped at 2000 rows) across pages.
+      const all: Judgment[] = [];
+      for (let p = 1; p <= 10 && all.length < 2000; p++) {
+        const { judgments: rows, total: t } = await apiClient.adminListJudgments({
+          page: p,
+          limit: 200,
+          ...filterOpts(),
+        });
+        all.push(...rows);
+        if (all.length >= t) break;
+      }
+      downloadCsv(
+        `judgments-${new Date().toISOString().slice(0, 10)}.csv`,
+        [
+          ["ID", "id"],
+          ["Case Number", "case_number"],
+          ["Title", "title"],
+          ["Judge", "judge_name"],
+          ["Court", "court"],
+          ["Date", "date"],
+        ],
+        all as unknown as Record<string, unknown>[],
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Export failed");
+    } finally {
+      setExporting(false);
+    }
   };
 
   const handleUpdate = async (id: number, field: string, value: string) => {
@@ -447,34 +647,54 @@ function JudgmentsTab() {
         onConfirm={() => handleDelete(confirmDelete!.id)}
         resourceName={confirmDelete?.label ?? ""}
       />
+      <DeleteConfirmModal
+        isOpen={confirmBulk}
+        onClose={() => setConfirmBulk(false)}
+        onConfirm={handleBulkDelete}
+        resourceName={`${selected.size} selected judgment${selected.size === 1 ? "" : "s"}`}
+      />
       {error && (
         <div className="mb-3 rounded-xl bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-400">{error}</div>
       )}
 
-      {/* Search / filter bar */}
-      <div className="mb-3 flex flex-wrap gap-2">
-        <div className="relative flex-1 min-w-[180px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/55 pointer-events-none" />
-          <input
-            value={search}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            placeholder="Search case no. or title…"
-            className="h-[44px] w-full rounded-xl border border-white/[0.08] bg-[#0d0d1a] pl-9 pr-3 text-sm text-white placeholder-white/20 focus:outline-none focus:border-[#009B3A]/50 transition-colors"
-          />
-        </div>
-        <select
-          value={courtFilter}
-          onChange={(e) => handleCourtChange(e.target.value)}
-          className="h-[44px] rounded-xl border border-white/[0.08] bg-[#0d0d1a] px-3 text-sm text-white/60 focus:outline-none focus:border-[#009B3A]/50 transition-colors"
-        >
-          <option value="">All courts</option>
-          {COURTS.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
-      </div>
+      <FilterBar
+        searchInput={searchInput}
+        onSearchInput={setSearchInput}
+        searchPlaceholder="Search case no., title, or judge…"
+        selectValue={courtFilter}
+        onSelectValue={setCourtFilter}
+        selectPlaceholder="All courts"
+        selectOptions={COURTS}
+        dateFrom={dateFrom}
+        onDateFrom={setDateFrom}
+        dateTo={dateTo}
+        onDateTo={setDateTo}
+        sort={sort}
+        onToggleSort={() => setSort((s) => (s === "newest" ? "oldest" : "newest"))}
+      />
 
       <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a] overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.05]">
+        <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-white/[0.05]">
           <span className="text-xs text-white/60">{total.toLocaleString()} total</span>
+          {selected.size > 0 && (
+            <button
+              onClick={() => setConfirmBulk(true)}
+              disabled={bulkBusy}
+              className="min-h-[44px] flex items-center gap-1.5 rounded-xl bg-red-500/10 border border-red-500/25 px-3 text-xs font-semibold text-red-400 hover:bg-red-500/20 disabled:opacity-50 transition-colors"
+            >
+              {bulkBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+              Delete selected ({selected.size})
+            </button>
+          )}
+          <div className="flex-1" />
+          <button
+            onClick={handleExportCsv}
+            disabled={exporting}
+            className="min-h-[44px] flex items-center gap-1.5 rounded-xl border border-white/[0.1] px-3 text-xs font-semibold text-white/70 hover:text-white hover:border-white/25 disabled:opacity-50 transition-colors"
+          >
+            {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+            Export CSV
+          </button>
           <button
             onClick={() => setShowAdd(true)}
             className="min-h-[44px] flex items-center gap-1.5 rounded-xl bg-[#009B3A]/15 border border-[#009B3A]/25 px-3 text-xs font-semibold text-[#009B3A] hover:bg-[#009B3A]/25 transition-colors"
@@ -487,6 +707,14 @@ function JudgmentsTab() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-white/[0.06]">
+                <th className="w-10 px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={judgments.length > 0 && selected.size === judgments.length}
+                    onChange={toggleSelectAll}
+                    className="accent-[#009B3A] cursor-pointer"
+                  />
+                </th>
                 {["ID", "Case No.", "Title", "Judge", "Court", "Date", ""].map((h, i) => (
                   <th key={i} className={`px-4 py-3 text-left text-[10px] font-bold uppercase tracking-[0.15em] text-white/60 ${i === 0 ? "w-12" : i === 6 ? "w-10" : ""}`}>
                     {h}
@@ -498,13 +726,21 @@ function JudgmentsTab() {
               {loading
                 ? Array.from({ length: 8 }).map((_, i) => (
                     <tr key={i} className="animate-pulse">
-                      {[1, 2, 3, 4, 5, 6, 7].map((c) => (
+                      {[0, 1, 2, 3, 4, 5, 6, 7].map((c) => (
                         <td key={c} className="px-4 py-3"><div className="h-3 rounded bg-white/[0.05]" /></td>
                       ))}
                     </tr>
                   ))
                 : judgments.map((j) => (
-                    <tr key={j.id} className="hover:bg-white/[0.02] transition-colors">
+                    <tr key={j.id} className={`transition-colors ${selected.has(j.id) ? "bg-[#009B3A]/[0.05]" : "hover:bg-white/[0.02]"}`}>
+                      <td className="px-4 py-2">
+                        <input
+                          type="checkbox"
+                          checked={selected.has(j.id)}
+                          onChange={() => toggleSelect(j.id)}
+                          className="accent-[#009B3A] cursor-pointer"
+                        />
+                      </td>
                       <td className="px-4 py-2 font-mono text-[10px] text-white/55">{j.id}</td>
                       <td className="px-4 py-2 font-mono text-[10px] text-white/50">{j.case_number}</td>
                       <td className="px-4 py-2"><EditCell value={j.title} onSave={(v) => handleUpdate(j.id, "title", v)} /></td>
@@ -547,41 +783,119 @@ function SittingsTab() {
   const [sittings, setSittings] = useState<CourtSitting[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const search = useDebounced(searchInput, 350);
   const [divisionFilter, setDivisionFilter] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [sort, setSort] = useState<SortOrder>("newest");
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<{ id: number; label: string } | null>(null);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [confirmBulk, setConfirmBulk] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
-  const load = useCallback(
-    async (p: number, q: string, division: string) => {
-      setLoading(true);
-      try {
-        const { sittings: rows, total: t } = await apiClient.adminListSittings(
-          p,
-          PAGE_SIZE,
-          q || undefined,
-          division || undefined,
-        );
-        setSittings(rows);
-        setTotal(t);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Load failed");
-      } finally {
-        setLoading(false);
-      }
-    },
-    [],
+  // Any filter change lands back on page 1.
+  useEffect(() => {
+    setPage(1);
+  }, [search, divisionFilter, dateFrom, dateTo, sort]);
+
+  const filterOpts = useCallback(
+    () => ({
+      search: search || undefined,
+      division: divisionFilter || undefined,
+      date_from: dateFrom || undefined,
+      date_to: dateTo || undefined,
+      sort,
+    }),
+    [search, divisionFilter, dateFrom, dateTo, sort],
   );
 
-  useEffect(() => {
-    load(page, search, divisionFilter);
-  }, [load, page, search, divisionFilter]);
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { sittings: rows, total: t } = await apiClient.adminListSittings({
+        page,
+        limit: PAGE_SIZE,
+        ...filterOpts(),
+      });
+      setSittings(rows);
+      setTotal(t);
+      setSelected(new Set());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Load failed");
+    } finally {
+      setLoading(false);
+    }
+  }, [page, filterOpts]);
 
-  const handleSearchChange = (v: string) => { setSearch(v); setPage(1); };
-  const handleDivisionChange = (v: string) => { setDivisionFilter(v); setPage(1); };
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const toggleSelect = (id: number) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const toggleSelectAll = () =>
+    setSelected((prev) =>
+      prev.size === sittings.length ? new Set() : new Set(sittings.map((s) => s.id)),
+    );
+
+  const handleBulkDelete = async () => {
+    setConfirmBulk(false);
+    setBulkBusy(true);
+    try {
+      await apiClient.adminBulkDeleteSittings([...selected]);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Bulk delete failed");
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const handleExportCsv = async () => {
+    setExporting(true);
+    try {
+      const all: CourtSitting[] = [];
+      for (let p = 1; p <= 10 && all.length < 2000; p++) {
+        const { sittings: rows, total: t } = await apiClient.adminListSittings({
+          page: p,
+          limit: 200,
+          ...filterOpts(),
+        });
+        all.push(...rows);
+        if (all.length >= t) break;
+      }
+      downloadCsv(
+        `sittings-${new Date().toISOString().slice(0, 10)}.csv`,
+        [
+          ["ID", "id"],
+          ["Case Number", "case_number"],
+          ["Title", "title"],
+          ["Judge", "judge_name"],
+          ["Division", "court_division"],
+          ["Event Type", "event_type"],
+          ["Date", "event_date"],
+          ["Time", "event_time"],
+        ],
+        all as unknown as Record<string, unknown>[],
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Export failed");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const handleUpdate = async (id: number, field: string, value: string) => {
     try {
@@ -622,34 +936,54 @@ function SittingsTab() {
         onConfirm={() => handleDelete(confirmDelete!.id)}
         resourceName={confirmDelete?.label ?? ""}
       />
+      <DeleteConfirmModal
+        isOpen={confirmBulk}
+        onClose={() => setConfirmBulk(false)}
+        onConfirm={handleBulkDelete}
+        resourceName={`${selected.size} selected sitting${selected.size === 1 ? "" : "s"}`}
+      />
       {error && (
         <div className="mb-3 rounded-xl bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-400">{error}</div>
       )}
 
-      {/* Search / filter bar */}
-      <div className="mb-3 flex flex-wrap gap-2">
-        <div className="relative flex-1 min-w-[180px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/55 pointer-events-none" />
-          <input
-            value={search}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            placeholder="Search case no. or title…"
-            className="h-[44px] w-full rounded-xl border border-white/[0.08] bg-[#0d0d1a] pl-9 pr-3 text-sm text-white placeholder-white/20 focus:outline-none focus:border-[#009B3A]/50 transition-colors"
-          />
-        </div>
-        <select
-          value={divisionFilter}
-          onChange={(e) => handleDivisionChange(e.target.value)}
-          className="h-[44px] rounded-xl border border-white/[0.08] bg-[#0d0d1a] px-3 text-sm text-white/60 focus:outline-none focus:border-[#009B3A]/50 transition-colors"
-        >
-          <option value="">All divisions</option>
-          {DIVISIONS.map((d) => <option key={d} value={d}>{d}</option>)}
-        </select>
-      </div>
+      <FilterBar
+        searchInput={searchInput}
+        onSearchInput={setSearchInput}
+        searchPlaceholder="Search case no., title, judge, or lawyers…"
+        selectValue={divisionFilter}
+        onSelectValue={setDivisionFilter}
+        selectPlaceholder="All divisions"
+        selectOptions={DIVISIONS}
+        dateFrom={dateFrom}
+        onDateFrom={setDateFrom}
+        dateTo={dateTo}
+        onDateTo={setDateTo}
+        sort={sort}
+        onToggleSort={() => setSort((s) => (s === "newest" ? "oldest" : "newest"))}
+      />
 
       <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a] overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.05]">
+        <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-white/[0.05]">
           <span className="text-xs text-white/60">{total.toLocaleString()} total</span>
+          {selected.size > 0 && (
+            <button
+              onClick={() => setConfirmBulk(true)}
+              disabled={bulkBusy}
+              className="min-h-[44px] flex items-center gap-1.5 rounded-xl bg-red-500/10 border border-red-500/25 px-3 text-xs font-semibold text-red-400 hover:bg-red-500/20 disabled:opacity-50 transition-colors"
+            >
+              {bulkBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+              Delete selected ({selected.size})
+            </button>
+          )}
+          <div className="flex-1" />
+          <button
+            onClick={handleExportCsv}
+            disabled={exporting}
+            className="min-h-[44px] flex items-center gap-1.5 rounded-xl border border-white/[0.1] px-3 text-xs font-semibold text-white/70 hover:text-white hover:border-white/25 disabled:opacity-50 transition-colors"
+          >
+            {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+            Export CSV
+          </button>
           <button
             onClick={() => setShowAdd(true)}
             className="min-h-[44px] flex items-center gap-1.5 rounded-xl bg-[#009B3A]/15 border border-[#009B3A]/25 px-3 text-xs font-semibold text-[#009B3A] hover:bg-[#009B3A]/25 transition-colors"
@@ -662,6 +996,14 @@ function SittingsTab() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-white/[0.06]">
+                <th className="w-10 px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={sittings.length > 0 && selected.size === sittings.length}
+                    onChange={toggleSelectAll}
+                    className="accent-[#009B3A] cursor-pointer"
+                  />
+                </th>
                 {["ID", "Title", "Judge", "Division", "Date", "Time", ""].map((h, i) => (
                   <th key={i} className={`px-4 py-3 text-left text-[10px] font-bold uppercase tracking-[0.15em] text-white/60 ${i === 0 ? "w-12" : i === 6 ? "w-10" : ""}`}>
                     {h}
@@ -673,13 +1015,21 @@ function SittingsTab() {
               {loading
                 ? Array.from({ length: 8 }).map((_, i) => (
                     <tr key={i} className="animate-pulse">
-                      {[1, 2, 3, 4, 5, 6, 7].map((c) => (
+                      {[0, 1, 2, 3, 4, 5, 6, 7].map((c) => (
                         <td key={c} className="px-4 py-3"><div className="h-3 rounded bg-white/[0.05]" /></td>
                       ))}
                     </tr>
                   ))
                 : sittings.map((s) => (
-                    <tr key={s.id} className="hover:bg-white/[0.02] transition-colors">
+                    <tr key={s.id} className={`transition-colors ${selected.has(s.id) ? "bg-[#009B3A]/[0.05]" : "hover:bg-white/[0.02]"}`}>
+                      <td className="px-4 py-2">
+                        <input
+                          type="checkbox"
+                          checked={selected.has(s.id)}
+                          onChange={() => toggleSelect(s.id)}
+                          className="accent-[#009B3A] cursor-pointer"
+                        />
+                      </td>
                       <td className="px-4 py-2 font-mono text-[10px] text-white/55">{s.id}</td>
                       <td className="px-4 py-2"><EditCell value={s.title} onSave={(v) => handleUpdate(s.id, "title", v)} /></td>
                       <td className="px-4 py-2"><EditCell value={s.judge_name} onSave={(v) => handleUpdate(s.id, "judge_name", v)} /></td>

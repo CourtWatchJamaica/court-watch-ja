@@ -250,11 +250,22 @@ pub async fn remove_skipped_pdf(
 // ── Data: Judgments ────────────────────────────────────────────────────────
 
 #[derive(Deserialize, Default)]
-pub struct PageParams {
+pub struct DataFilterParams {
     #[serde(default = "default_page")]
     pub page: i64,
     #[serde(default = "default_limit")]
     pub limit: i64,
+    /// Free-text search across case number, title, and judge (and lawyers for sittings).
+    pub search: Option<String>,
+    /// Judgments: exact court name.
+    pub court: Option<String>,
+    /// Sittings: exact court_division.
+    pub division: Option<String>,
+    /// Inclusive date range on the record's own date (YYYY-MM-DD).
+    pub date_from: Option<String>,
+    pub date_to: Option<String>,
+    /// "oldest" flips to oldest-first; anything else is newest-first.
+    pub sort: Option<String>,
 }
 fn default_page() -> i64 {
     1
@@ -263,12 +274,31 @@ fn default_limit() -> i64 {
     50
 }
 
+fn parse_date_param(v: &Option<String>, name: &str) -> Result<Option<NaiveDate>, AppError> {
+    v.as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .map(|s| NaiveDate::parse_from_str(s.trim(), "%Y-%m-%d"))
+        .transpose()
+        .map_err(|_| AppError::BadRequest(format!("Invalid {name}; expected YYYY-MM-DD")))
+}
+
 pub async fn list_judgments(
     State(state): State<AppState>,
-    Query(params): Query<PageParams>,
+    Query(params): Query<DataFilterParams>,
 ) -> Result<Json<Value>, AppError> {
-    let (judgments, total) =
-        queries::admin_list_judgments(&state.db, params.page, params.limit).await?;
+    let date_from = parse_date_param(&params.date_from, "date_from")?;
+    let date_to = parse_date_param(&params.date_to, "date_to")?;
+    let (judgments, total) = queries::admin_list_judgments(
+        &state.db,
+        params.page,
+        params.limit.min(200),
+        params.search.as_deref(),
+        params.court.as_deref().filter(|s| !s.is_empty()),
+        date_from,
+        date_to,
+        params.sort.as_deref() == Some("oldest"),
+    )
+    .await?;
     Ok(Json(json!({ "judgments": judgments, "total": total })))
 }
 
@@ -336,10 +366,21 @@ pub async fn delete_judgment(
 
 pub async fn list_sittings(
     State(state): State<AppState>,
-    Query(params): Query<PageParams>,
+    Query(params): Query<DataFilterParams>,
 ) -> Result<Json<Value>, AppError> {
-    let (sittings, total) =
-        queries::admin_list_sittings(&state.db, params.page, params.limit).await?;
+    let date_from = parse_date_param(&params.date_from, "date_from")?;
+    let date_to = parse_date_param(&params.date_to, "date_to")?;
+    let (sittings, total) = queries::admin_list_sittings(
+        &state.db,
+        params.page,
+        params.limit.min(200),
+        params.search.as_deref(),
+        params.division.as_deref().filter(|s| !s.is_empty()),
+        date_from,
+        date_to,
+        params.sort.as_deref() == Some("oldest"),
+    )
+    .await?;
     Ok(Json(json!({ "sittings": sittings, "total": total })))
 }
 
@@ -713,6 +754,10 @@ pub async fn get_admin_stats(State(state): State<AppState>) -> Result<Json<Value
 pub struct UserFilterParams {
     pub q: Option<String>,
     pub role: Option<String>,
+    /// "verified" / "unverified" — anything else means no filter.
+    pub verified: Option<String>,
+    /// "newest" (default) | "oldest" | "cases" | "email"
+    pub sort: Option<String>,
     #[serde(default = "default_page")]
     pub page: i64,
     #[serde(default = "default_limit_20")]
@@ -726,10 +771,17 @@ pub async fn list_users_filtered(
     State(state): State<AppState>,
     Query(params): Query<UserFilterParams>,
 ) -> Result<Json<Value>, AppError> {
+    let verified = match params.verified.as_deref() {
+        Some("verified") => Some(true),
+        Some("unverified") => Some(false),
+        _ => None,
+    };
     let (users, total) = queries::admin_list_users_filtered(
         &state.db,
         params.q.as_deref(),
-        params.role.as_deref(),
+        params.role.as_deref().filter(|s| !s.is_empty()),
+        verified,
+        queries::UserSort::from_param(params.sort.as_deref()),
         params.page,
         params.limit.min(100),
     )
@@ -1044,4 +1096,282 @@ fn extract_seq_name(default_val: &str) -> Option<String> {
     let rest = &default_val[start..];
     let end = rest.find('\'')?;
     Some(rest[..end].to_string())
+}
+
+// ── Health dashboard ───────────────────────────────────────────────────────
+
+pub async fn scraper_health(
+    State(state): State<AppState>,
+) -> Result<Json<Value>, AppError> {
+    let sources = queries::scraper_health(&state.db).await;
+    Ok(Json(json!({ "sources": sources })))
+}
+
+pub async fn email_stats(
+    State(state): State<AppState>,
+) -> Result<Json<Value>, AppError> {
+    let stats = queries::email_stats(&state.db).await?;
+    Ok(Json(json!({ "stats": stats })))
+}
+
+pub async fn data_quality(
+    State(state): State<AppState>,
+) -> Result<Json<Value>, AppError> {
+    async fn scalar(pool: &PgPool, sql: &str) -> i64 {
+        sqlx::query_scalar(sql).fetch_one(pool).await.unwrap_or(0)
+    }
+    let db = &state.db;
+    let sittings_missing_case_number = scalar(
+        db,
+        "SELECT COUNT(*) FROM court_sittings WHERE case_number IS NULL OR TRIM(case_number) = ''",
+    )
+    .await;
+    let sittings_missing_date =
+        scalar(db, "SELECT COUNT(*) FROM court_sittings WHERE event_date IS NULL").await;
+    let judgments_missing_pdf = scalar(
+        db,
+        "SELECT COUNT(*) FROM judgments WHERE pdf_url IS NULL AND local_pdf_path IS NULL",
+    )
+    .await;
+    let judgments_missing_judge =
+        scalar(db, "SELECT COUNT(*) FROM judgments WHERE judge_name IS NULL").await;
+    let duplicate_judgment_numbers = scalar(
+        db,
+        "SELECT COUNT(*) FROM (
+             SELECT case_number FROM judgments
+             GROUP BY case_number HAVING COUNT(*) > 1
+         ) dupes",
+    )
+    .await;
+    let unverified_users_stuck = scalar(
+        db,
+        "SELECT COUNT(*) FROM users
+         WHERE NOT email_verified AND created_at < NOW() - INTERVAL '7 days'",
+    )
+    .await;
+
+    Ok(Json(json!({
+        "checks": [
+            { "key": "sittings_missing_case_number", "label": "Sittings without a case number", "count": sittings_missing_case_number },
+            { "key": "sittings_missing_date", "label": "Sittings without a date", "count": sittings_missing_date },
+            { "key": "judgments_missing_pdf", "label": "Judgments with no PDF", "count": judgments_missing_pdf },
+            { "key": "judgments_missing_judge", "label": "Judgments with no judge name", "count": judgments_missing_judge },
+            { "key": "duplicate_judgment_numbers", "label": "Duplicate judgment case numbers", "count": duplicate_judgment_numbers },
+            { "key": "unverified_users_stuck", "label": "Users unverified for 7+ days", "count": unverified_users_stuck },
+        ]
+    })))
+}
+
+// ── Notification debugger ──────────────────────────────────────────────────
+
+#[derive(Deserialize)]
+pub struct DebugNotifParams {
+    pub email: String,
+    pub case_number: Option<String>,
+}
+
+pub async fn debug_notifications(
+    State(state): State<AppState>,
+    Query(params): Query<DebugNotifParams>,
+) -> Result<Json<Value>, AppError> {
+    let db = &state.db;
+    let email = params.email.trim();
+    if email.is_empty() {
+        return Err(AppError::BadRequest("email is required".into()));
+    }
+
+    let user: Option<(i32, String, bool, chrono::NaiveDateTime)> = sqlx::query_as(
+        "SELECT id, role, email_verified, created_at FROM users WHERE LOWER(email) = LOWER($1)",
+    )
+    .bind(email)
+    .fetch_optional(db)
+    .await?;
+
+    let Some((user_id, role, verified, created_at)) = user else {
+        return Ok(Json(json!({ "found": false })));
+    };
+
+    let case_filter = params
+        .case_number
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+
+    // Tracked rows with resolved case numbers and per-case settings.
+    #[derive(sqlx::FromRow, Serialize)]
+    struct TrackedRow {
+        id: i32,
+        case_type: String,
+        case_id: Option<i32>,
+        case_number: Option<String>,
+        resolved_case_number: Option<String>,
+        created_at: chrono::NaiveDateTime,
+        notify_immediately: Option<bool>,
+        notify_day_before: Option<bool>,
+        notify_morning_of: Option<bool>,
+    }
+    let tracked: Vec<TrackedRow> = sqlx::query_as(
+        "SELECT uc.id, uc.case_type, uc.case_id, uc.case_number,
+                COALESCE(uc.case_number, j.case_number, cs.case_number) AS resolved_case_number,
+                uc.created_at,
+                ucs.notify_immediately, ucs.notify_day_before, ucs.notify_morning_of
+         FROM user_cases uc
+         LEFT JOIN judgments j ON j.id = uc.case_id AND uc.case_type = 'judgment'
+         LEFT JOIN court_sittings cs ON cs.id = uc.case_id AND uc.case_type = 'sitting'
+         LEFT JOIN user_case_settings ucs ON ucs.user_case_id = uc.id
+         WHERE uc.user_id = $1
+           AND ($2::TEXT IS NULL
+                OR COALESCE(uc.case_number, j.case_number, cs.case_number) ILIKE '%' || $2 || '%')
+         ORDER BY uc.created_at DESC",
+    )
+    .bind(user_id)
+    .bind(case_filter)
+    .fetch_all(db)
+    .await?;
+
+    // Sittings & judgment on record for the case number (what SHOULD trigger alerts).
+    #[derive(sqlx::FromRow, Serialize)]
+    struct SittingRow {
+        id: i32,
+        case_number: Option<String>,
+        event_date: Option<NaiveDate>,
+        event_type: Option<String>,
+        court_division: Option<String>,
+    }
+    let matching_sittings: Vec<SittingRow> = match case_filter {
+        Some(num) => sqlx::query_as(
+            "SELECT id, case_number, event_date, event_type, court_division
+             FROM court_sittings WHERE case_number ILIKE '%' || $1 || '%'
+             ORDER BY event_date DESC NULLS LAST LIMIT 25",
+        )
+        .bind(num)
+        .fetch_all(db)
+        .await?,
+        None => Vec::new(),
+    };
+
+    #[derive(sqlx::FromRow, Serialize)]
+    struct JudgmentRow {
+        id: i32,
+        case_number: String,
+        title: Option<String>,
+        date: Option<NaiveDate>,
+    }
+    let matching_judgments: Vec<JudgmentRow> = match case_filter {
+        Some(num) => sqlx::query_as(
+            "SELECT id, case_number, title, date FROM judgments
+             WHERE case_number ILIKE '%' || $1 || '%' LIMIT 10",
+        )
+        .bind(num)
+        .fetch_all(db)
+        .await?,
+        None => Vec::new(),
+    };
+
+    // Notifications actually recorded for this user (newest first).
+    #[derive(sqlx::FromRow, Serialize)]
+    struct NotifRow {
+        id: i32,
+        #[sqlx(rename = "type")]
+        #[serde(rename = "type")]
+        notif_type: Option<String>,
+        case_id: Option<i32>,
+        resolved_case_number: Option<String>,
+        sent_at: Option<chrono::NaiveDateTime>,
+        emailed_at: Option<chrono::NaiveDateTime>,
+        read_at: Option<chrono::NaiveDateTime>,
+    }
+    let notifications: Vec<NotifRow> = sqlx::query_as(
+        "SELECT n.id, n.type, n.case_id,
+                COALESCE(cs.case_number, j.case_number) AS resolved_case_number,
+                n.sent_at, n.emailed_at, n.read_at
+         FROM notifications n
+         LEFT JOIN court_sittings cs ON cs.id = n.case_id
+         LEFT JOIN judgments j ON j.id = n.case_id
+         WHERE n.user_id = $1
+           AND ($2::TEXT IS NULL
+                OR COALESCE(cs.case_number, j.case_number) ILIKE '%' || $2 || '%')
+         ORDER BY n.sent_at DESC
+         LIMIT 30",
+    )
+    .bind(user_id)
+    .bind(case_filter)
+    .fetch_all(db)
+    .await?;
+
+    Ok(Json(json!({
+        "found": true,
+        "user": {
+            "id": user_id,
+            "email": email,
+            "role": role,
+            "email_verified": verified,
+            "created_at": created_at,
+        },
+        "tracked": tracked,
+        "matching_sittings": matching_sittings,
+        "matching_judgments": matching_judgments,
+        "notifications": notifications,
+    })))
+}
+
+// ── Bulk delete ────────────────────────────────────────────────────────────
+
+#[derive(Deserialize)]
+pub struct BulkDeleteBody {
+    pub ids: Vec<i32>,
+}
+
+pub async fn bulk_delete_judgments(
+    State(state): State<AppState>,
+    Extension(caller_id): Extension<i32>,
+    headers: HeaderMap,
+    Json(body): Json<BulkDeleteBody>,
+) -> Result<Json<Value>, AppError> {
+    if body.ids.is_empty() || body.ids.len() > 500 {
+        return Err(AppError::BadRequest("ids must contain 1–500 entries".into()));
+    }
+    let deleted = sqlx::query("DELETE FROM judgments WHERE id = ANY($1)")
+        .bind(&body.ids)
+        .execute(&state.db)
+        .await?
+        .rows_affected();
+    let _ = queries::log_admin_action(
+        &state.db,
+        caller_id,
+        "JUDGMENT_BULK_DELETE",
+        Some("judgment"),
+        None,
+        Some(json!({ "deleted": deleted })),
+        get_client_ip(&headers).as_deref(),
+    )
+    .await;
+    Ok(Json(json!({ "deleted": deleted })))
+}
+
+pub async fn bulk_delete_sittings(
+    State(state): State<AppState>,
+    Extension(caller_id): Extension<i32>,
+    headers: HeaderMap,
+    Json(body): Json<BulkDeleteBody>,
+) -> Result<Json<Value>, AppError> {
+    if body.ids.is_empty() || body.ids.len() > 500 {
+        return Err(AppError::BadRequest("ids must contain 1–500 entries".into()));
+    }
+    let deleted = sqlx::query("DELETE FROM court_sittings WHERE id = ANY($1)")
+        .bind(&body.ids)
+        .execute(&state.db)
+        .await?
+        .rows_affected();
+    let _ = queries::log_admin_action(
+        &state.db,
+        caller_id,
+        "SITTING_BULK_DELETE",
+        Some("sitting"),
+        None,
+        Some(json!({ "deleted": deleted })),
+        get_client_ip(&headers).as_deref(),
+    )
+    .await;
+    Ok(Json(json!({ "deleted": deleted })))
 }

@@ -17,13 +17,17 @@ import {
   Sparkles,
   AlertTriangle,
   HardDriveDownload,
+  Activity,
+  Bug,
 } from "lucide-react";
 
 const NAV = [
   { href: "/admin", label: "Overview", icon: Scale, exact: true },
+  { href: "/admin/health", label: "Health", icon: Activity },
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/data", label: "Data", icon: Database },
   { href: "/admin/scraper", label: "Scraper", icon: Cpu },
+  { href: "/admin/debug", label: "Debug", icon: Bug },
   { href: "/admin/upload", label: "Upload", icon: Upload },
   { href: "/admin/announce", label: "Announce", icon: Megaphone },
   { href: "/admin/promos", label: "Promos", icon: Sparkles },

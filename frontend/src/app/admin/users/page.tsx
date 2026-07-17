@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiClient } from "@/lib/api";
+import { downloadCsv } from "@/lib/csv";
 import { AdminUserRow, AdminUserDetail } from "@/lib/types";
 import {
+  Download,
   Users,
   Shield,
   ShieldCheck,
@@ -133,6 +135,8 @@ export default function AdminUsersPage() {
 
   const [q, setQ] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
+  const [verifiedFilter, setVerifiedFilter] = useState<"" | "verified" | "unverified">("");
+  const [sort, setSort] = useState<"newest" | "oldest" | "cases" | "email">("newest");
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [actionUserId, setActionUserId] = useState<number | null>(null);
@@ -147,12 +151,20 @@ export default function AdminUsersPage() {
   };
 
   const fetchUsers = useCallback(
-    async (qVal: string, roleVal: string, pg: number) => {
+    async (
+      qVal: string,
+      roleVal: string,
+      verifiedVal: "" | "verified" | "unverified",
+      sortVal: "newest" | "oldest" | "cases" | "email",
+      pg: number,
+    ) => {
       setLoading(true);
       try {
         const res = await apiClient.adminListUsersFiltered({
           q: qVal || undefined,
           role: roleVal || undefined,
+          verified: verifiedVal || undefined,
+          sort: sortVal,
           page: pg,
           limit: LIMIT,
         });
@@ -168,20 +180,61 @@ export default function AdminUsersPage() {
   );
 
   useEffect(() => {
-    fetchUsers(q, roleFilter, page);
-  }, [fetchUsers, page, roleFilter]);
+    fetchUsers(q, roleFilter, verifiedFilter, sort, page);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- q is debounced via handleSearch
+  }, [fetchUsers, page, roleFilter, verifiedFilter, sort]);
 
   const handleSearch = (val: string) => {
     setQ(val);
     setPage(1);
     if (searchTimer.current) clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => fetchUsers(val, roleFilter, 1), 350);
+    searchTimer.current = setTimeout(
+      () => fetchUsers(val, roleFilter, verifiedFilter, sort, 1),
+      350,
+    );
   };
 
   const handleRoleFilter = (val: string) => {
     setRoleFilter(val);
     setPage(1);
-    fetchUsers(q, val, 1);
+  };
+
+  const [exporting, setExporting] = useState(false);
+  const handleExportCsv = async () => {
+    setExporting(true);
+    try {
+      // Pull the full filtered set (capped at 1000 users) across pages.
+      const all: AdminUserRow[] = [];
+      for (let p = 1; p <= 10 && all.length < 1000; p++) {
+        const res = await apiClient.adminListUsersFiltered({
+          q: q || undefined,
+          role: roleFilter || undefined,
+          verified: verifiedFilter || undefined,
+          sort,
+          page: p,
+          limit: 100,
+        });
+        all.push(...res.users);
+        if (all.length >= res.total) break;
+      }
+      downloadCsv(
+        `users-${new Date().toISOString().slice(0, 10)}.csv`,
+        [
+          ["ID", "id"],
+          ["Email", "email"],
+          ["Name", "display_name"],
+          ["Role", "role"],
+          ["Verified", "email_verified"],
+          ["Tracked Cases", "case_count"],
+          ["Joined", "created_at"],
+        ],
+        all as unknown as Record<string, unknown>[],
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Export failed");
+    } finally {
+      setExporting(false);
+    }
   };
 
   const handleRoleChange = async (userId: number, role: "user" | "admin" | "super_admin") => {
@@ -237,6 +290,14 @@ export default function AdminUsersPage() {
           <p className="text-xs text-white/70 mt-0.5">Manage roles and access</p>
         </div>
         <div className="flex-1" />
+        <button
+          onClick={handleExportCsv}
+          disabled={exporting}
+          className="min-h-[42px] flex items-center gap-1.5 rounded-xl border border-white/[0.1] px-3 text-xs font-semibold text-white/70 hover:text-white hover:border-white/25 disabled:opacity-50 transition-colors"
+        >
+          {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+          Export CSV
+        </button>
         <div className="rounded-full bg-white/[0.06] px-3 py-1 text-[11px] font-semibold text-white/50">
           {total} total
         </div>
@@ -268,6 +329,31 @@ export default function AdminUsersPage() {
           <option value="user">User</option>
           <option value="admin">Admin</option>
           <option value="super_admin">Super Admin</option>
+        </select>
+        <select
+          value={verifiedFilter}
+          onChange={(e) => {
+            setVerifiedFilter(e.target.value as "" | "verified" | "unverified");
+            setPage(1);
+          }}
+          className="h-[42px] rounded-xl border border-white/[0.08] bg-black/20 px-3 text-sm text-white/70 focus:outline-none cursor-pointer"
+        >
+          <option value="">All statuses</option>
+          <option value="verified">Verified</option>
+          <option value="unverified">Unverified</option>
+        </select>
+        <select
+          value={sort}
+          onChange={(e) => {
+            setSort(e.target.value as "newest" | "oldest" | "cases" | "email");
+            setPage(1);
+          }}
+          className="h-[42px] rounded-xl border border-white/[0.08] bg-black/20 px-3 text-sm text-white/70 focus:outline-none cursor-pointer"
+        >
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+          <option value="cases">Most cases</option>
+          <option value="email">Email A–Z</option>
         </select>
       </div>
 
