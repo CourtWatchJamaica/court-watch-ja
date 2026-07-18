@@ -144,7 +144,7 @@ function NotifModal({
       {/* Card */}
       <div
         ref={modalRef}
-        className="relative z-10 w-[90vw] max-w-[380px] rounded-2xl border border-border bg-card/95 shadow-2xl backdrop-blur-xl ring-1 ring-inset ring-foreground/[0.04]"
+        className="relative z-10 w-[90vw] max-w-[380px] rounded-lg border border-border bg-card shadow-2xl"
       >
         {/* Header */}
         <div className="flex items-start justify-between border-b border-border px-5 py-4">
@@ -675,7 +675,7 @@ export function AddByNumberForm({ onRefresh }: { onRefresh: () => void }) {
 function DocketEmpty({ onRefresh }: { onRefresh: () => void }) {
   const router = useRouter();
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card py-10 text-center px-4">
+    <div className="flex flex-col items-center justify-center rounded-lg border border-border bg-card py-10 text-center px-4">
       <svg
         viewBox="0 0 64 64"
         className="mb-4 h-12 w-12 text-foreground/10"

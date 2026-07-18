@@ -34,7 +34,7 @@ function ConfigRow({
   };
 
   return (
-    <div className="rounded-xl border border-white/[0.07] bg-[#0d0d1a] p-4">
+    <div className="rounded-xl border border-white/[0.07] bg-[#0e0e1a] p-4">
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
@@ -178,11 +178,11 @@ export default function AdminConfigPage() {
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-24 animate-pulse rounded-xl border border-white/[0.06] bg-[#0d0d1a]" />
+            <div key={i} className="h-24 animate-pulse rounded-xl border border-white/[0.06] bg-[#0e0e1a]" />
           ))}
         </div>
       ) : config.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.05] bg-[#0d0d1a] py-16 text-center">
+        <div className="flex flex-col items-center justify-center rounded-lg border border-white/[0.05] bg-[#0e0e1a] py-16 text-center">
           <Settings className="h-8 w-8 text-white/10 mb-3" />
           <p className="text-sm text-white/60">No config entries found</p>
         </div>
@@ -195,7 +195,7 @@ export default function AdminConfigPage() {
       )}
 
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-xl border border-[#009B3A]/30 bg-[#0d0d1a] px-4 py-3 shadow-2xl flex items-center gap-2.5">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-xl border border-[#009B3A]/30 bg-[#0e0e1a] px-4 py-3 shadow-2xl flex items-center gap-2.5">
           <span className="h-2 w-2 rounded-full bg-[#009B3A]" />
           <p className="text-sm text-white/90">{toast}</p>
         </div>

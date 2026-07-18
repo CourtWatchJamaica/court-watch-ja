@@ -77,7 +77,7 @@ export default function LegalPulse() {
       </div>
 
       {/* Body */}
-      <div className="rounded-2xl border border-border bg-card overflow-hidden divide-y divide-border">
+      <div className="rounded-lg border border-border bg-card overflow-hidden divide-y divide-border">
         {loading ? (
           Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} />)
         ) : error || news.length === 0 ? (

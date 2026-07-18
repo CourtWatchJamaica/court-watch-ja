@@ -88,7 +88,7 @@ function Modal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="relative w-full max-w-lg rounded-2xl border border-white/[0.1] bg-[#0d0d1a] overflow-hidden">
+      <div className="relative w-full max-w-lg rounded-lg border border-white/[0.1] bg-[#0e0e1a] overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.07]">
           <h2 className="text-sm font-semibold text-white">{title}</h2>
           <button
@@ -325,7 +325,7 @@ function EditCell({ value, onSave }: { value: string | null; onSave: (v: string)
           if (e.key === "Enter") { onSave(draft); setEditing(false); }
           if (e.key === "Escape") setEditing(false);
         }}
-        className="h-8 rounded border border-[#009B3A]/40 bg-[#0d0d1a] px-2 text-xs text-white focus:outline-none w-32"
+        className="h-8 rounded border border-[#009B3A]/40 bg-[#0e0e1a] px-2 text-xs text-white focus:outline-none w-32"
       />
       <button onClick={() => { onSave(draft); setEditing(false); }} className="min-h-[44px] min-w-[44px] flex items-center justify-center text-[#009B3A]">
         <Check className="h-3.5 w-3.5" />
@@ -411,7 +411,7 @@ function FilterBar({
 }) {
   const hasFilters = searchInput || selectValue || dateFrom || dateTo;
   const dateCls =
-    "h-[44px] rounded-xl border border-white/[0.08] bg-[#0d0d1a] px-3 text-sm text-white/70 focus:outline-none focus:border-[#009B3A]/50 transition-colors [color-scheme:dark]";
+    "h-[44px] rounded-xl border border-white/[0.08] bg-[#0e0e1a] px-3 text-sm text-white/70 focus:outline-none focus:border-[#009B3A]/50 transition-colors [color-scheme:dark]";
   return (
     <div className="mb-3 flex flex-wrap items-center gap-2">
       <div className="relative flex-1 min-w-[200px]">
@@ -420,7 +420,7 @@ function FilterBar({
           value={searchInput}
           onChange={(e) => onSearchInput(e.target.value)}
           placeholder={searchPlaceholder}
-          className="h-[44px] w-full rounded-xl border border-white/[0.08] bg-[#0d0d1a] pl-9 pr-8 text-sm text-white placeholder-white/20 focus:outline-none focus:border-[#009B3A]/50 transition-colors"
+          className="h-[44px] w-full rounded-xl border border-white/[0.08] bg-[#0e0e1a] pl-9 pr-8 text-sm text-white placeholder-white/20 focus:outline-none focus:border-[#009B3A]/50 transition-colors"
         />
         {searchInput && (
           <button
@@ -434,7 +434,7 @@ function FilterBar({
       <select
         value={selectValue}
         onChange={(e) => onSelectValue(e.target.value)}
-        className="h-[44px] rounded-xl border border-white/[0.08] bg-[#0d0d1a] px-3 text-sm text-white/60 focus:outline-none focus:border-[#009B3A]/50 transition-colors"
+        className="h-[44px] rounded-xl border border-white/[0.08] bg-[#0e0e1a] px-3 text-sm text-white/60 focus:outline-none focus:border-[#009B3A]/50 transition-colors"
       >
         <option value="">{selectPlaceholder}</option>
         {selectOptions.map((c) => (
@@ -463,7 +463,7 @@ function FilterBar({
       <button
         onClick={onToggleSort}
         title="Toggle sort order"
-        className="h-[44px] flex items-center gap-1.5 rounded-xl border border-white/[0.08] bg-[#0d0d1a] px-3 text-xs font-medium text-white/70 hover:text-white hover:border-white/20 transition-colors"
+        className="h-[44px] flex items-center gap-1.5 rounded-xl border border-white/[0.08] bg-[#0e0e1a] px-3 text-xs font-medium text-white/70 hover:text-white hover:border-white/20 transition-colors"
       >
         {sort === "newest" ? (
           <ArrowDownWideNarrow className="h-3.5 w-3.5" />
@@ -673,7 +673,7 @@ function JudgmentsTab() {
         onToggleSort={() => setSort((s) => (s === "newest" ? "oldest" : "newest"))}
       />
 
-      <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a] overflow-hidden">
+      <div className="rounded-lg border border-white/[0.07] bg-[#0e0e1a] overflow-hidden">
         <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-white/[0.05]">
           <span className="text-xs text-white/60">{total.toLocaleString()} total</span>
           {selected.size > 0 && (
@@ -962,7 +962,7 @@ function SittingsTab() {
         onToggleSort={() => setSort((s) => (s === "newest" ? "oldest" : "newest"))}
       />
 
-      <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a] overflow-hidden">
+      <div className="rounded-lg border border-white/[0.07] bg-[#0e0e1a] overflow-hidden">
         <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-white/[0.05]">
           <span className="text-xs text-white/60">{total.toLocaleString()} total</span>
           {selected.size > 0 && (
@@ -1083,7 +1083,7 @@ export default function AdminDataPage() {
         </div>
       </div>
 
-      <div className="mb-5 flex gap-1 rounded-xl border border-white/[0.06] bg-[#0d0d1a] p-1 w-fit">
+      <div className="mb-5 flex gap-1 rounded-xl border border-white/[0.06] bg-[#0e0e1a] p-1 w-fit">
         {(["judgments", "sittings"] as Tab[]).map((t) => (
           <button
             key={t}

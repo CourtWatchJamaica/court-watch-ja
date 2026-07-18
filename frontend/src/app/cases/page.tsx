@@ -120,7 +120,7 @@ function sortByEventDate(items: CourtSitting[]): CourtSitting[] {
 
 function TabToggle({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) {
   return (
-    <div className="flex rounded-2xl bg-foreground/[0.03] border border-border p-1 gap-1">
+    <div className="flex rounded-lg bg-foreground/[0.03] border border-border p-1 gap-1">
       {(
         [
           { id: "judgments" as Tab, icon: Scale, label: "Judgments", sub: "Past decisions" },
@@ -249,7 +249,7 @@ function FilterPanel({
         open ? "max-h-[600px] opacity-100" : "max-h-0 opacity-0",
       ].join(" ")}
     >
-      <div className="rounded-2xl border border-border bg-card p-5 mt-3">
+      <div className="rounded-lg border border-border bg-card p-5 mt-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
           <div>
@@ -396,7 +396,7 @@ function ActiveChips({
 
 function SkeletonCard() {
   return (
-    <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
+    <div className="rounded-lg border border-border bg-card p-4 space-y-3">
       <div className="flex justify-between items-start gap-3">
         <Skeleton className="h-3.5 w-2/3 bg-foreground/[0.05]" />
         <Skeleton className="h-5 w-20 rounded-md bg-foreground/[0.04] shrink-0" />
@@ -431,12 +431,12 @@ function EmptyState({
       ? "This case number does not appear in our Supreme Court or Court of Appeal listings. Parish Court cases are tracked separately."
       : "Try different keywords or adjust your filters.";
     return (
-      <div className="col-span-full relative overflow-hidden flex flex-col items-center justify-center rounded-2xl border border-border bg-card py-20 text-center px-8">
-        <span className="pointer-events-none select-none absolute inset-0 flex items-center justify-center font-heading font-extrabold text-[7rem] text-foreground/[0.02] overflow-hidden">
+      <div className="col-span-full relative overflow-hidden flex flex-col items-center justify-center rounded-lg border border-border bg-card py-20 text-center px-8">
+        <span className="pointer-events-none select-none absolute inset-0 flex items-center justify-center font-heading font-bold text-[7rem] text-foreground/[0.02] overflow-hidden">
           {headline.split(" ")[0].toUpperCase()}
         </span>
         <div className="relative z-10">
-          <div className="mb-4 mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-muted">
+          <div className="mb-4 mx-auto flex h-14 w-14 items-center justify-center rounded-lg border border-border bg-muted">
             <SearchX className="h-7 w-7 text-foreground/20" />
           </div>
           <p className="font-heading font-semibold text-[15px] text-foreground/65">{headline}</p>
@@ -454,12 +454,12 @@ function EmptyState({
     );
   }
   return (
-    <div className="col-span-full relative overflow-hidden flex flex-col items-center justify-center rounded-2xl border border-border bg-card py-20 text-center px-8">
-      <span className="pointer-events-none select-none absolute inset-0 flex items-center justify-center font-heading font-extrabold text-[7rem] text-foreground/[0.02] overflow-hidden">
+    <div className="col-span-full relative overflow-hidden flex flex-col items-center justify-center rounded-lg border border-border bg-card py-20 text-center px-8">
+      <span className="pointer-events-none select-none absolute inset-0 flex items-center justify-center font-heading font-bold text-[7rem] text-foreground/[0.02] overflow-hidden">
         {tab === "judgments" ? "CASES" : "LISTS"}
       </span>
       <div className="relative z-10">
-        <div className="mb-4 mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-primary/[0.05]">
+        <div className="mb-4 mx-auto flex h-14 w-14 items-center justify-center rounded-lg border border-border bg-primary/[0.05]">
           {tab === "judgments" ? <Scale className="h-7 w-7 text-primary/40" /> : <Calendar className="h-7 w-7 text-primary/40" />}
         </div>
         <p className="font-heading font-semibold text-[15px] text-foreground/55">
@@ -753,7 +753,7 @@ export default function CasesPage() {
                 Case Registry
               </span>
             </div>
-            <h1 className="font-heading font-extrabold text-[2.4rem] sm:text-[3.2rem] leading-none tracking-tight text-foreground mb-6">
+            <h1 className="font-heading font-bold text-[2.4rem] sm:text-[3.2rem] leading-none tracking-tight text-foreground mb-6">
               Search Cases<span className="text-primary">.</span>
             </h1>
             <TabToggle active={activeTab} onChange={handleTabChange} />

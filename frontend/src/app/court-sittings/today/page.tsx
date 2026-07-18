@@ -95,7 +95,7 @@ function SectionSkeleton() {
       <Skeleton className="h-5 w-48 bg-white/[0.06]" />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {[0, 1, 2].map((i) => (
-          <div key={i} className="rounded-xl border border-white/[0.06] bg-[#0d0d1a] p-4 space-y-3">
+          <div key={i} className="rounded-xl border border-white/[0.06] bg-[#0e0e1a] p-4 space-y-3">
             <Skeleton className="h-3.5 w-2/3 bg-white/[0.06]" />
             <Skeleton className="h-2.5 w-1/2 bg-white/[0.04]" />
             <Skeleton className="h-2.5 w-1/3 bg-white/[0.04]" />
@@ -205,7 +205,7 @@ function TodaySittingsPage() {
   return (
     <div
       className="min-h-screen"
-      style={{ background: "linear-gradient(135deg, #0a0a0a 0%, #0d1a0d 100%)" }}
+      style={{ background: "#080810" }}
     >
       {/* Header bar */}
       <div className="border-b border-white/[0.06] bg-black/30 backdrop-blur-xl sticky top-0 z-10">
@@ -248,7 +248,7 @@ function TodaySittingsPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by title, case number, judge, or division…"
-            className="w-full rounded-2xl border border-white/[0.08] bg-white/[0.04] pl-11 pr-10 py-3 text-sm text-white/70 placeholder-white/20 focus:outline-none focus:border-[#FED100]/30 focus:bg-white/[0.06] transition-colors"
+            className="w-full rounded-lg border border-white/[0.08] bg-white/[0.04] pl-11 pr-10 py-3 text-sm text-white/70 placeholder-white/20 focus:outline-none focus:border-[#FED100]/30 focus:bg-white/[0.06] transition-colors"
           />
           {query && (
             <button
@@ -342,7 +342,7 @@ function TodaySittingsPage() {
                       ))}
                     </div>
                   ) : (
-                    <div className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.05] bg-black/20 py-10 text-center px-6">
+                    <div className="flex flex-col items-center justify-center rounded-lg border border-white/[0.05] bg-black/20 py-10 text-center px-6">
                       <div className={`mb-3 flex h-10 w-10 items-center justify-center rounded-xl ${cfg.bg}`}>
                         <CfgIcon className={`h-5 w-5 ${cfg.accent} opacity-40`} />
                       </div>

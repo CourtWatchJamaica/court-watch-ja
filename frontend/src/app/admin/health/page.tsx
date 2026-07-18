@@ -39,7 +39,7 @@ function timeAgo(iso: string | null): string {
 
 function StatTile({ label, value, accent }: { label: string; value: number; accent?: boolean }) {
   return (
-    <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a] px-5 py-4">
+    <div className="rounded-lg border border-white/[0.07] bg-[#0e0e1a] px-5 py-4">
       <p className={`text-2xl font-bold tabular-nums ${accent && value > 0 ? "text-amber-400" : "text-white"}`}>
         {value.toLocaleString()}
       </p>
@@ -124,10 +124,10 @@ export default function AdminHealthPage() {
             {sources.map((s) => (
               <div
                 key={s.source}
-                className={`rounded-2xl border px-4 py-3 ${
+                className={`rounded-lg border px-4 py-3 ${
                   s.stale
                     ? "border-amber-500/30 bg-amber-500/[0.04]"
-                    : "border-white/[0.07] bg-[#0d0d1a]"
+                    : "border-white/[0.07] bg-[#0e0e1a]"
                 }`}
               >
                 <div className="flex items-center gap-2">

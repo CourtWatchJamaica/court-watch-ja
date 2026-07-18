@@ -33,7 +33,7 @@ function StatPill({
   color: string;
 }) {
   return (
-    <div className="flex flex-col items-center rounded-2xl border border-border bg-card px-4 py-4">
+    <div className="flex flex-col items-center rounded-lg border border-border bg-card px-4 py-4">
       <span className={`text-2xl font-bold ${color}`}>{value}</span>
       <span className="mt-1 text-center text-[11px] text-muted-foreground leading-snug">{label}</span>
     </div>
@@ -145,7 +145,7 @@ export default function CourtPage() {
               [1, 2, 3].map((i) => (
                 <div
                   key={i}
-                  className="animate-pulse rounded-2xl border border-border bg-card px-4 py-4 flex flex-col items-center gap-2"
+                  className="animate-pulse rounded-lg border border-border bg-card px-4 py-4 flex flex-col items-center gap-2"
                 >
                   <div className="h-6 w-10 rounded bg-muted" />
                   <div className="h-2.5 w-20 rounded bg-muted/60" />
@@ -188,11 +188,11 @@ export default function CourtPage() {
               </Link>
             </div>
             {loading ? (
-              <div className="h-[168px] sm:h-[200px] rounded-2xl border border-border bg-card animate-pulse" />
+              <div className="h-[168px] sm:h-[200px] rounded-lg border border-border bg-card animate-pulse" />
             ) : judgments.length > 0 ? (
               <JudgmentCarousel judgments={judgments} />
             ) : (
-              <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card py-12">
+              <div className="flex flex-col items-center justify-center rounded-lg border border-border bg-card py-12">
                 <FileText className="h-8 w-8 text-muted-foreground/30 mb-2" />
                 <p className="text-sm text-muted-foreground">No judgments for this court</p>
               </div>
@@ -236,7 +236,7 @@ export default function CourtPage() {
                 ))}
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card py-12">
+              <div className="flex flex-col items-center justify-center rounded-lg border border-border bg-card py-12">
                 <Calendar className="h-8 w-8 text-muted-foreground/30 mb-2" />
                 <p className="text-sm text-muted-foreground">No sittings scheduled this week</p>
               </div>

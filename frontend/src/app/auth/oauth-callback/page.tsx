@@ -40,9 +40,9 @@ export default function OAuthCallbackPage() {
   }, [session, status, router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a]">
+    <div className="min-h-screen flex items-center justify-center bg-[#080810]">
       <div className="flex flex-col items-center gap-4 text-white/50">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#009B3A]/15 ring-1 ring-[#009B3A]/30">
+        <div className="flex items-center justify-center">
           <Scale className="h-6 w-6 text-[#009B3A]" />
         </div>
         <div className="flex items-center gap-2">

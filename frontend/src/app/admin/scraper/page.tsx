@@ -240,7 +240,7 @@ export default function AdminScraperPage() {
       )}
 
       {/* Status + Trigger */}
-      <div className="mb-6 rounded-2xl border border-white/[0.07] bg-[#0d0d1a] p-5">
+      <div className="mb-6 rounded-lg border border-white/[0.07] bg-[#0e0e1a] p-5">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
             <span
@@ -299,7 +299,7 @@ export default function AdminScraperPage() {
       </div>
 
       {/* Maintenance Mode */}
-      <div className="mb-6 rounded-2xl border border-white/[0.07] bg-[#0d0d1a] p-5">
+      <div className="mb-6 rounded-lg border border-white/[0.07] bg-[#0e0e1a] p-5">
         <div className="flex items-center justify-between">
           <div className="flex items-start gap-3">
             <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#FED100]/10 ring-1 ring-[#FED100]/20">
@@ -333,7 +333,7 @@ export default function AdminScraperPage() {
       </div>
 
       {/* Deep Scrape */}
-      <div className="mb-6 rounded-2xl border border-amber-400/15 bg-[#0d0d1a] p-5">
+      <div className="mb-6 rounded-lg border border-amber-400/15 bg-[#0e0e1a] p-5">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-start gap-3">
             <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-400/10 ring-1 ring-amber-400/20">
@@ -367,7 +367,7 @@ export default function AdminScraperPage() {
 
       {/* Pagination state */}
       {status && (
-        <div className="mb-6 rounded-2xl border border-white/[0.07] bg-[#0d0d1a] p-5">
+        <div className="mb-6 rounded-lg border border-white/[0.07] bg-[#0e0e1a] p-5">
           <h2 className="text-sm font-semibold text-white mb-4">
             Pagination State
           </h2>
@@ -398,7 +398,7 @@ export default function AdminScraperPage() {
 
       {/* PDF failures */}
       {status && Object.keys(status.pdf_failures).length > 0 && (
-        <div className="mb-6 rounded-2xl border border-amber-400/15 bg-[#0d0d1a] p-5">
+        <div className="mb-6 rounded-lg border border-amber-400/15 bg-[#0e0e1a] p-5">
           <div className="flex items-center gap-2 mb-4">
             <AlertTriangle className="h-4 w-4 text-amber-400" />
             <h2 className="text-sm font-semibold text-white">
@@ -465,7 +465,7 @@ export default function AdminScraperPage() {
       )}
 
       {/* Permanently skipped PDFs */}
-      <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a] p-5">
+      <div className="rounded-lg border border-white/[0.07] bg-[#0e0e1a] p-5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-semibold text-white">
             Permanently Skipped PDFs
@@ -529,7 +529,7 @@ export default function AdminScraperPage() {
       </div>
 
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-xl border border-[#009B3A]/30 bg-[#0d0d1a] px-4 py-3 shadow-2xl flex items-center gap-2.5">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-xl border border-[#009B3A]/30 bg-[#0e0e1a] px-4 py-3 shadow-2xl flex items-center gap-2.5">
           <span className="h-2 w-2 rounded-full bg-[#009B3A]" />
           <p className="text-sm text-white/90">{toast}</p>
         </div>

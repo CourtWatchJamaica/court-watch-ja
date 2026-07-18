@@ -29,7 +29,7 @@ import {
 
 function DetailSkeleton() {
   return (
-    <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a] overflow-hidden animate-pulse">
+    <div className="rounded-lg border border-white/[0.07] bg-[#0e0e1a] overflow-hidden animate-pulse">
       <div className="p-6 border-b border-white/[0.06] space-y-4">
         <div className="flex gap-2">
           <div className="h-6 w-28 rounded-full bg-white/[0.06]" />
@@ -109,7 +109,7 @@ function PdfPickerModal({
 
       {/* Sheet / Modal */}
       <div
-        className="relative z-10 w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl border border-white/[0.1] bg-[#0d0d1a]/95 shadow-2xl backdrop-blur-xl ring-1 ring-inset ring-white/[0.04]"
+        className="relative z-10 w-full sm:max-w-sm rounded-t-lg sm:rounded-lg border border-white/10 bg-[#0e0e1a] shadow-2xl"
         style={{ paddingBottom: "calc(1.25rem + env(safe-area-inset-bottom, 0px))" }}
       >
         {/* Drag handle — mobile only */}
@@ -227,7 +227,7 @@ export default function CaseDetailPage() {
             <DetailSkeleton />
           ) : fetchError ? (
             /* Network / server error — offer retry */
-            <div className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.07] bg-[#0d0d1a] py-16 text-center px-6 gap-5">
+            <div className="flex flex-col items-center justify-center rounded-lg border border-white/[0.07] bg-[#0e0e1a] py-16 text-center px-6 gap-5">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-red-500/10 ring-1 ring-red-500/20">
                 <AlertTriangle className="h-6 w-6 text-red-400" />
               </div>
@@ -248,11 +248,11 @@ export default function CaseDetailPage() {
               </button>
             </div>
           ) : !judgment ? (
-            <div className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.07] bg-[#0d0d1a] py-16 text-center">
+            <div className="flex flex-col items-center justify-center rounded-lg border border-white/[0.07] bg-[#0e0e1a] py-16 text-center">
               <p className="text-sm text-white/70">Case not found.</p>
             </div>
           ) : (
-            <div className="rounded-2xl border-l-[3px] border-l-[#009B3A] border-t border-r border-b border-white/[0.08] bg-[#0d0d1a] overflow-hidden">
+            <div className="rounded-lg border-l-[3px] border-l-[#009B3A] border-t border-r border-b border-white/[0.08] bg-[#0e0e1a] overflow-hidden">
               {/* Header */}
               <div className="p-6 border-b border-white/[0.06]">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">

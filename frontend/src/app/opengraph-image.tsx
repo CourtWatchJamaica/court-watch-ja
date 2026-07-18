@@ -10,7 +10,7 @@ export default function Image() {
     (
       <div
         style={{
-          background: "linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 55%, #0d2818 100%)",
+          background: "#080810",
           width: "100%",
           height: "100%",
           display: "flex",
@@ -18,61 +18,24 @@ export default function Image() {
           alignItems: "flex-start",
           justifyContent: "center",
           padding: "72px 80px",
-          fontFamily: "system-ui, sans-serif",
           position: "relative",
-          overflow: "hidden",
         }}
       >
-        {/* Background glow blobs */}
-        <div
-          style={{
-            position: "absolute",
-            top: -120,
-            right: -80,
-            width: 480,
-            height: 480,
-            borderRadius: "50%",
-            background: "#FED100",
-            opacity: 0.06,
-            filter: "blur(80px)",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            bottom: -100,
-            left: -60,
-            width: 360,
-            height: 360,
-            borderRadius: "50%",
-            background: "#009B3A",
-            opacity: 0.1,
-            filter: "blur(60px)",
-          }}
-        />
-
         {/* Brand row */}
-        <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 36 }}>
-          <div
-            style={{
-              width: 60,
-              height: 60,
-              borderRadius: 14,
-              background: "linear-gradient(135deg, #009B3A, #006B3F)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 32,
-              boxShadow: "0 0 24px rgba(0,155,58,0.4)",
-            }}
-          >
-            ⚖️
-          </div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 14,
+            marginBottom: 40,
+          }}
+        >
+          <span style={{ fontSize: 30 }}>⚖️</span>
           <span
             style={{
               fontSize: 26,
               fontWeight: 700,
-              color: "#FED100",
+              color: "#ffffff",
               letterSpacing: -0.5,
             }}
           >
@@ -83,67 +46,63 @@ export default function Image() {
         {/* Headline */}
         <h1
           style={{
-            fontSize: 68,
-            fontWeight: 800,
+            fontSize: 66,
+            fontWeight: 700,
             color: "#ffffff",
-            letterSpacing: -2,
-            lineHeight: 1.05,
-            margin: "0 0 20px",
-            maxWidth: 880,
+            letterSpacing: -1.5,
+            lineHeight: 1.1,
+            margin: "0 0 24px",
+            maxWidth: 900,
           }}
         >
-          Jamaican Legal{" "}
-          <span style={{ color: "#009B3A" }}>Case Tracker</span>
+          Track Jamaican court cases as they happen.
         </h1>
 
         {/* Sub-headline */}
         <p
           style={{
             fontSize: 24,
-            color: "rgba(255,255,255,0.45)",
-            margin: "0 0 52px",
-            maxWidth: 720,
+            color: "rgba(255,255,255,0.55)",
+            margin: "0 0 48px",
+            maxWidth: 760,
             lineHeight: 1.45,
           }}
         >
-          Track court judgments, monitor cases, and follow live decisions from Jamaica&apos;s courts.
+          Search judgments, browse court lists, and get notified when your case
+          is listed. Free to use.
         </p>
 
-        {/* Court badges */}
-        <div style={{ display: "flex", gap: 12 }}>
-          {[
-            { label: "Supreme Court", color: "#009B3A" },
-            { label: "Court of Appeal", color: "#FED100" },
-            { label: "Parish Court", color: "#CD7F32" },
-          ].map(({ label, color }) => (
-            <div
-              key={label}
-              style={{
-                background: `${color}18`,
-                border: `1px solid ${color}55`,
-                borderRadius: 999,
-                padding: "10px 22px",
-                color,
-                fontSize: 15,
-                fontWeight: 600,
-              }}
-            >
-              {label}
-            </div>
-          ))}
+        {/* Courts */}
+        <div
+          style={{
+            display: "flex",
+            gap: 10,
+            fontSize: 17,
+            color: "rgba(255,255,255,0.5)",
+          }}
+        >
+          <span>Supreme Court</span>
+          <span>·</span>
+          <span>Court of Appeal</span>
+          <span>·</span>
+          <span>Parish Court</span>
         </div>
 
-        {/* Bottom accent bar */}
+        {/* Jamaican flag stripe */}
         <div
           style={{
             position: "absolute",
             bottom: 0,
             left: 0,
             right: 0,
-            height: 5,
-            background: "linear-gradient(to right, #009B3A, #FED100, #009B3A)",
+            height: 6,
+            display: "flex",
           }}
-        />
+        >
+          <div style={{ flex: 1, background: "#111111" }} />
+          <div style={{ flex: 1, background: "#009B3A" }} />
+          <div style={{ flex: 1, background: "#FED100" }} />
+        </div>
       </div>
     ),
     { ...size },

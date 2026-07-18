@@ -51,9 +51,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <AdminGuard>
-      <div className="flex min-h-screen bg-[#0a0a0a]">
+      <div className="flex min-h-screen bg-[#080810]">
         {/* Sidebar */}
-        <aside className="hidden md:flex w-56 shrink-0 flex-col border-r border-white/[0.06] bg-[#0d0d1a]">
+        <aside className="hidden md:flex w-56 shrink-0 flex-col border-r border-white/[0.06] bg-[#0e0e1a]">
           {/* Logo */}
           <div className="flex items-center gap-2.5 px-5 py-5 border-b border-white/[0.06]">
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#009B3A]/20">
@@ -109,7 +109,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </aside>
 
         {/* Mobile top bar */}
-        <div className="md:hidden fixed inset-x-0 top-0 z-50 flex items-center gap-3 border-b border-white/[0.06] bg-[#0d0d1a] px-4 py-3">
+        <div className="md:hidden fixed inset-x-0 top-0 z-50 flex items-center gap-3 border-b border-white/[0.06] bg-[#0e0e1a] px-4 py-3">
           <Scale className="h-4 w-4 text-[#009B3A]" />
           <span className="text-sm font-bold text-white">Admin</span>
           <div className="flex-1" />

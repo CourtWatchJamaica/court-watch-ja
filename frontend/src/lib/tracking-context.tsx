@@ -110,7 +110,7 @@ export function TrackingProvider({ children }: { children: React.ReactNode }) {
       {children}
       {toast && (
         <div className="fixed bottom-24 left-1/2 z-[200] -translate-x-1/2 animate-in fade-in slide-in-from-bottom-2">
-          <div className="flex items-center gap-2.5 rounded-xl border border-[#009B3A]/30 bg-[#0d0d1a] px-4 py-3 shadow-2xl">
+          <div className="flex items-center gap-2.5 rounded-xl border border-[#009B3A]/30 bg-[#0e0e1a] px-4 py-3 shadow-2xl">
             <span className="h-2 w-2 shrink-0 rounded-full bg-[#009B3A]" />
             <p className="text-sm text-white/90">{toast}</p>
           </div>

@@ -39,11 +39,11 @@ export default function SignupPage() {
   };
 
   const inputCls =
-    "w-full rounded-xl border border-white/[0.1] bg-black/30 px-4 py-3 text-sm text-white placeholder-white/25 focus:outline-none focus:border-[#009B3A]/60 focus:bg-black/50 transition-colors";
+    "w-full rounded-md border border-white/15 bg-black/30 px-3.5 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#009B3A]/70 transition-colors";
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] px-4">
+      <div className="min-h-screen flex items-center justify-center bg-[#080810] px-4">
         <div
           className="fixed top-0 left-0 right-0 h-[3px] z-50"
           style={{
@@ -53,11 +53,9 @@ export default function SignupPage() {
         />
         <div className="w-full max-w-sm text-center">
           <div className="mb-6 flex justify-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#009B3A]/15 ring-1 ring-[#009B3A]/30">
-              <CheckCircle className="h-7 w-7 text-[#009B3A]" />
-            </div>
+            <CheckCircle className="h-8 w-8 text-[#009B3A]" />
           </div>
-          <h1 className="text-xl font-bold text-white mb-2">Check your inbox</h1>
+          <h1 className="font-heading text-xl font-semibold text-white mb-2">Check your inbox</h1>
           <p className="text-sm text-white/50 mb-6">
             We sent a verification link to{" "}
             <span className="text-white/80">{email}</span>.
@@ -75,7 +73,7 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] px-4">
+    <div className="min-h-screen flex items-center justify-center bg-[#080810] px-4">
       <div
         className="fixed top-0 left-0 right-0 h-[3px] z-50"
         style={{
@@ -86,22 +84,19 @@ export default function SignupPage() {
 
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#009B3A]/15 ring-1 ring-[#009B3A]/30">
-            <Scale className="h-6 w-6 text-[#009B3A]" />
-          </div>
+          <Scale className="h-7 w-7 text-[#009B3A]" />
           <div className="text-center">
-            <h1 className="text-2xl font-bold tracking-tight text-white">
-              Court<span className="text-[#009B3A]">Watch</span>
-              <span className="text-[#FED100]"> JA</span>
+            <h1 className="font-heading text-2xl font-semibold tracking-tight text-white">
+              CourtWatch JA
             </h1>
-            <p className="mt-1 text-sm text-white/70">Create your account</p>
+            <p className="mt-1 text-sm text-white/60">Create your account</p>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-white/[0.08] bg-[#0d0d1a] p-6">
+        <div className="rounded-lg border border-white/10 bg-[#0e0e1a] p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70 mb-1.5">
+              <label className="block text-xs font-medium text-white/70 mb-1.5">
                 Email
               </label>
               <input
@@ -116,7 +111,7 @@ export default function SignupPage() {
             </div>
 
             <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70 mb-1.5">
+              <label className="block text-xs font-medium text-white/70 mb-1.5">
                 Display Name <span className="normal-case font-normal">(optional)</span>
               </label>
               <input
@@ -130,7 +125,7 @@ export default function SignupPage() {
             </div>
 
             <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70 mb-1.5">
+              <label className="block text-xs font-medium text-white/70 mb-1.5">
                 Password
               </label>
               <input
@@ -145,7 +140,7 @@ export default function SignupPage() {
             </div>
 
             <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70 mb-1.5">
+              <label className="block text-xs font-medium text-white/70 mb-1.5">
                 Confirm Password
               </label>
               <input
@@ -160,7 +155,7 @@ export default function SignupPage() {
             </div>
 
             {error && (
-              <div className="rounded-xl bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-400">
+              <div className="rounded-md bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-400">
                 {error}
               </div>
             )}
@@ -168,7 +163,7 @@ export default function SignupPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#009B3A] py-3 text-sm font-semibold text-white hover:bg-[#009B3A]/85 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full flex items-center justify-center gap-2 rounded-md bg-[#009B3A] py-2.5 text-sm font-medium text-white hover:bg-[#009B3A]/85 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? "Creating account…" : "Create Account"}
             </button>
@@ -182,7 +177,7 @@ export default function SignupPage() {
                   <div className="w-full border-t border-white/[0.08]" />
                 </div>
                 <div className="relative flex justify-center">
-                  <span className="bg-[#0d0d1a] px-3 text-[11px] text-white/55">
+                  <span className="bg-[#0e0e1a] px-3 text-[11px] text-white/55">
                     or continue with
                   </span>
                 </div>
@@ -193,7 +188,7 @@ export default function SignupPage() {
                 onClick={() =>
                   signIn("google", { callbackUrl: "/auth/oauth-callback" })
                 }
-                className="flex w-full items-center justify-center gap-3 rounded-xl border border-white/[0.1] bg-white/[0.04] py-2.5 text-sm font-medium text-white/70 hover:bg-white/[0.08] hover:text-white transition-colors"
+                className="flex w-full items-center justify-center gap-3 rounded-md border border-white/15 bg-white/[0.04] py-2.5 text-sm font-medium text-white/70 hover:bg-white/[0.08] hover:text-white transition-colors"
               >
                 <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24">
                   <path
@@ -230,7 +225,7 @@ export default function SignupPage() {
         </div>
 
         <p className="mt-6 text-center text-[11px] text-white/50">
-          Jamaica&apos;s premier legal case tracker
+          Free access to Jamaican court records
         </p>
       </div>
     </div>

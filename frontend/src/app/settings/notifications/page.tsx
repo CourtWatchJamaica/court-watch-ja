@@ -71,7 +71,7 @@ function Toast({ message, onDismiss }: { message: string; onDismiss: () => void 
   }, [onDismiss]);
 
   return (
-    <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[90] flex items-center gap-2 rounded-full border border-white/[0.1] bg-[#0d0d1a]/95 px-4 py-2.5 shadow-lg backdrop-blur-xl">
+    <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[90] flex items-center gap-2 rounded-md border border-white/15 bg-[#0e0e1a] px-4 py-2.5 shadow-lg">
       <Bell className="h-3.5 w-3.5 text-[#009B3A]" />
       <span className="text-[12px] font-medium text-white">{message}</span>
     </div>
@@ -105,7 +105,7 @@ function CasePanel({
   return (
     <div className="flex-1 space-y-5">
       {/* Case info */}
-      <div className="rounded-xl border border-white/[0.07] bg-[#0d0d1a] p-4">
+      <div className="rounded-xl border border-white/[0.07] bg-[#0e0e1a] p-4">
         <div className="flex items-center gap-2 mb-2">
           <div className="flex items-center gap-1.5 rounded-full bg-[#009B3A]/10 border border-[#009B3A]/20 px-2.5 py-1">
             <Scale className="h-3 w-3 text-[#009B3A]" />
@@ -119,7 +119,7 @@ function CasePanel({
       </div>
 
       {/* Master toggle */}
-      <div className="rounded-xl border border-white/[0.07] bg-[#0d0d1a] p-4">
+      <div className="rounded-xl border border-white/[0.07] bg-[#0e0e1a] p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             {settings.enabled ? (
@@ -147,7 +147,7 @@ function CasePanel({
       {/* Alert timings */}
       <div
         className={cn(
-          "rounded-xl border border-white/[0.07] bg-[#0d0d1a] overflow-hidden transition-opacity duration-200",
+          "rounded-xl border border-white/[0.07] bg-[#0e0e1a] overflow-hidden transition-opacity duration-200",
           !settings.enabled && "opacity-40 pointer-events-none",
         )}
       >
@@ -227,7 +227,7 @@ function ActiveNotifsList({
 
   if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.05] bg-[#0d0d1a] py-12 text-center px-4">
+      <div className="flex flex-col items-center justify-center rounded-lg border border-white/[0.05] bg-[#0e0e1a] py-12 text-center px-4">
         <Bell className="mb-3 h-10 w-10 text-white/10" />
         <p className="text-sm text-white/70">No alerts scheduled</p>
         <p className="mt-1 text-[12px] text-white/55">
@@ -238,7 +238,7 @@ function ActiveNotifsList({
   }
 
   return (
-    <div className="rounded-2xl border border-white/[0.06] bg-[#0d0d1a] overflow-hidden divide-y divide-white/[0.05]">
+    <div className="rounded-lg border border-white/[0.06] bg-[#0e0e1a] overflow-hidden divide-y divide-white/[0.05]">
       {items.map(({ key, title, timing }) => (
         <div key={key} className="flex items-center gap-3 px-4 py-3">
           <Bell className="h-3.5 w-3.5 text-[#009B3A] shrink-0" />
@@ -353,7 +353,7 @@ export default function NotificationSettingsPage() {
           </div>
 
           {/* Global settings strip */}
-          <div className="mb-6 rounded-2xl border border-white/[0.07] bg-[#0d0d1a] p-4">
+          <div className="mb-6 rounded-lg border border-white/[0.07] bg-[#0e0e1a] p-4">
             <div className="flex flex-col sm:flex-row gap-4">
               {/* Do Not Disturb */}
               <div className="flex items-center justify-between flex-1 gap-4">
@@ -435,12 +435,12 @@ export default function NotificationSettingsPage() {
               {[1, 2, 3].map((i) => (
                 <div
                   key={i}
-                  className="h-14 animate-pulse rounded-xl border border-white/[0.06] bg-[#0d0d1a]"
+                  className="h-14 animate-pulse rounded-xl border border-white/[0.06] bg-[#0e0e1a]"
                 />
               ))}
             </div>
           ) : trackedCases.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.05] bg-[#0d0d1a] py-16 text-center">
+            <div className="flex flex-col items-center justify-center rounded-lg border border-white/[0.05] bg-[#0e0e1a] py-16 text-center">
               <Bell className="mb-3 h-10 w-10 text-white/10" />
               <p className="text-sm text-white/70">No tracked cases</p>
               <p className="mt-1 text-[12px] text-white/55">
@@ -457,7 +457,7 @@ export default function NotificationSettingsPage() {
             /* ── Two-panel layout ── */
             <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
               {/* Left: Case list */}
-              <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a] overflow-hidden h-fit">
+              <div className="rounded-lg border border-white/[0.07] bg-[#0e0e1a] overflow-hidden h-fit">
                 <div className="px-4 py-3 border-b border-white/[0.06]">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Tracked Cases
@@ -523,7 +523,7 @@ export default function NotificationSettingsPage() {
                     onUpdate={(cs) => updateCaseSettings(selectedCaseId, cs)}
                   />
                 ) : (
-                  <div className="flex items-center justify-center h-48 rounded-2xl border border-white/[0.06] text-white/60 text-sm">
+                  <div className="flex items-center justify-center h-48 rounded-lg border border-white/[0.06] text-white/60 text-sm">
                     Select a case to manage alerts
                   </div>
                 )}
@@ -540,7 +540,7 @@ export default function NotificationSettingsPage() {
               onClick={() => setMobileSheetOpen(false)}
             />
             <div
-              className="lg:hidden fixed bottom-0 inset-x-0 z-[75] rounded-t-2xl bg-[#0d0d1a] border-t border-white/[0.1] flex flex-col max-h-[85vh]"
+              className="lg:hidden fixed bottom-0 inset-x-0 z-[75] rounded-t-2xl bg-[#0e0e1a] border-t border-white/[0.1] flex flex-col max-h-[85vh]"
               style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
             >
               <div className="mx-auto mt-2.5 mb-1 h-1 w-10 rounded-full bg-white/[0.12]" />

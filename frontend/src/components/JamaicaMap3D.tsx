@@ -390,7 +390,7 @@ function MapScene({
 
   return (
     <>
-      <color attach="background" args={["#0a0a0a"]} />
+      <color attach="background" args={["#080810"]} />
       <ambientLight intensity={0.5} />
       <directionalLight position={[6, 10, 8]} intensity={1.2} castShadow />
       <pointLight position={[-8, 4, 4]} intensity={0.3} color="#1a0a00" />
@@ -541,7 +541,7 @@ function ParishLeaderboard({
     "px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-widest text-white/60 cursor-pointer hover:text-white/60 transition-colors select-none whitespace-nowrap";
 
   return (
-    <div className="mt-6 overflow-x-auto rounded-2xl border border-white/[0.06]">
+    <div className="mt-6 overflow-x-auto rounded-lg border border-white/[0.06]">
       <table className="w-full min-w-[540px] text-sm">
         <thead>
           <tr className="border-b border-white/[0.06] bg-white/[0.02]">
@@ -643,7 +643,7 @@ function TopOffences({ cases }: { cases: ParishCourtCase[] }) {
   if (offences.length === 0) return null;
 
   return (
-    <div className="mt-6 overflow-x-auto rounded-2xl border border-white/[0.06]">
+    <div className="mt-6 overflow-x-auto rounded-lg border border-white/[0.06]">
       <table className="w-full min-w-[460px] text-sm">
         <thead>
           <tr className="border-b border-white/[0.06] bg-white/[0.02]">
@@ -705,7 +705,7 @@ const CAT_ACTIVE_COLORS: Record<MapCategory, string> = {
 function CanvasSkeleton({ mobile }: { mobile: boolean }) {
   return (
     <div
-      className={`w-full rounded-2xl bg-white/[0.03] border border-white/[0.05] animate-pulse flex items-center justify-center ${
+      className={`w-full rounded-lg bg-white/[0.03] border border-white/[0.05] animate-pulse flex items-center justify-center ${
         mobile ? "h-[350px]" : "h-[450px]"
       }`}
     >
@@ -864,7 +864,7 @@ export default function JamaicaMap3D({
           <CanvasSkeleton mobile={false} />
         </>
       ) : (
-        <div className="relative rounded-2xl overflow-hidden border border-white/[0.06]">
+        <div className="relative rounded-lg overflow-hidden border border-white/[0.06]">
           <div className="h-[350px] md:h-[450px]">
             <Canvas
               camera={{ position: [0, 2, 7], fov: 52 }}

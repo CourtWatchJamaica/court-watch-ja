@@ -89,7 +89,7 @@ function DetailSkeleton() {
       <div className="h-10 w-1/2 rounded-xl bg-white/[0.06]" />
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="h-20 rounded-2xl bg-white/[0.04]" />
+          <div key={i} className="h-20 rounded-lg bg-white/[0.04]" />
         ))}
       </div>
       <div className="space-y-2">
@@ -204,7 +204,7 @@ function ParishCaseDetail() {
   return (
     <div
       className="min-h-screen"
-      style={{ background: "linear-gradient(135deg, #0a0a0a 0%, #1a0a00 100%)" }}
+      style={{ background: "#080810" }}
     >
       {/* Header bar */}
       <div className="border-b border-white/[0.06] bg-black/30 backdrop-blur-xl">
@@ -247,7 +247,7 @@ function ParishCaseDetail() {
         {loading ? (
           <DetailSkeleton />
         ) : notFound || !courtCase ? (
-          <div className="flex flex-col items-center justify-center rounded-2xl border border-white/[0.07] bg-black/30 py-16 text-center gap-4 px-6">
+          <div className="flex flex-col items-center justify-center rounded-lg border border-white/[0.07] bg-black/30 py-16 text-center gap-4 px-6">
             <p className="text-sm text-white/70">Case not found.</p>
             <button
               onClick={() => router.push("/parish-court")}
@@ -260,7 +260,7 @@ function ParishCaseDetail() {
           <>
             {/* ── Hero ─────────────────────────────────────────────────────── */}
             <div
-              className="rounded-2xl overflow-hidden"
+              className="rounded-lg overflow-hidden"
               style={{
                 borderTop: "1px solid rgba(255,255,255,0.08)",
                 borderRight: "1px solid rgba(255,255,255,0.08)",
@@ -320,7 +320,7 @@ function ParishCaseDetail() {
                     return (
                       <div
                         key={cat}
-                        className={`rounded-2xl border p-4 min-h-[80px] ${
+                        className={`rounded-lg border p-4 min-h-[80px] ${
                           count > 0
                             ? `${cfg.bg} ${cfg.border}`
                             : "border-white/[0.05] bg-white/[0.02]"

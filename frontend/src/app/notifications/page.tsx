@@ -189,7 +189,7 @@ function CaseGroupCard({
   const unread = notifications.filter((n) => n.read_at === null).length;
 
   return (
-    <div className="rounded-2xl border border-border bg-card overflow-hidden">
+    <div className="rounded-lg border border-border bg-card overflow-hidden">
       {/* Card header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-muted/20">
         <div className="flex-1 flex items-center gap-2 min-w-0">
@@ -296,7 +296,7 @@ function SystemRow({
 
 function SkeletonCard() {
   return (
-    <div className="rounded-2xl border border-border bg-card overflow-hidden animate-pulse">
+    <div className="rounded-lg border border-border bg-card overflow-hidden animate-pulse">
       <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-muted/20">
         <div className="h-4 w-28 rounded bg-muted" />
         <div className="h-4 w-12 rounded-full bg-muted ml-1" />
@@ -500,8 +500,8 @@ export default function NotificationsPage() {
 
           {/* Empty state */}
           {isEmpty && (
-            <div className="rounded-2xl border border-border bg-card flex flex-col items-center justify-center py-20 text-center">
-              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted/30">
+            <div className="rounded-lg border border-border bg-card flex flex-col items-center justify-center py-20 text-center">
+              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-muted/30">
                 <Bell className="h-7 w-7 text-muted-foreground/30" />
               </div>
               <p className="text-sm font-medium text-muted-foreground">No notifications yet</p>
@@ -542,7 +542,7 @@ export default function NotificationsPage() {
                 </span>
                 <div className="flex-1 h-px bg-border" />
               </div>
-              <div className="rounded-2xl border border-border bg-card overflow-hidden divide-y divide-border/50">
+              <div className="rounded-lg border border-border bg-card overflow-hidden divide-y divide-border/50">
                 {systemNotifs.map((n) => (
                   <SystemRow
                     key={n.id}

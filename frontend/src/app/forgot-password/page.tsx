@@ -31,10 +31,10 @@ export default function ForgotPasswordPage() {
   };
 
   const inputCls =
-    "w-full rounded-xl border border-white/[0.1] bg-black/30 px-4 py-3 text-sm text-white placeholder-white/25 focus:outline-none focus:border-[#009B3A]/60 focus:bg-black/50 transition-colors";
+    "w-full rounded-md border border-white/15 bg-black/30 px-3.5 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#009B3A]/70 transition-colors";
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] px-4">
+    <div className="min-h-screen flex items-center justify-center bg-[#080810] px-4">
       <div
         className="fixed top-0 left-0 right-0 h-[3px] z-50"
         style={{
@@ -45,7 +45,7 @@ export default function ForgotPasswordPage() {
 
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#009B3A]/15 ring-1 ring-[#009B3A]/30">
+          <div className="flex items-center justify-center">
             {submitted ? (
               <CheckCircle className="h-6 w-6 text-[#009B3A]" />
             ) : (
@@ -53,9 +53,8 @@ export default function ForgotPasswordPage() {
             )}
           </div>
           <div className="text-center">
-            <h1 className="text-2xl font-bold tracking-tight text-white">
-              Court<span className="text-[#009B3A]">Watch</span>
-              <span className="text-[#FED100]"> JA</span>
+            <h1 className="font-heading text-2xl font-semibold tracking-tight text-white">
+              CourtWatch JA
             </h1>
             <p className="mt-1 text-sm text-white/70">
               {submitted ? "Check your inbox" : "Reset your password"}
@@ -63,7 +62,7 @@ export default function ForgotPasswordPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-white/[0.08] bg-[#0d0d1a] p-6">
+        <div className="rounded-lg border border-white/10 bg-[#0e0e1a] p-6">
           {submitted ? (
             <div className="text-center space-y-4">
               <div className="flex justify-center">
@@ -79,9 +78,9 @@ export default function ForgotPasswordPage() {
               </p>
               <Link
                 href="/auth/login"
-                className="mt-2 inline-block w-full rounded-xl bg-[#009B3A]/15 border border-[#009B3A]/30 py-3 text-sm font-semibold text-[#009B3A] hover:bg-[#009B3A]/25 transition-colors text-center"
+                className="mt-2 inline-block w-full rounded-md bg-[#009B3A]/15 border border-[#009B3A]/30 py-2.5 text-sm font-medium text-[#009B3A] hover:bg-[#009B3A]/25 transition-colors text-center"
               >
-                Back to Sign In
+                Back to sign in
               </Link>
             </div>
           ) : (
@@ -92,7 +91,7 @@ export default function ForgotPasswordPage() {
               </p>
 
               <div>
-                <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70 mb-1.5">
+                <label className="block text-xs font-medium text-white/70 mb-1.5">
                   Email
                 </label>
                 <input
@@ -108,7 +107,7 @@ export default function ForgotPasswordPage() {
               </div>
 
               {error && (
-                <div className="rounded-xl bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-400">
+                <div className="rounded-md bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-400">
                   {error}
                 </div>
               )}
@@ -116,7 +115,7 @@ export default function ForgotPasswordPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#009B3A] py-3 text-sm font-semibold text-white hover:bg-[#009B3A]/85 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="w-full flex items-center justify-center gap-2 rounded-md bg-[#009B3A] py-2.5 text-sm font-medium text-white hover:bg-[#009B3A]/85 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {loading ? (
                   <>
@@ -124,7 +123,7 @@ export default function ForgotPasswordPage() {
                     Sending…
                   </>
                 ) : (
-                  "Send Reset Link"
+                  "Send reset link"
                 )}
               </button>
 
@@ -133,7 +132,7 @@ export default function ForgotPasswordPage() {
                   href="/auth/login"
                   className="font-medium text-[#009B3A] hover:text-[#009B3A]/80 transition-colors"
                 >
-                  Back to Sign In
+                  Back to sign in
                 </Link>
               </div>
             </form>

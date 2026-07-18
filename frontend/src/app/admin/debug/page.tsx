@@ -40,7 +40,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   return (
     <div className="mb-5">
       <h2 className="mb-2 text-[11px] font-bold uppercase tracking-[0.15em] text-white/60">{title}</h2>
-      <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a] p-4">{children}</div>
+      <div className="rounded-lg border border-white/[0.07] bg-[#0e0e1a] p-4">{children}</div>
     </div>
   );
 }
@@ -67,7 +67,7 @@ export default function AdminDebugPage() {
   };
 
   const inputCls =
-    "h-[44px] rounded-xl border border-white/[0.08] bg-[#0d0d1a] px-3 text-sm text-white placeholder-white/20 focus:outline-none focus:border-[#009B3A]/50 transition-colors";
+    "h-[44px] rounded-xl border border-white/[0.08] bg-[#0e0e1a] px-3 text-sm text-white placeholder-white/20 focus:outline-none focus:border-[#009B3A]/50 transition-colors";
 
   return (
     <div className="p-6 md:p-8 max-w-4xl">

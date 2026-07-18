@@ -45,7 +45,7 @@ function CaseCard({
   return (
     <button
       onClick={onClick}
-      className="group w-full text-left relative overflow-hidden rounded-2xl border border-border bg-card hover:border-primary/20 hover:shadow-[0_8px_32px_rgba(0,196,74,0.06),0_2px_8px_rgba(0,0,0,0.5)] transition-all duration-250 p-5 hover:-translate-y-0.5"
+      className="group w-full text-left relative overflow-hidden rounded-lg border border-border bg-card hover:border-primary/20 hover:shadow-lg transition-all duration-250 p-5 hover:-translate-y-0.5"
     >
       {/* Ghost case number watermark */}
       <span
@@ -124,7 +124,7 @@ function CaseCard({
 
 function SkeletonCard() {
   return (
-    <div className="rounded-2xl border border-border bg-card p-5 animate-pulse">
+    <div className="rounded-lg border border-border bg-card p-5 animate-pulse">
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 space-y-3">
           <div className="flex gap-2 mb-1">
@@ -184,7 +184,7 @@ export default function DocketPage() {
                   Case Files
                 </span>
               </div>
-              <h1 className="font-heading font-extrabold text-[2.8rem] sm:text-[3.5rem] leading-none tracking-tight text-foreground mb-2">
+              <h1 className="font-heading font-bold text-[2.8rem] sm:text-[3.5rem] leading-none tracking-tight text-foreground mb-2">
                 My Docket<span className="text-primary">.</span>
               </h1>
               {!loading && items.length > 0 && (
@@ -218,12 +218,12 @@ export default function DocketPage() {
 
           {/* Empty */}
           {!loading && items.length === 0 && (
-            <div className="relative overflow-hidden rounded-2xl border border-border bg-card flex flex-col items-center justify-center py-24 text-center px-8">
-              <span className="pointer-events-none select-none absolute inset-0 flex items-center justify-center font-heading font-extrabold text-[7rem] text-foreground/[0.02] overflow-hidden">
+            <div className="relative overflow-hidden rounded-lg border border-border bg-card flex flex-col items-center justify-center py-24 text-center px-8">
+              <span className="pointer-events-none select-none absolute inset-0 flex items-center justify-center font-heading font-bold text-[7rem] text-foreground/[0.02] overflow-hidden">
                 EMPTY
               </span>
               <div className="relative z-10">
-                <div className="mb-5 mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-border bg-muted">
+                <div className="mb-5 mx-auto flex h-16 w-16 items-center justify-center rounded-lg border border-border bg-muted">
                   <FolderOpen className="h-7 w-7 text-foreground/[0.18]" />
                 </div>
                 <h2 className="font-heading font-bold text-xl text-foreground/75 mb-2">

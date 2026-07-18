@@ -73,16 +73,16 @@ function StatTile({
   );
   if (href) {
     return (
-      <Link href={href} className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a] hover:border-white/[0.12] transition-colors">
+      <Link href={href} className="rounded-lg border border-white/[0.07] bg-[#0e0e1a] hover:border-white/[0.12] transition-colors">
         {inner}
       </Link>
     );
   }
-  return <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a]">{inner}</div>;
+  return <div className="rounded-lg border border-white/[0.07] bg-[#0e0e1a]">{inner}</div>;
 }
 
 const CHART_TOOLTIP_STYLE = {
-  backgroundColor: "#0d0d1a",
+  backgroundColor: "#0e0e1a",
   border: "1px solid rgba(255,255,255,0.08)",
   borderRadius: 10,
   color: "#fff",
@@ -193,7 +193,7 @@ export default function AdminOverviewPage() {
 
       {/* Backup reminder */}
       {!loading && isSuperAdmin && backupStale && (
-        <div className="mb-6 flex items-center gap-3 rounded-2xl border border-amber-400/20 bg-amber-400/[0.06] p-4">
+        <div className="mb-6 flex items-center gap-3 rounded-lg border border-amber-400/20 bg-amber-400/[0.06] p-4">
           <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" />
           <p className="flex-1 text-sm text-amber-400/90">
             {backupDate
@@ -215,7 +215,7 @@ export default function AdminOverviewPage() {
       {loading ? (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
           {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-            <div key={i} className="h-[72px] animate-pulse rounded-2xl border border-white/[0.06] bg-[#0d0d1a]" />
+            <div key={i} className="h-[72px] animate-pulse rounded-lg border border-white/[0.06] bg-[#0e0e1a]" />
           ))}
         </div>
       ) : stats ? (
@@ -234,7 +234,7 @@ export default function AdminOverviewPage() {
       {/* Charts row */}
       <div className="grid md:grid-cols-2 gap-5 mb-6">
         {/* New users per week */}
-        <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a] p-5">
+        <div className="rounded-lg border border-white/[0.07] bg-[#0e0e1a] p-5">
           <div className="mb-4 flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-blue-400" />
             <h2 className="text-sm font-semibold text-white">New Users / Week</h2>
@@ -258,7 +258,7 @@ export default function AdminOverviewPage() {
         </div>
 
         {/* Emails per day */}
-        <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a] p-5">
+        <div className="rounded-lg border border-white/[0.07] bg-[#0e0e1a] p-5">
           <div className="mb-4 flex items-center gap-2">
             <Mail className="h-4 w-4 text-purple-400" />
             <h2 className="text-sm font-semibold text-white">Emails Sent / Day</h2>
@@ -284,7 +284,7 @@ export default function AdminOverviewPage() {
 
       {/* Bottom row: scraper + config */}
       <div className="grid md:grid-cols-2 gap-6">
-        <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a] p-5">
+        <div className="rounded-lg border border-white/[0.07] bg-[#0e0e1a] p-5">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Cpu className="h-4 w-4 text-[#FED100]" />
@@ -323,7 +323,7 @@ export default function AdminOverviewPage() {
           )}
         </div>
 
-        <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a] p-5">
+        <div className="rounded-lg border border-white/[0.07] bg-[#0e0e1a] p-5">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Settings className="h-4 w-4 text-purple-400" />
@@ -349,7 +349,7 @@ export default function AdminOverviewPage() {
 
       {/* Maintenance mode */}
       {isSuperAdmin && (
-        <div className="mt-6 rounded-2xl border border-white/[0.07] bg-[#0d0d1a] p-5">
+        <div className="mt-6 rounded-lg border border-white/[0.07] bg-[#0e0e1a] p-5">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className={`rounded-xl p-2.5 ${maintenance ? "bg-[#FED100]/15" : "bg-white/[0.06]"}`}>

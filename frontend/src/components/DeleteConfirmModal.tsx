@@ -22,7 +22,7 @@ export default function DeleteConfirmModal({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <div className="w-full max-w-sm rounded-2xl border border-white/[0.1] bg-[#0d0d1a] p-6">
+      <div className="w-full max-w-sm rounded-lg border border-white/[0.1] bg-[#0e0e1a] p-6">
         <div className="flex items-start gap-3 mb-5">
           <div className="shrink-0 rounded-xl bg-red-500/15 p-2.5">
             <AlertTriangle className="h-5 w-5 text-red-400" />

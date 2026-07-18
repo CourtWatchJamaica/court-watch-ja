@@ -39,7 +39,7 @@ function formatDate(date: string): string {
 
 function DetailSkeleton() {
   return (
-    <div className="rounded-2xl border border-border bg-card overflow-hidden animate-pulse">
+    <div className="rounded-lg border border-border bg-card overflow-hidden animate-pulse">
       <div className="p-6 border-b border-white/[0.06] space-y-4">
         <div className="flex gap-2">
           <div className="h-6 w-28 rounded-full bg-white/[0.06]" />
@@ -92,11 +92,11 @@ export default function SittingDetailPage() {
           {loading ? (
             <DetailSkeleton />
           ) : !sitting ? (
-            <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card py-16 text-center">
+            <div className="flex flex-col items-center justify-center rounded-lg border border-border bg-card py-16 text-center">
               <p className="text-sm text-muted-foreground">Sitting not found.</p>
             </div>
           ) : (
-            <div className="rounded-2xl border-l-[3px] border-l-[#FED100] border-t border-r border-b border-border bg-card overflow-hidden">
+            <div className="rounded-lg border-l-[3px] border-l-[#FED100] border-t border-r border-b border-border bg-card overflow-hidden">
               {/* Header */}
               <div className="p-6 border-b border-border">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">

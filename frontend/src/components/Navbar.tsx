@@ -137,7 +137,7 @@ export default function Navbar() {
             {/* Logo + Court Tabs */}
             <div className="flex items-center gap-4 shrink-0 min-w-0">
               <Link href="/" className="shrink-0 group">
-                <span className="font-heading font-extrabold text-[17px] tracking-tight whitespace-nowrap">
+                <span className="font-heading font-bold text-[17px] tracking-tight whitespace-nowrap">
                   <span className="text-foreground group-hover:text-foreground transition-colors duration-150">Court</span><span className="text-primary">Watch</span><sup className="text-[10px] font-semibold text-accent ml-0.5 tracking-wide">JA</sup>
                 </span>
               </Link>
@@ -286,7 +286,7 @@ export default function Navbar() {
                 </Button>
 
                 {moreOpen && (
-                  <div className="absolute right-0 top-full mt-1.5 w-44 rounded-2xl border border-border bg-card shadow-2xl overflow-hidden z-[100]">
+                  <div className="absolute right-0 top-full mt-1.5 w-44 rounded-lg border border-border bg-card shadow-2xl overflow-hidden z-[100]">
                     <div className="flex items-center justify-between px-3 py-2 border-b border-border">
                       <span className="text-[11px] text-foreground/35">Theme</span>
                       <ThemeToggle />
@@ -327,7 +327,7 @@ export default function Navbar() {
       {/* Mobile bottom nav */}
       <div className="md:hidden fixed bottom-0 inset-x-0 z-50 flex justify-center pointer-events-none">
         <nav
-          className="pointer-events-auto flex items-center gap-0 rounded-[22px] border border-border bg-card/97 px-1 py-2 shadow-[0_8px_48px_rgba(0,0,0,0.6)] backdrop-blur-2xl"
+          className="pointer-events-auto flex items-center gap-0 rounded-[22px] border border-border bg-card px-1 py-2 shadow-xl"
           style={{ marginBottom: "env(safe-area-inset-bottom, 0px)" }}
         >
           {[
@@ -433,7 +433,7 @@ export default function Navbar() {
       {/* New notification toast */}
       {notifToast && (
         <div className="fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-[200] pointer-events-none">
-          <div className="flex items-center gap-2.5 rounded-2xl border border-primary/20 bg-card px-4 py-3 shadow-2xl animate-in fade-in slide-in-from-bottom-2">
+          <div className="flex items-center gap-2.5 rounded-lg border border-primary/20 bg-card px-4 py-3 shadow-2xl animate-in fade-in slide-in-from-bottom-2">
             <Bell className="h-4 w-4 text-primary shrink-0" />
             <p className="text-sm text-foreground/85">{notifToast}</p>
           </div>

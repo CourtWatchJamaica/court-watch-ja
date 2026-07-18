@@ -26,7 +26,7 @@ import { Badge } from "@/components/ui/badge";
 const JamaicaMap3D = dynamic(() => import("@/components/JamaicaMap3D"), {
   ssr: false,
   loading: () => (
-    <div className="h-[450px] w-full rounded-2xl bg-white/[0.03] border border-white/[0.05] animate-pulse" />
+    <div className="h-[450px] w-full rounded-lg bg-white/[0.03] border border-white/[0.05] animate-pulse" />
   ),
 });
 
@@ -140,7 +140,7 @@ function TabToggle({
   onChange: (t: ActiveTab) => void;
 }) {
   return (
-    <div className="flex rounded-2xl bg-black/30 border border-white/[0.06] p-1.5 gap-1.5 backdrop-blur-sm">
+    <div className="flex rounded-lg bg-black/30 border border-white/[0.06] p-1.5 gap-1.5 backdrop-blur-sm">
       {(
         [
           { id: "cases" as ActiveTab,     icon: List,       label: "Cases",     sub: "Case feed" },
@@ -309,7 +309,7 @@ function ParishCourtDashboard() {
   return (
     <div
       className="min-h-screen"
-      style={{ background: "linear-gradient(135deg, #0a0a0a 0%, #1a0a00 100%)" }}
+      style={{ background: "#080810" }}
     >
       {/* Header */}
       <div className="border-b border-white/[0.06] bg-black/30 backdrop-blur-xl">
@@ -363,7 +363,7 @@ function ParishCourtDashboard() {
                     <button
                       key={cat}
                       onClick={() => setActiveCategory(active ? null : cat)}
-                      className={`rounded-2xl border p-4 text-left transition-all duration-200 min-h-[88px] ${
+                      className={`rounded-lg border p-4 text-left transition-all duration-200 min-h-[88px] ${
                         active
                           ? `${cfg.bg} ${cfg.border} ring-1 ${cfg.border.replace("border-", "ring-")}`
                           : "border-white/[0.06] bg-white/[0.03] hover:bg-white/[0.06]"
@@ -473,7 +473,7 @@ function ParishCourtDashboard() {
                   ))}
                 </div>
               ) : cases.length === 0 ? (
-                <div className="rounded-2xl border border-white/[0.05] bg-white/[0.02] py-16 text-center">
+                <div className="rounded-lg border border-white/[0.05] bg-white/[0.02] py-16 text-center">
                   <p className="text-white/60 text-sm">No cases match your filters.</p>
                 </div>
               ) : (
@@ -564,13 +564,13 @@ function ParishCourtDashboard() {
           <section className="space-y-2">
             {analyticsLoading && analyticsCases.length === 0 ? (
               <div className="space-y-4">
-                <div className="h-[450px] w-full rounded-2xl bg-white/[0.03] border border-white/[0.05] animate-pulse flex items-center justify-center">
+                <div className="h-[450px] w-full rounded-lg bg-white/[0.03] border border-white/[0.05] animate-pulse flex items-center justify-center">
                   <p className="text-white/15 text-xs">Loading analytics…</p>
                 </div>
                 {[1, 2].map((i) => (
                   <div
                     key={i}
-                    className="h-24 w-full rounded-2xl bg-white/[0.03] border border-white/[0.05] animate-pulse"
+                    className="h-24 w-full rounded-lg bg-white/[0.03] border border-white/[0.05] animate-pulse"
                   />
                 ))}
               </div>

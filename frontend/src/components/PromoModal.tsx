@@ -52,7 +52,7 @@ export default function PromoModal() {
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={handleDismiss}
       />
-      <div className="relative w-full max-w-md rounded-2xl border border-white/[0.08] bg-[#0d0d1a]/95 backdrop-blur-xl shadow-2xl shadow-black/60 p-6">
+      <div className="relative w-full max-w-md rounded-lg border border-white/[0.08] bg-[#0e0e1a] shadow-2xl p-6">
         <button
           onClick={handleDismiss}
           aria-label="Dismiss"
@@ -62,7 +62,7 @@ export default function PromoModal() {
         </button>
 
         <div className="flex items-start gap-3 pr-8">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#009B3A]/15">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[#009B3A]/15">
             <Megaphone className="h-4 w-4 text-[#009B3A]" />
           </div>
           <div className="flex-1 min-w-0">

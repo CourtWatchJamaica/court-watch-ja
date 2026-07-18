@@ -39,7 +39,7 @@ function VerifyEmailContent() {
   }, [searchParams, router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] px-4">
+    <div className="min-h-screen flex items-center justify-center bg-[#080810] px-4">
       <div
         className="fixed top-0 left-0 right-0 h-[3px] z-50"
         style={{
@@ -50,7 +50,7 @@ function VerifyEmailContent() {
 
       <div className="w-full max-w-sm text-center">
         <div className="mb-6 flex justify-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#009B3A]/15 ring-1 ring-[#009B3A]/30">
+          <div className="flex items-center justify-center">
             {status === "loading" && (
               <Loader2 className="h-7 w-7 text-[#009B3A] animate-spin" />
             )}
@@ -65,14 +65,14 @@ function VerifyEmailContent() {
 
         {status === "loading" && (
           <>
-            <h1 className="text-xl font-bold text-white mb-2">Verifying your email…</h1>
+            <h1 className="font-heading text-xl font-semibold text-white mb-2">Verifying your email…</h1>
             <p className="text-sm text-white/70">Please wait a moment.</p>
           </>
         )}
 
         {status === "success" && (
           <>
-            <h1 className="text-xl font-bold text-white mb-2">
+            <h1 className="font-heading text-xl font-semibold text-white mb-2">
               Email verified!{" "}
               <span className="text-[#009B3A]">Welcome to CourtWatch JA.</span>
             </h1>
@@ -82,14 +82,14 @@ function VerifyEmailContent() {
 
         {status === "error" && (
           <>
-            <h1 className="text-xl font-bold text-white mb-2">Verification failed</h1>
+            <h1 className="font-heading text-xl font-semibold text-white mb-2">Verification failed</h1>
             <p className="text-sm text-white/50 mb-6">{errorMessage}</p>
             <p className="text-sm text-white/70 mb-4">
               The link may have expired. Request a new one by signing up again with the same email.
             </p>
             <Link
               href="/auth/signup"
-              className="inline-block rounded-xl bg-[#009B3A] px-6 py-3 text-sm font-semibold text-white hover:bg-[#009B3A]/85 transition-colors"
+              className="inline-block rounded-md bg-[#009B3A] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#009B3A]/85 transition-colors"
             >
               Resend verification email
             </Link>
@@ -104,7 +104,7 @@ export default function VerifyEmailPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-[#0a0a0a]">
+        <div className="flex min-h-screen items-center justify-center bg-[#080810]">
           <Loader2 className="h-8 w-8 animate-spin text-[#009B3A]" />
         </div>
       }

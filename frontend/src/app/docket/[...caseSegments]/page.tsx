@@ -72,7 +72,7 @@ function UntrackModal({
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onCancel}
       />
-      <div className="relative z-10 w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-2xl">
+      <div className="relative z-10 w-full max-w-sm rounded-lg border border-border bg-card p-6 shadow-2xl">
         <button
           onClick={onCancel}
           className="absolute right-4 top-4 rounded-lg p-1 text-muted-foreground/50 hover:text-foreground hover:bg-muted transition-colors"
@@ -174,8 +174,8 @@ function JudgmentTab({ detail }: { detail: DocketDetail }) {
 
   if (!j) {
     return (
-      <div className="rounded-2xl border border-border bg-card p-8 text-center">
-        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/30">
+      <div className="rounded-lg border border-border bg-card p-8 text-center">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-lg bg-muted/30">
           <BookOpen className="h-6 w-6 text-muted-foreground/30" />
         </div>
         <p className="text-sm font-medium text-muted-foreground">
@@ -193,7 +193,7 @@ function JudgmentTab({ detail }: { detail: DocketDetail }) {
   return (
     <div className="space-y-4">
       {/* Main judgment card */}
-      <div className="rounded-2xl border border-border bg-card overflow-hidden">
+      <div className="rounded-lg border border-border bg-card overflow-hidden">
         <div className="px-5 py-4 border-b border-border bg-muted/10">
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
@@ -271,7 +271,7 @@ function JudgmentTab({ detail }: { detail: DocketDetail }) {
 
       {/* Summary */}
       {j.summary_text && (
-        <div className="rounded-2xl border border-border bg-card p-5">
+        <div className="rounded-lg border border-border bg-card p-5">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60 mb-3">
             Summary
           </p>
@@ -291,8 +291,8 @@ function SittingsTab({ detail }: { detail: DocketDetail }) {
 
   if (sittings.length === 0) {
     return (
-      <div className="rounded-2xl border border-border bg-card p-8 text-center">
-        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/30">
+      <div className="rounded-lg border border-border bg-card p-8 text-center">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-lg bg-muted/30">
           <Calendar className="h-6 w-6 text-muted-foreground/30" />
         </div>
         <p className="text-sm font-medium text-muted-foreground">
@@ -306,7 +306,7 @@ function SittingsTab({ detail }: { detail: DocketDetail }) {
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-card overflow-hidden">
+    <div className="rounded-lg border border-border bg-card overflow-hidden">
       {sittings.map((s, i) => {
         const isPast = isPastDateOnly(s.event_date);
         return (
@@ -347,7 +347,7 @@ function SittingsTab({ detail }: { detail: DocketDetail }) {
                   {s.event_type ?? "Hearing"}
                 </span>
                 {isPast ? (
-                  <span className="rounded-full bg-muted/60 px-2 py-px text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wide">
+                  <span className="rounded-sm bg-muted/60 px-1.5 py-px text-[10px] font-medium text-muted-foreground/70 uppercase tracking-wide">
                     Past
                   </span>
                 ) : (
@@ -392,7 +392,7 @@ function Skeleton() {
     <div className="animate-pulse space-y-4">
       <div className="h-8 w-48 rounded-lg bg-muted" />
       <div className="h-11 w-full rounded-xl bg-muted/60" />
-      <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
+      <div className="rounded-lg border border-border bg-card p-5 space-y-3">
         <div className="h-4 w-32 rounded bg-muted" />
         <div className="h-5 w-64 rounded bg-muted/70" />
         <div className="grid grid-cols-2 gap-3">
@@ -486,8 +486,8 @@ export default function DocketDetailPage({
 
           {/* Not tracking redirect state */}
           {notTracking && (
-            <div className="rounded-2xl border border-border bg-card p-8 text-center">
-              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10">
+            <div className="rounded-lg border border-border bg-card p-8 text-center">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-lg bg-amber-500/10">
                 <AlertTriangle className="h-6 w-6 text-amber-500" />
               </div>
               <p className="text-sm font-medium text-foreground">Not tracking this case</p>

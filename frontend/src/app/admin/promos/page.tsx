@@ -175,7 +175,7 @@ export default function AdminPromosPage() {
       </div>
 
       {/* Form */}
-      <div className="mb-8 rounded-2xl border border-white/[0.07] bg-[#0d0d1a] p-5">
+      <div className="mb-8 rounded-lg border border-white/[0.07] bg-[#0e0e1a] p-5">
         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-white/70 mb-4">
           {editingId !== null ? "Edit Promo" : "New Promo"}
         </p>
@@ -367,10 +367,10 @@ export default function AdminPromosPage() {
             {promos.map((p) => (
               <div
                 key={p.id}
-                className={`rounded-2xl border p-4 transition-colors ${
+                className={`rounded-lg border p-4 transition-colors ${
                   editingId === p.id
                     ? "border-[#009B3A]/30 bg-[#009B3A]/[0.04]"
-                    : "border-white/[0.07] bg-[#0d0d1a]"
+                    : "border-white/[0.07] bg-[#0e0e1a]"
                 }`}
               >
                 <div className="flex items-start gap-3">
@@ -380,7 +380,7 @@ export default function AdminPromosPage() {
                         {p.title}
                       </p>
                       <span
-                        className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                        className={`shrink-0 rounded-sm px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
                           p.enabled
                             ? "bg-[#009B3A]/15 text-[#009B3A]"
                             : "bg-white/[0.06] text-white/60"

@@ -8,14 +8,12 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { HelpCircle, Search, Bell, Bookmark, Gavel, Mail } from "lucide-react";
+import { Search, Bell, Bookmark, Gavel, Mail } from "lucide-react";
 
 const SECTIONS = [
   {
     id: "search",
     icon: Search,
-    color: "text-[#009B3A]",
-    bg: "bg-[#009B3A]/10",
     title: "Searching Cases",
     items: [
       {
@@ -39,8 +37,6 @@ const SECTIONS = [
   {
     id: "tracking",
     icon: Bookmark,
-    color: "text-[#FED100]",
-    bg: "bg-[#FED100]/10",
     title: "Tracking Cases",
     items: [
       {
@@ -64,8 +60,6 @@ const SECTIONS = [
   {
     id: "notifications",
     icon: Bell,
-    color: "text-[#009B3A]",
-    bg: "bg-[#009B3A]/10",
     title: "Notifications",
     items: [
       {
@@ -85,8 +79,6 @@ const SECTIONS = [
   {
     id: "chambers",
     icon: Gavel,
-    color: "text-[#FED100]",
-    bg: "bg-[#FED100]/10",
     title: "Chambers Tools",
     items: [
       {
@@ -113,13 +105,7 @@ export default function HelpPage() {
 
         {/* Header */}
         <div className="mb-8">
-          <div className="mb-3 flex items-center gap-2">
-            <HelpCircle className="h-4 w-4 text-[#009B3A]" />
-            <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#009B3A]">
-              Support
-            </span>
-          </div>
-          <h1 className="text-3xl font-bold tracking-tight">Help Centre</h1>
+          <h1 className="font-heading text-3xl font-semibold tracking-tight">Help Centre</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             Answers to the most common questions about CourtWatch JA.
           </p>
@@ -131,14 +117,12 @@ export default function HelpPage() {
             const Icon = section.icon;
             return (
               <section key={section.id}>
-                <div className="mb-3 flex items-center gap-2.5">
-                  <div className={`flex h-7 w-7 items-center justify-center rounded-lg ${section.bg}`}>
-                    <Icon className={`h-3.5 w-3.5 ${section.color}`} />
-                  </div>
+                <div className="mb-3 flex items-center gap-2">
+                  <Icon className="h-4 w-4 text-muted-foreground" />
                   <h2 className="text-sm font-semibold text-foreground">{section.title}</h2>
                 </div>
 
-                <div className="rounded-2xl border border-border bg-card overflow-hidden">
+                <div className="rounded-lg border border-border bg-card overflow-hidden">
                   <Accordion type="multiple" className="divide-y divide-border">
                     {section.items.map((item, i) => (
                       <AccordionItem
@@ -146,7 +130,7 @@ export default function HelpPage() {
                         value={`${section.id}-${i}`}
                         className="border-0 px-5"
                       >
-                        <AccordionTrigger className="py-4 text-left text-sm font-medium text-foreground hover:no-underline hover:text-[#009B3A] transition-colors [&[data-state=open]]:text-[#009B3A]">
+                        <AccordionTrigger className="py-4 text-left text-sm font-medium text-foreground hover:no-underline hover:text-primary transition-colors [&[data-state=open]]:text-primary">
                           {item.q}
                         </AccordionTrigger>
                         <AccordionContent className="pb-4 text-sm text-muted-foreground leading-relaxed">
@@ -162,22 +146,17 @@ export default function HelpPage() {
         </div>
 
         {/* Contact CTA */}
-        <div className="mt-8 rounded-2xl border border-[#009B3A]/20 bg-[#009B3A]/[0.04] p-6 text-center">
-          <div className="mb-3 flex justify-center">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#009B3A]/15">
-              <Mail className="h-5 w-5 text-[#009B3A]" />
-            </div>
-          </div>
+        <div className="mt-8 rounded-lg border border-border bg-card p-6 text-center">
           <h3 className="text-sm font-semibold text-foreground">Still need help?</h3>
           <p className="mt-1 text-sm text-muted-foreground">
             Our team is happy to assist with any questions.
           </p>
           <Link
             href="mailto:courtwatchjamaica@protonmail.com"
-            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#009B3A] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#009B3A]/85 transition-colors"
+            className="mt-4 inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
           >
             <Mail className="h-4 w-4" />
-            Contact Us
+            Contact us
           </Link>
         </div>
 

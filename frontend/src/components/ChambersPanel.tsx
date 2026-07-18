@@ -339,7 +339,7 @@ function DonutChart({ data }: { data: PAYEResult }) {
       <div className="relative h-24 w-24 shrink-0">
         <div className="h-full w-full rounded-full" style={{ background: `conic-gradient(${gradient})` }} />
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="h-14 w-14 rounded-full bg-gray-100 dark:bg-[#0d0d1a] flex items-center justify-center">
+          <div className="h-14 w-14 rounded-full bg-gray-100 dark:bg-[#0e0e1a] flex items-center justify-center">
             <span className="text-[9px] font-semibold text-gray-500 dark:text-white/70 text-center leading-tight">
               Net<br />Pay
             </span>
@@ -963,7 +963,7 @@ export default function ChambersPanel() {
         onClick={openChambers}
         title="Open Chambers (⌘K)"
         className={cn(
-          "hidden md:flex fixed bottom-[4.5rem] right-4 z-40 items-center gap-2 rounded-full border border-[#009B3A]/30 bg-white dark:bg-[#0d0d1a] px-4 py-2.5 text-[12px] font-semibold text-[#009B3A] shadow-lg shadow-[#009B3A]/10 transition-all duration-200 hover:bg-[#009B3A]/10 hover:border-[#009B3A]/60",
+          "hidden md:flex fixed bottom-[4.5rem] right-4 z-40 items-center gap-2 rounded-full border border-[#009B3A]/30 bg-white dark:bg-[#0e0e1a] px-4 py-2.5 text-[12px] font-semibold text-[#009B3A] shadow-lg shadow-[#009B3A]/10 transition-all duration-200 hover:bg-[#009B3A]/10 hover:border-[#009B3A]/60",
           isOpen && "opacity-0 pointer-events-none",
         )}
       >
@@ -983,7 +983,7 @@ export default function ChambersPanel() {
       <div
         className={cn(
           "hidden md:flex fixed right-0 top-0 z-[60] h-full w-[380px] flex-col",
-          "bg-white dark:bg-[#0d0d1a]",
+          "bg-white dark:bg-[#0e0e1a]",
           "border-l border-gray-200/60 dark:border-white/[0.07]",
           "shadow-[-12px_0_60px_rgba(0,0,0,0.12)] dark:shadow-[-12px_0_60px_rgba(0,0,0,0.5)]",
           "transition-transform duration-300 [transition-timing-function:cubic-bezier(0.32,0.72,0,1)]",
@@ -1002,7 +1002,7 @@ export default function ChambersPanel() {
       <div
         className={cn(
           "md:hidden fixed bottom-0 inset-x-0 z-[68] flex flex-col rounded-t-[20px]",
-          "bg-white dark:bg-[#0d0d1a]",
+          "bg-white dark:bg-[#0e0e1a]",
           "border-t border-gray-200/80 dark:border-white/[0.08]",
           "shadow-[0_-12px_60px_rgba(0,0,0,0.15)] dark:shadow-[0_-12px_60px_rgba(0,0,0,0.6)]",
           "max-h-[90vh] overflow-hidden",

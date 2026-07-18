@@ -96,7 +96,7 @@ export default function BackupPage() {
       </div>
 
       {/* Info card */}
-      <div className="mb-6 rounded-2xl border border-white/[0.07] bg-[#0d0d1a] p-5 space-y-4">
+      <div className="mb-6 rounded-lg border border-white/[0.07] bg-[#0e0e1a] p-5 space-y-4">
         <div className="flex items-start gap-3">
           <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#009B3A]" />
           <div>
@@ -132,7 +132,7 @@ export default function BackupPage() {
       </div>
 
       {/* Download card */}
-      <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a] p-5">
+      <div className="rounded-lg border border-white/[0.07] bg-[#0e0e1a] p-5">
         <div className="flex items-center gap-3 mb-5">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#009B3A]/15">
             <HardDriveDownload className="h-5 w-5 text-[#009B3A]" />
@@ -215,7 +215,7 @@ export default function BackupPage() {
       </div>
 
       {/* Restore instructions */}
-      <div className="mt-6 rounded-2xl border border-white/[0.07] bg-[#0d0d1a] p-5">
+      <div className="mt-6 rounded-lg border border-white/[0.07] bg-[#0e0e1a] p-5">
         <p className="text-xs font-semibold uppercase tracking-wider text-white/70 mb-3">
           How to restore
         </p>

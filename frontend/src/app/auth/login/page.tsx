@@ -59,10 +59,10 @@ export default function LoginPage() {
   };
 
   const inputCls =
-    "w-full rounded-xl border border-white/[0.1] bg-black/30 px-4 py-3 text-sm text-white placeholder-white/25 focus:outline-none focus:border-[#009B3A]/60 focus:bg-black/50 transition-colors";
+    "w-full rounded-md border border-white/15 bg-black/30 px-3.5 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#009B3A]/70 transition-colors";
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] px-4">
+    <div className="min-h-screen flex items-center justify-center bg-[#080810] px-4">
       {/* Jamaican stripe */}
       <div
         className="fixed top-0 left-0 right-0 h-[3px] z-50"
@@ -75,22 +75,19 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="mb-8 flex flex-col items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#009B3A]/15 ring-1 ring-[#009B3A]/30">
-            <Scale className="h-6 w-6 text-[#009B3A]" />
-          </div>
+          <Scale className="h-7 w-7 text-[#009B3A]" />
           <div className="text-center">
-            <h1 className="text-2xl font-bold tracking-tight text-white">
-              Court<span className="text-[#009B3A]">Watch</span>
-              <span className="text-[#FED100]"> JA</span>
+            <h1 className="font-heading text-2xl font-semibold tracking-tight text-white">
+              CourtWatch JA
             </h1>
-            <p className="mt-1 text-sm text-white/70">
+            <p className="mt-1 text-sm text-white/60">
               Sign in to your account
             </p>
           </div>
         </div>
 
         {/* Card */}
-        <div className="rounded-2xl border border-white/[0.08] bg-[#0d0d1a] p-6">
+        <div className="rounded-lg border border-white/10 bg-[#0e0e1a] p-6">
           {/* OAuth buttons — only render when provider credentials are configured */}
           {(googleEnabled || appleEnabled) && (
             <>
@@ -101,7 +98,7 @@ export default function LoginPage() {
                     onClick={() =>
                       signIn("google", { callbackUrl: "/auth/oauth-callback" })
                     }
-                    className="flex w-full items-center justify-center gap-3 rounded-xl border border-white/[0.1] bg-white/[0.04] py-2.5 text-sm font-medium text-white/70 hover:bg-white/[0.08] hover:text-white transition-colors"
+                    className="flex w-full items-center justify-center gap-3 rounded-md border border-white/15 bg-white/[0.04] py-2.5 text-sm font-medium text-white/70 hover:bg-white/[0.08] hover:text-white transition-colors"
                   >
                     <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24">
                       <path
@@ -130,7 +127,7 @@ export default function LoginPage() {
                     onClick={() =>
                       signIn("apple", { callbackUrl: "/auth/oauth-callback" })
                     }
-                    className="flex w-full items-center justify-center gap-3 rounded-xl border border-white/[0.1] bg-white/[0.04] py-2.5 text-sm font-medium text-white/70 hover:bg-white/[0.08] hover:text-white transition-colors"
+                    className="flex w-full items-center justify-center gap-3 rounded-md border border-white/15 bg-white/[0.04] py-2.5 text-sm font-medium text-white/70 hover:bg-white/[0.08] hover:text-white transition-colors"
                   >
                     <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701" />
@@ -145,7 +142,7 @@ export default function LoginPage() {
                   <div className="w-full border-t border-white/[0.08]" />
                 </div>
                 <div className="relative flex justify-center">
-                  <span className="bg-[#0d0d1a] px-3 text-[11px] text-white/55">
+                  <span className="bg-[#0e0e1a] px-3 text-[11px] text-white/55">
                     or sign in with email
                   </span>
                 </div>
@@ -155,14 +152,14 @@ export default function LoginPage() {
 
 
           {passwordReset && (
-            <div className="rounded-xl bg-green-500/10 border border-green-500/20 px-4 py-3 text-sm text-green-400 mb-5">
+            <div className="rounded-md bg-green-500/10 border border-green-500/20 px-4 py-3 text-sm text-green-400 mb-5">
               Password reset successfully. Sign in with your new password.
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70 mb-1.5">
+              <label className="block text-xs font-medium text-white/70 mb-1.5">
                 Email
               </label>
               <input
@@ -178,7 +175,7 @@ export default function LoginPage() {
 
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70">
+                <label className="block text-xs font-medium text-white/70">
                   Password
                 </label>
                 <Link
@@ -200,13 +197,13 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <div className="rounded-xl bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-400">
+              <div className="rounded-md bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-400">
                 {error}
               </div>
             )}
 
             {unverified && !resent && (
-              <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 px-4 py-3 text-sm text-amber-300">
+              <div className="rounded-md bg-amber-500/10 border border-amber-500/20 px-4 py-3 text-sm text-amber-300">
                 <p>Your email is not yet verified. Check your inbox for the verification link, or click below to resend.</p>
                 <button
                   type="button"
@@ -220,7 +217,7 @@ export default function LoginPage() {
             )}
 
             {resent && (
-              <div className="rounded-xl bg-green-500/10 border border-green-500/20 px-4 py-3 text-sm text-green-400">
+              <div className="rounded-md bg-green-500/10 border border-green-500/20 px-4 py-3 text-sm text-green-400">
                 Verification email resent. Check your inbox.
               </div>
             )}
@@ -228,7 +225,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#009B3A] py-3 text-sm font-semibold text-white hover:bg-[#009B3A]/85 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full flex items-center justify-center gap-2 rounded-md bg-[#009B3A] py-2.5 text-sm font-medium text-white hover:bg-[#009B3A]/85 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? (
                 <>
@@ -236,7 +233,7 @@ export default function LoginPage() {
                   Signing in…
                 </>
               ) : (
-                "Sign In"
+                "Sign in"
               )}
             </button>
           </form>
@@ -253,7 +250,7 @@ export default function LoginPage() {
         </div>
 
         <p className="mt-6 text-center text-[11px] text-white/50">
-          Jamaica&apos;s premier legal case tracker
+          Free access to Jamaican court records
         </p>
       </div>
     </div>

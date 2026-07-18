@@ -29,7 +29,7 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
 
   if (!authorized) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0a0a0a]">
+      <div className="flex min-h-screen items-center justify-center bg-[#080810]">
         <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/10 border-t-[#009B3A]" />
       </div>
     );

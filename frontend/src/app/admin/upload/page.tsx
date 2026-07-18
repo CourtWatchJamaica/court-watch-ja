@@ -114,12 +114,12 @@ export default function AdminUploadPage() {
         onDragLeave={handleDragLeave}
         onClick={() => !file && inputRef.current?.click()}
         className={[
-          "mb-5 relative rounded-2xl border-2 border-dashed transition-all duration-200 cursor-pointer",
+          "mb-5 relative rounded-lg border-2 border-dashed transition-all duration-200 cursor-pointer",
           dragging
             ? "border-[#009B3A] bg-[#009B3A]/[0.06]"
             : file
-              ? "border-white/[0.12] bg-[#0d0d1a] cursor-default"
-              : "border-white/[0.08] bg-[#0d0d1a] hover:border-white/[0.18] hover:bg-white/[0.02]",
+              ? "border-white/[0.12] bg-[#0e0e1a] cursor-default"
+              : "border-white/[0.08] bg-[#0e0e1a] hover:border-white/[0.18] hover:bg-white/[0.02]",
         ].join(" ")}
       >
         <input
@@ -155,7 +155,7 @@ export default function AdminUploadPage() {
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.05] ring-1 ring-white/[0.08]">
+            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-lg bg-white/[0.05] ring-1 ring-white/[0.08]">
               <Upload className="h-5 w-5 text-white/60" />
             </div>
             <p className="text-sm font-medium text-white/60">

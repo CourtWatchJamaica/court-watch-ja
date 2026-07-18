@@ -72,7 +72,7 @@ export default function WelcomeGuide({ notificationId, onClose }: WelcomeGuidePr
     <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={handleClose} />
 
-      <div className="relative w-full max-w-sm rounded-2xl border border-white/[0.08] bg-[#0d0d1a]/98 backdrop-blur-xl shadow-2xl shadow-black/70 overflow-hidden">
+      <div className="relative w-full max-w-sm rounded-lg border border-white/[0.08] bg-[#0e0e1a] shadow-2xl overflow-hidden">
         {/* Skip button */}
         <button
           onClick={handleClose}
@@ -96,7 +96,7 @@ export default function WelcomeGuide({ notificationId, onClose }: WelcomeGuidePr
 
         <div className="p-7">
           {/* Icon */}
-          <div className={`mb-5 flex h-12 w-12 items-center justify-center rounded-2xl ${current.iconBg}`}>
+          <div className={`mb-5 flex h-12 w-12 items-center justify-center rounded-lg ${current.iconBg}`}>
             <Icon className={`h-6 w-6 ${current.iconColor}`} />
           </div>
 
@@ -126,7 +126,7 @@ export default function WelcomeGuide({ notificationId, onClose }: WelcomeGuidePr
 
             <button
               onClick={handleNext}
-              className="flex items-center gap-2 rounded-xl bg-[#009B3A] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#009B3A]/85 transition-colors"
+              className="flex items-center gap-2 rounded-md bg-[#009B3A] px-4 py-2 text-sm font-medium text-white hover:bg-[#009B3A]/85 transition-colors"
             >
               {isLast ? "Get Started" : "Next"}
               <ArrowRight className="h-3.5 w-3.5" />

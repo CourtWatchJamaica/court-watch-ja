@@ -756,7 +756,7 @@ function JudgeInfoCard({
 
   return (
     <div
-      className="absolute bottom-6 right-6 z-20 w-[260px] rounded-2xl border bg-[#0d0d1a]/96 backdrop-blur-xl shadow-2xl overflow-hidden flex flex-col"
+      className="absolute bottom-6 right-6 z-20 w-[260px] rounded-lg border bg-[#0e0e1a] shadow-2xl overflow-hidden flex flex-col"
       style={{
         borderColor: `${color}35`,
         maxHeight: "70%",
@@ -892,7 +892,7 @@ function JudgeInfoCard({
       <div className="px-4 pb-4 pt-2 shrink-0">
         <button
           onClick={() => router.push(`/judges/${judge.id}`)}
-          className="group flex w-full items-center justify-center gap-1.5 rounded-xl border border-[#009B3A]/30 bg-[#009B3A]/12 px-3 py-2 text-[11px] font-semibold text-[#009B3A] hover:bg-[#009B3A]/20 hover:shadow-[0_0_18px_rgba(0,155,58,0.28)] transition-all duration-200"
+          className="group flex w-full items-center justify-center gap-1.5 rounded-xl border border-[#009B3A]/30 bg-[#009B3A]/12 px-3 py-2 text-[11px] font-semibold text-[#009B3A] hover:bg-[#009B3A]/20 transition-all duration-200"
         >
           View Full Profile
           <ExternalLink className="h-3 w-3 transition-transform duration-200 group-hover:translate-x-px group-hover:-translate-y-px" />
@@ -942,7 +942,7 @@ function MobileSheet({
 
   return (
     <div
-      className="md:hidden fixed bottom-0 inset-x-0 z-[70] rounded-t-2xl border-t bg-[#0d0d1a] shadow-[0_-8px_48px_rgba(0,0,0,0.6)] flex flex-col"
+      className="md:hidden fixed bottom-0 inset-x-0 z-[70] rounded-t-2xl border-t bg-[#0e0e1a] shadow-[0_-8px_48px_rgba(0,0,0,0.6)] flex flex-col"
       style={{
         borderColor: `${color}30`,
         maxHeight: "70vh",
@@ -1107,7 +1107,7 @@ function StaticFallback({ judges }: { judges: Judge[] }) {
           <button
             key={j.id}
             onClick={() => router.push(`/judges/${j.id}`)}
-            className="flex items-center gap-4 rounded-2xl border border-white/[0.07] bg-[#0d0d1a] p-5 text-left hover:border-[#009B3A]/30 transition-colors"
+            className="flex items-center gap-4 rounded-lg border border-white/[0.07] bg-[#0e0e1a] p-5 text-left hover:border-[#009B3A]/30 transition-colors"
           >
             <div
               className="h-10 w-10 shrink-0 rounded-xl flex items-center justify-center text-lg"
@@ -1177,7 +1177,7 @@ function ViewToggle({
         "flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2.5 text-[13px] font-medium",
         "transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#009B3A]/50",
         isGalactic
-          ? "border-[#009B3A]/50 bg-[#009B3A]/10 text-[#009B3A] shadow-[0_0_20px_rgba(0,155,58,0.18)]"
+          ? "border-[#009B3A]/50 bg-[#009B3A]/10 text-[#009B3A]"
           : "border-white/[0.1] bg-white/[0.05] text-white/55 hover:border-white/20 hover:text-white/80",
       ].join(" ")}
     >
@@ -1211,7 +1211,7 @@ function ConnectionsToggle({
         "flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2.5 text-[13px] font-medium",
         "transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FED100]/50",
         showConnections
-          ? "border-[#FED100]/50 bg-[#FED100]/10 text-[#FED100] shadow-[0_0_20px_rgba(254,209,0,0.15)]"
+          ? "border-[#FED100]/50 bg-[#FED100]/10 text-[#FED100]"
           : "border-white/[0.1] bg-white/[0.05] text-white/55 hover:border-white/20 hover:text-white/80",
       ].join(" ")}
     >
@@ -1468,13 +1468,13 @@ export default function JudicialConstellation({ judges, connections }: Props) {
       </div>
 
       {isListView ? (
-        <div className="flex-1 overflow-y-auto rounded-2xl border border-white/[0.05] px-4">
+        <div className="flex-1 overflow-y-auto rounded-lg border border-white/[0.05] px-4">
           <StaticFallback judges={searchFilteredJudges} />
         </div>
       ) : (
         <>
           {/* Canvas container */}
-          <div className="relative flex-1 rounded-2xl overflow-hidden border border-white/[0.05]">
+          <div className="relative flex-1 rounded-lg overflow-hidden border border-white/[0.05]">
             <Canvas
               camera={{ position: [0, 2.5, 10], fov: 50 }}
               onPointerMissed={handleCanvasClick}

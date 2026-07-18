@@ -45,7 +45,7 @@ function formatTime(s: string | null | undefined): string {
 function SittingsTimeline({ sittings }: { sittings: CourtSitting[] }) {
   if (sittings.length === 0) {
     return (
-      <div className="rounded-2xl border border-border bg-card p-8 text-center">
+      <div className="rounded-lg border border-border bg-card p-8 text-center">
         <Calendar className="h-8 w-8 text-muted-foreground/20 mx-auto mb-3" />
         <p className="text-sm text-muted-foreground">No court sittings on record for this case.</p>
       </div>
@@ -53,7 +53,7 @@ function SittingsTimeline({ sittings }: { sittings: CourtSitting[] }) {
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-card overflow-hidden">
+    <div className="rounded-lg border border-border bg-card overflow-hidden">
       {sittings.map((s, i) => {
         const isPast = isPastDateOnly(s.event_date);
         return (
@@ -92,7 +92,7 @@ function SittingsTimeline({ sittings }: { sittings: CourtSitting[] }) {
                   {s.event_type ?? "Hearing"}
                 </span>
                 {isPast ? (
-                  <span className="rounded-full bg-muted/60 px-2 py-px text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wide">
+                  <span className="rounded-sm bg-muted/60 px-1.5 py-px text-[10px] font-medium text-muted-foreground/70 uppercase tracking-wide">
                     Past
                   </span>
                 ) : (
@@ -134,7 +134,7 @@ function SittingsTimeline({ sittings }: { sittings: CourtSitting[] }) {
 function JudgmentCard({ judgment, caseNumber }: { judgment: Judgment | null; caseNumber: string }) {
   if (!judgment) {
     return (
-      <div className="rounded-2xl border border-border bg-card p-6 text-center">
+      <div className="rounded-lg border border-border bg-card p-6 text-center">
         <BookOpen className="h-7 w-7 text-muted-foreground/20 mx-auto mb-2" />
         <p className="text-sm text-muted-foreground">No judgment on record for{" "}
           <span className="font-mono font-semibold">{caseNumber}</span>.
@@ -144,7 +144,7 @@ function JudgmentCard({ judgment, caseNumber }: { judgment: Judgment | null; cas
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-card overflow-hidden">
+    <div className="rounded-lg border border-border bg-card overflow-hidden">
       <div className="px-5 py-4 border-b border-border bg-muted/10 flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 mb-1">Judgment</p>
@@ -188,9 +188,9 @@ function PageSkeleton() {
   return (
     <div className="animate-pulse space-y-4">
       <div className="h-8 w-48 rounded-lg bg-muted" />
-      <div className="h-12 w-full rounded-2xl bg-muted/60" />
-      <div className="h-32 w-full rounded-2xl bg-muted/40" />
-      <div className="h-48 w-full rounded-2xl bg-muted/40" />
+      <div className="h-12 w-full rounded-lg bg-muted/60" />
+      <div className="h-32 w-full rounded-lg bg-muted/40" />
+      <div className="h-48 w-full rounded-lg bg-muted/40" />
     </div>
   );
 }
@@ -269,7 +269,7 @@ export default function CaseHistoryPage({
         {loading && <PageSkeleton />}
 
         {!loading && notFound && (
-          <div className="rounded-2xl border border-border bg-card p-10 text-center">
+          <div className="rounded-lg border border-border bg-card p-10 text-center">
             <p className="text-sm font-medium text-foreground">Case not found</p>
             <p className="mt-1 text-xs text-muted-foreground/60">
               No records found for <span className="font-mono font-semibold">{caseNumber}</span>.
@@ -366,7 +366,7 @@ export default function CaseHistoryPage({
 
             {/* Docket CTA banner */}
             {!alreadyTracked && (
-              <div className="mt-5 rounded-2xl border border-[#009B3A]/20 bg-[#009B3A]/[0.04] p-4 flex items-center justify-between gap-4">
+              <div className="mt-5 rounded-lg border border-[#009B3A]/20 bg-[#009B3A]/[0.04] p-4 flex items-center justify-between gap-4">
                 <div>
                   <p className="text-sm font-semibold text-foreground">Get notified about updates</p>
                   <p className="text-xs text-muted-foreground/60 mt-0.5">

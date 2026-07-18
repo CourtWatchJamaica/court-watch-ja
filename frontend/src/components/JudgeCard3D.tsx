@@ -117,7 +117,7 @@ export default function JudgeCard3D({ judge, onClick }: JudgeCard3DProps) {
 
   return (
     <Card
-      className="group relative bg-black/25 border-white/[0.07] overflow-hidden cursor-pointer transition-all duration-300 hover:border-[#009B3A]/40 hover:shadow-[0_0_32px_rgba(0,155,58,0.12)]"
+      className="group relative bg-black/25 border-white/[0.07] overflow-hidden cursor-pointer transition-all duration-300 hover:border-[#009B3A]/40"
       onClick={onClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}

@@ -53,7 +53,7 @@ export default function MaintenanceGate({ children }: { children: React.ReactNod
           }}
         />
         <div className="text-center max-w-sm">
-          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#FED100]/10 ring-1 ring-[#FED100]/25">
+          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-lg bg-[#FED100]/10 ring-1 ring-[#FED100]/25">
             <Wrench className="h-8 w-8 text-[#FED100]" />
           </div>
           <h1 className="text-2xl font-bold text-foreground mb-3">

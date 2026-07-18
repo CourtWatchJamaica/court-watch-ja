@@ -364,7 +364,7 @@ export default function AdminUsersPage() {
       )}
 
       {/* Table */}
-      <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a] overflow-hidden">
+      <div className="rounded-lg border border-white/[0.07] bg-[#0e0e1a] overflow-hidden">
         <div className="hidden md:grid grid-cols-[auto_1fr_auto_auto_auto_auto] items-center gap-3 px-4 py-3 border-b border-white/[0.06]">
           <span className="w-8" />
           <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/60">User</span>
@@ -529,7 +529,7 @@ export default function AdminUsersPage() {
       )}
 
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-xl border border-[#009B3A]/30 bg-[#0d0d1a] px-4 py-3 shadow-2xl flex items-center gap-2.5">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-xl border border-[#009B3A]/30 bg-[#0e0e1a] px-4 py-3 shadow-2xl flex items-center gap-2.5">
           <span className="h-2 w-2 rounded-full bg-[#009B3A]" />
           <p className="text-sm text-white/90">{toast}</p>
         </div>

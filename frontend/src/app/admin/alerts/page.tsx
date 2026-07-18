@@ -108,7 +108,7 @@ export default function AdminAlertsPage() {
 
       {/* Current active banner */}
       {current && (
-        <div className="mb-6 rounded-2xl border border-amber-500/20 bg-amber-500/[0.05] px-4 py-3.5">
+        <div className="mb-6 rounded-lg border border-amber-500/20 bg-amber-500/[0.05] px-4 py-3.5">
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold text-amber-400 mb-1">

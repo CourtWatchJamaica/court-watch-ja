@@ -73,7 +73,7 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-card overflow-hidden">
+    <div className="rounded-lg border border-border bg-card overflow-hidden">
       <div className="flex items-center gap-3 px-6 py-4 border-b border-border">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#009B3A]/10">
           <Icon className="h-4 w-4 text-[#009B3A]" />
@@ -155,7 +155,7 @@ function DeleteAccountModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-2xl border border-border bg-background/95 backdrop-blur-sm p-6 space-y-5 shadow-2xl"
+        className="w-full max-w-md rounded-lg border border-border bg-background/95 backdrop-blur-sm p-6 space-y-5 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -403,7 +403,7 @@ function ProfilePage() {
 
         {/* ── Page header ── */}
         <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#009B3A]/10 ring-1 ring-[#009B3A]/25 shrink-0">
+          <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-[#009B3A]/10 ring-1 ring-[#009B3A]/25 shrink-0">
             <UserCircle2 className="h-7 w-7 text-[#009B3A]" />
           </div>
           <div>

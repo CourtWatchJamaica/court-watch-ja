@@ -98,7 +98,7 @@ function ActivityTab() {
         </div>
       )}
 
-      <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a] overflow-hidden">
+      <div className="rounded-lg border border-white/[0.07] bg-[#0e0e1a] overflow-hidden">
         <div className="hidden md:grid grid-cols-[auto_1fr_auto_auto] items-center gap-4 px-4 py-3 border-b border-white/[0.06]">
           <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/60">Type</span>
           <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/60">User</span>
@@ -298,7 +298,7 @@ function AuditTab() {
       </div>
 
       {showFilters && (
-        <div className="mb-5 rounded-2xl border border-white/[0.07] bg-[#0d0d1a] p-4">
+        <div className="mb-5 rounded-lg border border-white/[0.07] bg-[#0e0e1a] p-4">
           <div className="flex flex-wrap gap-3 items-end">
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] text-white/70 uppercase tracking-wider">From date</label>
@@ -363,7 +363,7 @@ function AuditTab() {
         </div>
       )}
 
-      <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a] overflow-hidden">
+      <div className="rounded-lg border border-white/[0.07] bg-[#0e0e1a] overflow-hidden">
         <div className="hidden md:grid grid-cols-[auto_auto_1fr_auto_auto_auto] items-center gap-4 px-4 py-3 border-b border-white/[0.06]">
           <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/60">Time</span>
           <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/60">Action</span>
@@ -463,7 +463,7 @@ export default function AdminLogsPage() {
         </div>
       </div>
 
-      <div className="mb-6 flex gap-1 rounded-xl border border-white/[0.06] bg-[#0d0d1a] p-1 w-fit">
+      <div className="mb-6 flex gap-1 rounded-xl border border-white/[0.06] bg-[#0e0e1a] p-1 w-fit">
         {(["activity", "audit"] as LogTab[]).map((t) => (
           <button
             key={t}

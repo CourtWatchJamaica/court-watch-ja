@@ -50,7 +50,7 @@ export default function AdminAnnouncePage() {
       </div>
 
       {/* Info card */}
-      <div className="mb-6 flex items-start gap-3 rounded-2xl border border-[#FED100]/15 bg-[#FED100]/[0.04] px-4 py-3.5">
+      <div className="mb-6 flex items-start gap-3 rounded-lg border border-[#FED100]/15 bg-[#FED100]/[0.04] px-4 py-3.5">
         <Users className="h-4 w-4 text-[#FED100]/70 shrink-0 mt-0.5" />
         <p className="text-xs text-white/50 leading-relaxed">
           The announcement will appear in each user&apos;s notification list and
@@ -135,7 +135,7 @@ export default function AdminAnnouncePage() {
 
         {/* Preview */}
         {(title || message) && (
-          <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d1a] p-4">
+          <div className="rounded-lg border border-white/[0.07] bg-[#0e0e1a] p-4">
             <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/55 mb-3">
               Preview
             </p>
