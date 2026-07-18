@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Syne, Space_Grotesk, Geist_Mono } from "next/font/google";
+import { Source_Serif_4, Inter, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import { cn } from "@/lib/utils";
@@ -9,17 +9,16 @@ import ChambersPanel from "@/components/ChambersPanel";
 import MaintenanceGate from "@/components/MaintenanceGate";
 import Footer from "@/components/Footer";
 
-const syne = Syne({
+const sourceSerif = Source_Serif_4({
   subsets: ["latin"],
   weight: ["400", "600", "700", "800"],
-  variable: "--font-syne",
+  variable: "--font-source-serif",
   display: "swap",
 });
 
-const spaceGrotesk = Space_Grotesk({
+const inter = Inter({
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
-  variable: "--font-space-grotesk",
+  variable: "--font-inter",
   display: "swap",
 });
 
@@ -75,7 +74,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn(syne.variable, spaceGrotesk.variable, geistMono.variable)}
+      className={cn(sourceSerif.variable, inter.variable, geistMono.variable)}
     >
       <body className="min-h-screen bg-background font-sans antialiased">
         <Script
