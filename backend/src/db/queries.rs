@@ -1791,6 +1791,73 @@ pub async fn upsert_court_sitting(
         .await
 }
 
+/// Returns `true` if ANY sitting exists for this case on this date, regardless
+/// of event_type.  Used by the PDF backfill, where the same list may have been
+/// partially ingested by an older parser that assigned different event_type
+/// strings — the exact-match `sitting_exists` would let those through as
+/// near-duplicates.
+pub async fn sitting_exists_any_type(
+    pool: &PgPool,
+    case_number: &str,
+    event_date: NaiveDate,
+) -> sqlx::Result<bool> {
+    sqlx::query_scalar(
+        "SELECT EXISTS (
+             SELECT 1 FROM court_sittings
+             WHERE case_number = $1 AND event_date = $2
+         )",
+    )
+    .bind(case_number)
+    .bind(event_date)
+    .fetch_one(pool)
+    .await
+}
+
+/// Every distinct pdf_source_url present in court_sittings.  Used by the
+/// backfill to map locally saved PDF files back to their original URLs.
+pub async fn distinct_sitting_source_urls(pool: &PgPool) -> sqlx::Result<Vec<String>> {
+    sqlx::query_scalar(
+        "SELECT DISTINCT pdf_source_url FROM court_sittings WHERE pdf_source_url IS NOT NULL",
+    )
+    .fetch_all(pool)
+    .await
+}
+
+/// Returns (pdf_hash, parser_version) recorded for a locally saved PDF, if any.
+pub async fn get_pdf_ingest_state(
+    pool: &PgPool,
+    filename: &str,
+) -> sqlx::Result<Option<(String, i32)>> {
+    sqlx::query_as(
+        "SELECT pdf_hash, parser_version FROM pdf_ingest_state WHERE filename = $1",
+    )
+    .bind(filename)
+    .fetch_optional(pool)
+    .await
+}
+
+pub async fn upsert_pdf_ingest_state(
+    pool: &PgPool,
+    filename: &str,
+    pdf_hash: &str,
+    parser_version: i32,
+    entries_inserted: i64,
+) -> sqlx::Result<()> {
+    sqlx::query(
+        "INSERT INTO pdf_ingest_state (filename, pdf_hash, parser_version, entries_inserted, processed_at)
+         VALUES ($1, $2, $3, $4, NOW())
+         ON CONFLICT (filename) DO UPDATE SET
+           pdf_hash = $2, parser_version = $3, entries_inserted = $4, processed_at = NOW()",
+    )
+    .bind(filename)
+    .bind(pdf_hash)
+    .bind(parser_version)
+    .bind(entries_inserted)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 /// Returns `true` if a sitting with the same natural key already exists.
 /// Uses `IS NOT DISTINCT FROM` so NULL event_type / event_time match correctly.
 pub async fn sitting_exists(

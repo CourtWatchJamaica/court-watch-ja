@@ -141,6 +141,156 @@ pub async fn run(
     Ok(())
 }
 
+/// Re-parses locally saved court-list PDFs with the current parser and inserts
+/// any sittings the parser version that originally processed them missed.
+///
+/// Runs on every startup (spawned, non-blocking) and is idempotent:
+/// - Only files that map back to a known court-list source URL are touched
+///   (judgment PDFs share the same directory and must not be parsed as lists).
+/// - A file is skipped when `pdf_ingest_state` records the same content hash
+///   AND the current `PARSER_VERSION` — so after one full pass, subsequent
+///   boots only hash the files and do no parsing.
+/// - Inserts are deduplicated per (case_number, event_date) via
+///   `sitting_exists_any_type`, so partially ingested lists are topped up
+///   without duplicating rows created by an older parser.
+///
+/// Returns (files_reparsed, sittings_inserted).
+pub async fn backfill_local_pdfs(
+    pool: &PgPool,
+    pdf_dir: &str,
+    scraper_state_path: &str,
+) -> anyhow::Result<(usize, usize)> {
+    use std::collections::HashMap;
+
+    // ── Map local filenames back to their original source URLs ────────────
+    let mut url_by_file: HashMap<String, String> = HashMap::new();
+    for url in queries::distinct_sitting_source_urls(pool).await? {
+        url_by_file.insert(sanitize_filename(&url), url);
+    }
+    let state = super::ScraperState::load_from_db(pool, scraper_state_path).await;
+    for url in state
+        .processed_pdf_urls
+        .iter()
+        .chain(state.processed_appeal_pdf_urls.iter())
+    {
+        url_by_file
+            .entry(sanitize_filename(url))
+            .or_insert_with(|| url.clone());
+    }
+
+    let mut files_reparsed = 0usize;
+    let mut total_inserted = 0usize;
+
+    let mut dir = match tokio::fs::read_dir(pdf_dir).await {
+        Ok(d) => d,
+        Err(e) => {
+            info!("[PDF backfill] No PDF directory at {pdf_dir} ({e}); nothing to do");
+            return Ok((0, 0));
+        }
+    };
+
+    while let Ok(Some(entry)) = dir.next_entry().await {
+        let filename = entry.file_name().to_string_lossy().to_string();
+        if !filename.to_lowercase().ends_with(".pdf") {
+            continue;
+        }
+        // Unknown files are judgment PDFs or manual drops — never parse those
+        // as court lists.
+        let Some(source_url) = url_by_file.get(&filename) else {
+            continue;
+        };
+
+        let bytes = match tokio::fs::read(entry.path()).await {
+            Ok(b) => b,
+            Err(e) => {
+                warn!("[PDF backfill] Failed to read {filename}: {e}");
+                continue;
+            }
+        };
+        let hash = compute_pdf_hash(&bytes);
+
+        match queries::get_pdf_ingest_state(pool, &filename).await {
+            Ok(Some((h, v))) if h == hash && v == pdf_parser::PARSER_VERSION => continue,
+            Ok(_) => {}
+            Err(e) => {
+                warn!("[PDF backfill] State lookup failed for {filename}: {e}");
+                continue;
+            }
+        }
+
+        let raw_text = extract_text_safe(&bytes, source_url);
+        if raw_text.trim().is_empty() {
+            // Record it so unparseable scans aren't re-attempted every boot.
+            let _ = queries::upsert_pdf_ingest_state(
+                pool, &filename, &hash, pdf_parser::PARSER_VERSION, 0,
+            )
+            .await;
+            continue;
+        }
+        let text = normalize_ocr_text(&raw_text);
+        let event_date = date_from_url(source_url).or_else(|| date_from_text(&text));
+        let entries = pdf_parser::parse_court_list_text(&text, event_date);
+
+        let is_appeal = source_url.contains("courtofappeal");
+        let mut inserted = 0i64;
+        for entry in entries {
+            let (Some(cn), Some(date)) = (entry.case_number.as_deref(), entry.event_date)
+            else {
+                // Backfill is conservative: without a case number AND date we
+                // cannot dedup reliably, so skip rather than risk duplicates.
+                continue;
+            };
+            match queries::sitting_exists_any_type(pool, cn, date).await {
+                Ok(true) => continue,
+                Ok(false) => {}
+                Err(e) => {
+                    warn!("[PDF backfill] Dedup check failed for {cn}: {e}");
+                    continue;
+                }
+            }
+            let division = if is_appeal {
+                Some("Court of Appeal")
+            } else {
+                entry.division.as_deref().or(Some("Civil"))
+            };
+            match queries::upsert_court_sitting(
+                pool,
+                Some(cn),
+                entry.title.as_deref(),
+                entry.judge_name.as_deref(),
+                division,
+                entry.event_type.as_deref(),
+                entry.event_date,
+                entry.event_time,
+                entry.lawyers.as_deref(),
+                Some(source_url),
+            )
+            .await
+            {
+                Ok(Some(_)) => inserted += 1,
+                Ok(None) => {}
+                Err(e) => warn!("[PDF backfill] Insert failed for {cn}: {e}"),
+            }
+        }
+
+        if let Err(e) = queries::upsert_pdf_ingest_state(
+            pool, &filename, &hash, pdf_parser::PARSER_VERSION, inserted,
+        )
+        .await
+        {
+            warn!("[PDF backfill] Failed to record state for {filename}: {e}");
+        }
+
+        files_reparsed += 1;
+        total_inserted += inserted as usize;
+        if inserted > 0 {
+            info!("[PDF backfill] {filename}: recovered {inserted} sitting(s)");
+        }
+    }
+
+    Ok((files_reparsed, total_inserted))
+}
+
 /// Compute a SHA-256 fingerprint of PDF bytes for change detection.
 pub fn compute_pdf_hash(bytes: &[u8]) -> String {
     let mut h = Sha256::new();

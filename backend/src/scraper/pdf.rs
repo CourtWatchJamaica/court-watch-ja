@@ -21,6 +21,20 @@
 use chrono::{NaiveDate, NaiveTime};
 use regex::Regex;
 
+/// Version of the court-list parsing logic.
+///
+/// Bump this whenever `parse_court_list_text` (or its helpers) is changed in a
+/// way that could extract entries a previous version missed.  The startup
+/// backfill re-parses every locally saved court-list PDF whose recorded
+/// parser_version is older than this, so historical sittings dropped by an old
+/// parser bug are recovered automatically — even after the source PDF has been
+/// removed from the court website.
+///
+/// Version history:
+///   1 — original parser (no legacy `2016HCV05029`-style case numbers).
+///   2 — legacy year-first case numbers, Masters' matters, expanded sections.
+pub const PARSER_VERSION: i32 = 2;
+
 #[derive(Debug, Clone, Default)]
 pub struct SittingEntry {
     pub case_number: Option<String>,

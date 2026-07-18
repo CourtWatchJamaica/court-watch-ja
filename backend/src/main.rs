@@ -119,10 +119,48 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
+    // One-off CLI mode: re-ingest locally saved court-list PDFs and exit.
+    // Useful for running the backfill against a database without starting the
+    // server (e.g. after a parser fix, or pointed at production).
+    if std::env::args().any(|a| a == "--backfill-pdfs") {
+        let (files, rows) = scraper::court_lists::backfill_local_pdfs(
+            &pool,
+            &config.pdf_dir,
+            &config.scraper_state_path,
+        )
+        .await?;
+        info!("[PDF backfill] Done: {files} PDF(s) re-parsed, {rows} sitting(s) recovered");
+        return Ok(());
+    }
+
     // Extract judge names from CoA PDFs that are already on disk (fast, no network I/O).
     // Must run before seed_judges_from_judgments so the newly extracted names are included.
     if let Err(e) = scraper::runner::backfill_coa_judge_names(&pool).await {
         tracing::warn!("Startup CoA judge backfill failed: {e}");
+    }
+
+    // Re-ingest locally saved court-list PDFs whose content or parser version
+    // changed (see PARSER_VERSION in scraper::pdf).  Spawned so a large first
+    // pass never delays binding the port — important on hosts that spin the
+    // service down and health-check it back up.  Idempotent on every boot.
+    {
+        let pool = pool.clone();
+        let config = config.clone();
+        tokio::spawn(async move {
+            match scraper::court_lists::backfill_local_pdfs(
+                &pool,
+                &config.pdf_dir,
+                &config.scraper_state_path,
+            )
+            .await
+            {
+                Ok((0, _)) => info!("[PDF backfill] Up to date"),
+                Ok((files, rows)) => {
+                    info!("[PDF backfill] Re-parsed {files} PDF(s), recovered {rows} sitting(s)")
+                }
+                Err(e) => tracing::warn!("[PDF backfill] Failed: {e}"),
+            }
+        });
     }
 
     // Sync judges table from judgments on every startup (idempotent – ON CONFLICT DO NOTHING).
