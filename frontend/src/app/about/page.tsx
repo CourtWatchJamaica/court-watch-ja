@@ -45,8 +45,8 @@ export default function AboutPage() {
             Our mission
           </h2>
           <p className="text-white/70 leading-relaxed text-base">
-            CourtWatch JA makes Jamaican court information — Supreme Court
-            judgments, Court of Appeal decisions, and Parish Court records —
+            CourtWatch JA makes Jamaican court information  Supreme Court
+            judgments, Court of Appeal decisions, and Parish Court records
             accessible to everyone: lawyers, journalists, students, and the
             general public. Court data in Jamaica has historically been
             difficult to access and harder to search. We believe transparency
@@ -72,7 +72,7 @@ export default function AboutPage() {
               appears on a new court list or a related judgment is published.
             </li>
             <li>
-              Provide an interactive Judicial Constellation — a 3D map of
+              Provide an interactive Judicial Constellation  a 3D map of
               Jamaica&apos;s judges and their case relationships across the
               legal system.
             </li>
@@ -105,7 +105,7 @@ export default function AboutPage() {
             href="/auth/signup"
             className="inline-flex items-center px-5 py-2.5 bg-[#009B3A] hover:bg-[#00893a] text-white font-medium text-sm rounded-md transition-colors"
           >
-            Get started — it&apos;s free
+            Get started  it&apos;s free
           </Link>
         </div>
       </main>

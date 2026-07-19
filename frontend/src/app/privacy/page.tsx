@@ -44,21 +44,21 @@ export default function PrivacyPage() {
             </p>
             <ul className="mt-3 space-y-2 list-disc list-inside text-white/55">
               <li>
-                <strong className="text-white/80">Email address</strong> — used
+                <strong className="text-white/80">Email address</strong>  used
                 to create your account and send you court notifications.
               </li>
               <li>
-                <strong className="text-white/80">Display name</strong> —
+                <strong className="text-white/80">Display name</strong>
                 optional, shown on your dashboard.
               </li>
               <li>
                 <strong className="text-white/80">Tracked case numbers</strong>{" "}
-                — the case numbers you choose to follow, stored so we can alert
+                 the case numbers you choose to follow, stored so we can alert
                 you when they appear in court lists or new judgments.
               </li>
               <li>
                 <strong className="text-white/80">Notification preferences</strong>{" "}
-                — your settings for when and how you want to be notified.
+                 your settings for when and how you want to be notified.
               </li>
             </ul>
           </section>
@@ -89,13 +89,13 @@ export default function PrivacyPage() {
             <p>
               Your data is stored in a secured PostgreSQL database. Passwords
               are hashed using bcrypt and are never stored in plain text.
-              Authentication tokens expire and are invalidated on sign-out.
+              Authentication tokens expire and are invalidated on sign out.
             </p>
           </section>
 
           <section>
             <h2 className="font-heading text-lg font-semibold text-white mb-3">Third-Party Services</h2>
-            <p>We use the following third-party services:</p>
+            <p>We use the following third party services:</p>
             <ul className="mt-3 space-y-2 list-disc list-inside text-white/55">
               <li>
                 <strong className="text-white/80">Brevo (Sendinblue)</strong> —
@@ -104,7 +104,7 @@ export default function PrivacyPage() {
               </li>
               <li>
                 <strong className="text-white/80">Google OAuth</strong> —
-                optional sign-in method. We only receive your email and public
+                optional sign in method. We only receive your email and public
                 profile when you choose to sign in with Google.
               </li>
             </ul>

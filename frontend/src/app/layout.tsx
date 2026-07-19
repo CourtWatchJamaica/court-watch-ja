@@ -30,7 +30,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://courtwatchjamaica.com"),
-  title: "CourtWatch JA — Free Jamaican Court Case Tracker",
+  title: "CourtWatch JA  Free Jamaican Court Case Tracker",
   description:
     "Search Supreme Court and Court of Appeal judgments, browse upcoming court lists, track cases, and get notified. Free access to Jamaican court records.",
   keywords:
