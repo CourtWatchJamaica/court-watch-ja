@@ -87,21 +87,6 @@ export default function RootLayout({
           gtag('js', new Date());
           gtag('config', 'AW-18168669700');
         `}</Script>
-        <Script id="kofi-widget" strategy="afterInteractive">{`
-          (function() {
-            var s = document.createElement('script');
-            s.src = 'https://storage.ko-fi.com/cdn/scripts/overlay-widget.js';
-            s.onload = function() {
-              kofiWidgetOverlay.draw('courtwatchja', {
-                'type': 'floating-chat',
-                'floating-chat.donateButton.text': 'Support Us',
-                'floating-chat.donateButton.background-color': '#009B3A',
-                'floating-chat.donateButton.text-color': '#ffffff'
-              });
-            };
-            document.head.appendChild(s);
-          })();
-        `}</Script>
         <Providers>
           <MaintenanceGate>
             {children}
