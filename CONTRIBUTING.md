@@ -1,6 +1,6 @@
 # Contributing to CourtWatch JA
 
-Thank you for your interest in contributing to CourtWatch JA — a free, open-source platform for tracking Jamaican court cases and judgments.
+Thank you for your interest in contributing to CourtWatch JA  a free, open-source platform for tracking Jamaican court cases and judgments.
 
 ## Ways to Contribute
 
