@@ -9,7 +9,7 @@ import { Notification } from "@/lib/types";
 import {
   Bell, FileText, Calendar, CheckCheck, Megaphone, PartyPopper,
   ExternalLink, Info, AlertTriangle, AlertOctagon, ChevronDown,
-  ChevronUp, X, ArrowUpDown,
+  ChevronUp, X, ArrowUpDown, MapPin,
 } from "lucide-react";
 
 // ── Type metadata ──────────────────────────────────────────────────────────────
@@ -31,6 +31,7 @@ const TYPE_META: Record<string, NotifMeta> = {
   announcement:             { label: "Announcement",     bg: "bg-[#FED100]/15", text: "text-amber-600 dark:text-[#FED100]",     icon: Megaphone     },
   welcome:                  { label: "Welcome",          bg: "bg-[#009B3A]/15", text: "text-[#009B3A]",                        icon: PartyPopper   },
   service_alert:            { label: "Service Alert",    bg: "bg-amber-400/15", text: "text-amber-600 dark:text-amber-400",      icon: AlertTriangle },
+  parish_status_changed:    { label: "Parish Court",     bg: "bg-[#CD7F32]/15", text: "text-[#CD7F32]",                          icon: MapPin        },
 };
 
 function typeToLabel(t: string): string {
@@ -75,6 +76,7 @@ function fallbackTitle(n: Notification): string {
     case "sitting_changed":          return `Sitting schedule changed — Case #${n.case_id}`;
     case "sitting_reminder_1d":      return "Upcoming hearing tomorrow";
     case "sitting_reminder_morning": return "Hearing scheduled for today";
+    case "parish_status_changed":    return `Parish Court status updated — Case #${n.case_id}`;
     default:                         return typeToLabel(n.type);
   }
 }
@@ -99,6 +101,12 @@ function TimelineItem({
 
   const handleClick = () => {
     if (isUnread) onRead(notif.id);
+    // Parish Court notifications carry their own deep link (case_id there
+    // refers to parish_court_cases, not judgments/court_sittings).
+    if (notif.type === "parish_status_changed") {
+      if (notif.link) router.push(notif.link);
+      return;
+    }
     if (!notif.case_id) return;
     if (notif.type === "sitting_changed" || notif.type === "case_listed" ||
         notif.type === "sitting_reminder_1d" || notif.type === "sitting_reminder_morning") {

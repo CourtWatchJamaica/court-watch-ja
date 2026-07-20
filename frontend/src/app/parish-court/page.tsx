@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api";
-import { ParishCourtCase, ParishSummary } from "@/lib/types";
+import { ParishAnalytics, ParishCourtCase, ParishSummary } from "@/lib/types";
 import AuthGuard from "@/components/AuthGuard";
 import dynamic from "next/dynamic";
 import {
@@ -19,6 +19,10 @@ import {
   ArrowLeft,
   BarChart3,
   List,
+  Download,
+  Trophy,
+  TrendingUp,
+  Clock,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
@@ -30,55 +34,11 @@ const JamaicaMap3D = dynamic(() => import("@/components/JamaicaMap3D"), {
   ),
 });
 
-// ── Offence categorisation ────────────────────────────────────────────────────
+// ── Offence categorisation display config ─────────────────────────────────────
+// The category itself is computed once, server-side, in
+// backend/src/utils/offence_category.rs — this just maps it to a look.
 
 type Category = "Violent" | "Property" | "Drugs" | "Other";
-
-const VIOLENT_KEYWORDS = [
-  "murder", "attempted murder", "manslaughter",
-  "assault", "ass ob", "ob harm", "o b harm", "bodily harm",
-  "wounding", "unlawful wounding", "wounding with intent",
-  "shooting", "stabbing", "arson",
-  "robbery", "rape",
-  "indecent assault", "gross indecen",
-  "sexual", "grievous",
-  "gun", "firearm", "ammunition",
-  "threat", "threatening", "stone throwing", "abduction",
-  "weapon", "prohibited weapon",
-  "buggery",
-  "sex with",
-  "cruelty",
-  "causing death",
-  "g s a", "g b h", "s i w p u s",
-];
-const PROPERTY_KEYWORDS = [
-  "larceny", "praedial larceny",
-  "theft", "stealing", "receiving stolen",
-  "burglary", "housebreaking", "breaking",
-  "fraud", "forgery", "obtaining", "false pretences",
-  "malicious destruction", "malicious", "mal dest", "ma dest",
-  "toll evasion",
-  "embezzlement", "forged", "uttering", "counterfeit",
-  "identity information", "id information", "id info", "identity info",
-  "access device",
-];
-const DRUG_KEYWORDS = [
-  "ganja", "cannabis", "cocaine", "crack",
-  "dangerous drug", "controlled substance",
-  "possession of ganja", "possession of cocaine",
-  "drug trafficking", "trafficking", "traffick",
-  "cultivation",
-  "export of", "import of",
-];
-
-function categorise(offence: string | null): Category {
-  if (!offence) return "Other";
-  const o = offence.toLowerCase().replace(/\./g, " ").replace(/\s{2,}/g, " ").trim();
-  if (VIOLENT_KEYWORDS.some((k) => o.includes(k))) return "Violent";
-  if (DRUG_KEYWORDS.some((k) => o.includes(k))) return "Drugs";
-  if (PROPERTY_KEYWORDS.some((k) => o.includes(k))) return "Property";
-  return "Other";
-}
 
 const CATEGORY_CONFIG: Record<
   Category,
@@ -179,6 +139,176 @@ function TabToggle({
   );
 }
 
+// ── Journalist insights ──────────────────────────────────────────────────────
+
+function formatShortDate(date: string): string {
+  return new Date(`${date}T00:00:00`).toLocaleDateString("en-JM", {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function InsightsPanel({
+  insights,
+  loading,
+  onParishClick,
+}: {
+  insights: ParishAnalytics | null;
+  loading: boolean;
+  onParishClick: (parish: string) => void;
+}) {
+  if (loading && !insights) {
+    return (
+      <div className="grid gap-4 lg:grid-cols-2">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-64 rounded-lg bg-white/[0.03] border border-white/[0.05] animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+  if (!insights) return null;
+
+  const { leaderboard, spikes, backlog } = insights;
+  const maxCount = Math.max(1, ...leaderboard.map((r) => r.count));
+  const flaggedSpikes = spikes.filter((s) => s.is_spike);
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      {/* Most-Charged Offences */}
+      <section className="rounded-lg border border-white/[0.06] bg-black/25 p-5">
+        <h2 className="flex items-center gap-2 text-xs font-semibold text-white/60 uppercase tracking-widest mb-4">
+          <Trophy className="h-3.5 w-3.5 text-[#CD7F32]" />
+          Most-Charged Offences
+        </h2>
+        {leaderboard.length === 0 ? (
+          <p className="text-sm text-white/50">No data yet.</p>
+        ) : (
+          <ol className="space-y-2.5">
+            {leaderboard.map((row, i) => {
+              const cfg = CATEGORY_CONFIG[row.category];
+              return (
+                <li key={`${row.offence}-${i}`} className="flex items-center gap-3">
+                  <span className="w-4 shrink-0 text-[11px] font-semibold text-white/40 tabular-nums">
+                    {i + 1}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className="text-[12.5px] text-white/85 truncate">{row.offence}</span>
+                      <span className={`text-[11px] font-semibold tabular-nums shrink-0 ${cfg.color}`}>
+                        {row.count}
+                      </span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${cfg.color.replace("text-", "bg-")}`}
+                        style={{ width: `${Math.max(4, (row.count / maxCount) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+      </section>
+
+      {/* Spike Alerts */}
+      <section className="rounded-lg border border-white/[0.06] bg-black/25 p-5">
+        <h2 className="flex items-center gap-2 text-xs font-semibold text-white/60 uppercase tracking-widest mb-4">
+          <TrendingUp className="h-3.5 w-3.5 text-[#CD7F32]" />
+          Week-over-Week Spikes
+        </h2>
+        {flaggedSpikes.length === 0 ? (
+          <p className="text-sm text-white/50">No unusual case-volume jumps flagged this week.</p>
+        ) : (
+          <ul className="space-y-2">
+            {flaggedSpikes
+              .sort((a, b) => b.pct_change - a.pct_change)
+              .map((s) => (
+                <li key={s.parish}>
+                  <button
+                    onClick={() => onParishClick(s.parish)}
+                    className="w-full flex items-center justify-between gap-3 rounded-xl border border-amber-500/25 bg-amber-500/[0.06] px-3.5 py-2.5 text-left hover:bg-amber-500/[0.1] transition-colors"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-medium text-white/90">{s.parish}</p>
+                      <p className="text-[11px] text-white/55">
+                        {s.previous_count} → {s.current_count} cases ·{" "}
+                        {formatShortDate(s.previous_week)} to {formatShortDate(s.current_week)}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-[13px] font-bold text-amber-400 tabular-nums">
+                      +{s.pct_change.toFixed(0)}%
+                    </span>
+                  </button>
+                </li>
+              ))}
+          </ul>
+        )}
+      </section>
+
+      {/* Backlog Watch */}
+      <section className="rounded-lg border border-white/[0.06] bg-black/25 p-5 lg:col-span-2">
+        <h2 className="flex items-center gap-2 text-xs font-semibold text-white/60 uppercase tracking-widest mb-4">
+          <Clock className="h-3.5 w-3.5 text-[#CD7F32]" />
+          Backlog Watch — Charges Recurring Across Weeks
+        </h2>
+        <p className="text-[11px] text-white/45 -mt-2.5 mb-4">
+          Same accused, parish, and offence appearing in 2+ separate weekly cause lists —
+          a status-code-independent signal a charge hasn&apos;t resolved.
+        </p>
+
+        {backlog.by_parish.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-4">
+            {backlog.by_parish.map((p) => (
+              <button
+                key={p.parish}
+                onClick={() => onParishClick(p.parish)}
+                className="rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1 text-[11px] text-white/65 hover:text-white/85 hover:border-white/[0.15] transition-colors"
+              >
+                {p.parish} <span className="text-[#CD7F32] font-semibold">{p.flagged_count}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {backlog.top.length === 0 ? (
+          <p className="text-sm text-white/50">No charges recurring across 2+ weekly lists.</p>
+        ) : (
+          <div className="overflow-x-auto -mx-1">
+            <table className="w-full text-left text-[12px]">
+              <thead>
+                <tr className="text-white/45 text-[10px] uppercase tracking-wider">
+                  <th className="px-1 pb-2 font-semibold">Accused</th>
+                  <th className="px-1 pb-2 font-semibold">Offence</th>
+                  <th className="px-1 pb-2 font-semibold">Parish</th>
+                  <th className="px-1 pb-2 font-semibold text-right">Weeks Listed</th>
+                  <th className="px-1 pb-2 font-semibold hidden sm:table-cell">First seen</th>
+                </tr>
+              </thead>
+              <tbody>
+                {backlog.top.map((row, i) => (
+                  <tr key={i} className="border-t border-white/[0.05]">
+                    <td className="px-1 py-2 text-white/85 whitespace-nowrap">{row.accused_name}</td>
+                    <td className="px-1 py-2 text-white/65 max-w-[220px] truncate">{row.offence}</td>
+                    <td className="px-1 py-2 text-white/55 whitespace-nowrap">{row.parish}</td>
+                    <td className="px-1 py-2 text-right font-semibold text-amber-400 tabular-nums">
+                      {row.appearance_count}
+                    </td>
+                    <td className="px-1 py-2 text-white/50 hidden sm:table-cell whitespace-nowrap">
+                      {row.first_seen ? formatShortDate(row.first_seen) : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 function ParishCourtDashboard() {
@@ -201,6 +331,11 @@ function ParishCourtDashboard() {
   const [analyticsCases, setAnalyticsCases]     = useState<ParishCourtCase[]>([]);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const analyticsLoadedRef                      = useRef(false);
+
+  // Journalist insights (leaderboard / spikes / backlog) — lazy-loaded once too
+  const [insights, setInsights]               = useState<ParishAnalytics | null>(null);
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const insightsLoadedRef                     = useRef(false);
 
   // Auto-scroll to cases feed when the user taps a filter (mobile only)
   const casesFeedRef    = useRef<HTMLElement>(null);
@@ -235,7 +370,7 @@ function ParishCourtDashboard() {
         const counts: Record<Category, number> = {
           Violent: 0, Property: 0, Drugs: 0, Other: 0,
         };
-        for (const c of res.cases) counts[categorise(c.offence)] += 1;
+        for (const c of res.cases) counts[c.category] += 1;
         setCategoryCounts(counts);
       })
       .catch(() => {});
@@ -251,6 +386,18 @@ function ParishCourtDashboard() {
       .then((res) => setAnalyticsCases(res.cases))
       .catch(() => {})
       .finally(() => setAnalyticsLoading(false));
+  }, [activeTab]);
+
+  // ── Journalist insights (lazy, once) ────────────────────────────────────────
+  useEffect(() => {
+    if (activeTab !== "analytics" || insightsLoadedRef.current) return;
+    insightsLoadedRef.current = true;
+    setInsightsLoading(true);
+    apiClient
+      .getParishAnalytics()
+      .then(setInsights)
+      .catch(() => {})
+      .finally(() => setInsightsLoading(false));
   }, [activeTab]);
 
   // ── Main paginated fetch ────────────────────────────────────────────────────
@@ -449,6 +596,18 @@ function ParishCourtDashboard() {
                     Clear all
                   </button>
                 )}
+                <a
+                  href={apiClient.getParishExportUrl({
+                    ...(selectedParish ? { parish: selectedParish } : {}),
+                    ...(activeCategory ? { category: activeCategory } : {}),
+                    ...(debouncedSearch ? { q: debouncedSearch } : {}),
+                  })}
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-[#CD7F32]/25 bg-[#CD7F32]/10 px-3.5 py-2.5 text-[12px] font-semibold text-[#CD7F32] hover:bg-[#CD7F32]/20 hover:border-[#CD7F32]/40 active:scale-[0.97] transition-all duration-150 whitespace-nowrap"
+                  title="Export the current filtered case list as CSV"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Export CSV</span>
+                </a>
               </div>
               <p className="mt-2 text-xs text-muted-foreground">
                 {loading
@@ -479,8 +638,7 @@ function ParishCourtDashboard() {
               ) : (
                 <div className="space-y-2">
                   {cases.map((c) => {
-                    const cat = categorise(c.offence);
-                    const cfg = CATEGORY_CONFIG[cat];
+                    const cfg = CATEGORY_CONFIG[c.category];
                     const statusLabel = c.status ? STATUS_LABELS[c.status] ?? c.status : null;
                     return (
                       <button
@@ -504,7 +662,7 @@ function ParishCourtDashboard() {
                             variant="outline"
                             className={`text-[10px] border ${cfg.border} ${cfg.color} bg-transparent`}
                           >
-                            {cat}
+                            {c.category}
                           </Badge>
                           <span className="text-[10px] text-white/60 hidden sm:block">
                             {c.parish}
@@ -582,6 +740,12 @@ function ParishCourtDashboard() {
                 onParishClick={handleMapParishClick}
               />
             )}
+
+            <InsightsPanel
+              insights={insights}
+              loading={insightsLoading}
+              onParishClick={handleMapParishClick}
+            />
           </section>
         )}
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import { apiClient } from "@/lib/api";
+import { useTracking } from "@/lib/tracking-context";
 import type { ParishCourtCase, ParishCaseDetail } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -17,33 +18,15 @@ import {
   Pill,
   Shield,
   Hash,
+  Bookmark,
+  BookmarkCheck,
 } from "lucide-react";
 
-// ── Categorisation (mirrors dashboard + backend) ──────────────────────────────
+// ── Categorisation display config ─────────────────────────────────────────────
+// The category itself is computed once, server-side, in
+// backend/src/utils/offence_category.rs — this just maps it to a look.
 
 type Category = "Violent" | "Property" | "Drugs" | "Other";
-
-const VIOLENT_KEYWORDS = [
-  "murder", "manslaughter", "assault", "wounding", "robbery", "rape",
-  "sexual", "grievous", "gun", "firearm", "shooting", "stabbing", "arson",
-];
-const PROPERTY_KEYWORDS = [
-  "larceny", "theft", "burglary", "housebreaking", "fraud", "forgery",
-  "obtaining", "malicious", "damage", "possession of sto",
-];
-const DRUG_KEYWORDS = [
-  "ganja", "cannabis", "cocaine", "drug", "possession of prohib", "traffick",
-  "dangerous drug",
-];
-
-function categorise(offence: string | null): Category {
-  if (!offence) return "Other";
-  const o = offence.toLowerCase();
-  if (VIOLENT_KEYWORDS.some((k) => o.includes(k))) return "Violent";
-  if (DRUG_KEYWORDS.some((k) => o.includes(k))) return "Drugs";
-  if (PROPERTY_KEYWORDS.some((k) => o.includes(k))) return "Property";
-  return "Other";
-}
 
 const CATEGORY_CONFIG: Record<
   Category,
@@ -112,8 +95,7 @@ function ChargeRow({
 }) {
   const router = useRouter();
   const isSelected = c.id === selectedId;
-  const cat = categorise(c.offence);
-  const cfg = CATEGORY_CONFIG[cat];
+  const cfg = CATEGORY_CONFIG[c.category];
   const CatIcon = cfg.Icon;
   const statusLabel = c.status ? (STATUS_LABELS[c.status] ?? c.status) : null;
 
@@ -182,6 +164,7 @@ function ParishCaseDetail() {
   const params = useParams();
   const router = useRouter();
   const selectedId = Number(params.id);
+  const { isTracked, track } = useTracking();
 
   const [detail, setDetail] = useState<ParishCaseDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -288,10 +271,26 @@ function ParishCaseDetail() {
                   </a>
                 </div>
 
-                {/* Accused name */}
-                <h1 className="text-2xl sm:text-3xl font-bold text-white leading-tight mb-1">
-                  {courtCase.accused_name ?? "Unknown"}
-                </h1>
+                {/* Accused name + track button */}
+                <div className="flex items-start justify-between gap-3">
+                  <h1 className="text-2xl sm:text-3xl font-bold text-white leading-tight mb-1">
+                    {courtCase.accused_name ?? "Unknown"}
+                  </h1>
+                  {isTracked(courtCase.id, "parish_court") ? (
+                    <span className="flex shrink-0 items-center gap-1.5 rounded-xl border border-[#CD7F32]/30 bg-[#CD7F32]/10 px-3.5 py-2 text-[12px] font-semibold text-[#CD7F32]">
+                      <BookmarkCheck className="h-3.5 w-3.5" />
+                      Tracked
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => track(courtCase.id, "parish_court")}
+                      className="flex shrink-0 items-center gap-1.5 rounded-xl border border-white/[0.12] bg-white/[0.04] px-3.5 py-2 text-[12px] font-semibold text-white/50 hover:border-[#CD7F32]/40 hover:text-[#CD7F32] hover:bg-[#CD7F32]/[0.08] transition-colors"
+                    >
+                      <Bookmark className="h-3.5 w-3.5" />
+                      Track case
+                    </button>
+                  )}
+                </div>
                 <p className="text-[12px] text-white/60 flex items-center gap-1.5">
                   <Hash className="h-3 w-3" />
                   Case record #{courtCase.id} · Indexed{" "}

@@ -54,6 +54,8 @@ pub fn router(state: AppState) -> Router {
         .route("/api/auth/reset-password", post(auth::reset_password))
         .route("/api/maintenance/status", get(maintenance::status))
         .route("/api/parish-cases", get(parish_cases::list_parish_cases))
+        .route("/api/parish-cases/export", get(parish_cases::export_parish_cases_csv))
+        .route("/api/parish-cases/analytics", get(parish_cases::parish_analytics))
         .route("/api/parish-cases/:id", get(parish_cases::get_parish_case_by_id))
         .route("/api/parish-summary", get(parish_cases::parish_summary))
         .route("/api/pdf/judgment/:id", get(pdf::judgment_pdf))

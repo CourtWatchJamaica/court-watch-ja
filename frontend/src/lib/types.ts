@@ -163,7 +163,7 @@ export interface UserCase {
   user_id: number;
   /** Null when the entry was tracked by case_number before a real case was matched. */
   case_id: number | null;
-  case_type: "judgment" | "sitting";
+  case_type: "judgment" | "sitting" | "parish_court";
   case_number?: string | null;
   /** Notification preferences (null = use defaults). */
   notify_immediately?: boolean | null;
@@ -172,6 +172,8 @@ export interface UserCase {
   /** Last known sitting date — used by the notification engine to detect changes. */
   last_event_date?: string | null;
   last_event_time?: string | null;
+  /** Last known parish_court_cases.status — used to detect status changes. */
+  last_status?: string | null;
   created_at: string;
 }
 
@@ -239,11 +241,55 @@ export interface ParishCourtCase {
   pdf_source_url: string | null;
   created_at: string;
   case_type: string; // "criminal" | "civil"
+  category: "Violent" | "Property" | "Drugs" | "Other";
 }
 
 export interface ParishSummary {
   name: string;
   total_cases: number;
+}
+
+// ── Parish Court journalist analytics ──────────────────────────────────────
+
+export interface OffenceLeaderboardRow {
+  offence: string;
+  count: number;
+  category: "Violent" | "Property" | "Drugs" | "Other";
+}
+
+export interface ParishSpikeRow {
+  parish: string;
+  current_week: string;
+  current_count: number;
+  previous_week: string;
+  previous_count: number;
+  pct_change: number;
+  is_spike: boolean;
+}
+
+export interface BacklogRow {
+  accused_name: string;
+  parish: string;
+  offence: string;
+  /** Number of distinct weekly cause lists this charge has appeared in. */
+  appearance_count: number;
+  total_appearances: number;
+  first_seen: string | null;
+  last_seen: string | null;
+}
+
+export interface ParishBacklogCount {
+  parish: string;
+  flagged_count: number;
+}
+
+export interface ParishAnalytics {
+  leaderboard: OffenceLeaderboardRow[];
+  spikes: ParishSpikeRow[];
+  backlog: {
+    top: BacklogRow[];
+    by_parish: ParishBacklogCount[];
+  };
 }
 
 export interface ParishCaseTallies {

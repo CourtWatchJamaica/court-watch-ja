@@ -19,6 +19,7 @@ import {
   Judgment,
   LegalNewsItem,
   Notification,
+  ParishAnalytics,
   ParishCaseDetail,
   ParishCourtCase,
   ParishSummary,
@@ -273,7 +274,7 @@ export const apiClient = {
 
   async addUserCase(
     case_id: number,
-    case_type: "judgment" | "sitting" = "judgment",
+    case_type: "judgment" | "sitting" | "parish_court" = "judgment",
   ): Promise<{ success: boolean }> {
     return request("/user/cases", {
       method: "POST",
@@ -293,7 +294,7 @@ export const apiClient = {
 
   async removeUserCase(
     case_id: number,
-    case_type: "judgment" | "sitting" = "judgment",
+    case_type: "judgment" | "sitting" | "parish_court" = "judgment",
   ): Promise<{ success: boolean }> {
     return request(`/user/cases/${case_id}?case_type=${case_type}`, {
       method: "DELETE",
@@ -644,6 +645,21 @@ export const apiClient = {
 
   async getParishSummary(): Promise<{ summary: ParishSummary[] }> {
     return request("/parish-summary");
+  },
+
+  /** Builds a direct download URL for the filtered CSV export (public endpoint, no auth needed). */
+  getParishExportUrl(opts?: { parish?: string; q?: string; category?: string }): string {
+    const params = new URLSearchParams();
+    if (opts?.parish) params.set("parish", opts.parish);
+    if (opts?.q) params.set("q", opts.q);
+    if (opts?.category) params.set("category", opts.category);
+    const qs = params.toString();
+    return `${BASE_URL}/parish-cases/export${qs ? `?${qs}` : ""}`;
+  },
+
+  async getParishAnalytics(parish?: string): Promise<ParishAnalytics> {
+    const qs = parish ? `?parish=${encodeURIComponent(parish)}` : "";
+    return request(`/parish-cases/analytics${qs}`);
   },
 
   // ── Case Lookup ───────────────────────────────────────────────────────────

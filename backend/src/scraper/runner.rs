@@ -825,11 +825,12 @@ async fn dispatch_notification_emails(
 
     for row in rows {
         let case_ref = row.case_number.as_deref().unwrap_or("your tracked case");
-        // Deep-link to the case's docket page when we know the case number
-        // (slashes are fine — the docket route is a catch-all segment).
-        let cta_url = match row.case_number.as_deref() {
-            Some(num) => format!("{app_url}/docket/{}", num.replace(' ', "%20")),
-            None => format!("{app_url}/cases"),
+        // Deep-link priority: an explicit `link` column (parish court cases,
+        // which have no case_number) beats the docket route (judgments/sittings).
+        let cta_url = match (row.link.as_deref(), row.case_number.as_deref()) {
+            (Some(link), _) => format!("{app_url}{link}"),
+            (None, Some(num)) => format!("{app_url}/docket/{}", num.replace(' ', "%20")),
+            (None, None) => format!("{app_url}/cases"),
         };
         let cta_url = cta_url.as_str();
 
@@ -903,6 +904,16 @@ async fn dispatch_notification_emails(
   <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="padding:4px 0">{date_str}</td></tr>
 </table>
 <p style="margin-top:24px"><a href="{cta_url}" style="background:#1d4ed8;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600">View on CourtWatch JA →</a></p>"#
+                );
+                (subj, body)
+            }
+            "parish_status_changed" => {
+                let title = row.title.as_deref().unwrap_or("Case Status Updated");
+                let subj = format!("CourtWatch JA: {title}");
+                let body = format!(
+                    r#"<p>{}</p>
+<p style="margin-top:24px"><a href="{cta_url}" style="background:#1d4ed8;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600">View Case →</a></p>"#,
+                    row.message.as_deref().unwrap_or("A case you are tracking in Parish Court has a status update.")
                 );
                 (subj, body)
             }

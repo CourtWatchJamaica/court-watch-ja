@@ -78,67 +78,9 @@ const COLOR_SCALES: Record<MapCategory, string[]> = {
   drugs:    ["#fef3c7", "#fcd34d", "#d97706", "#b45309", "#78350f"],
 };
 
-// ── Offence categorisation ────────────────────────────────────────────────────
-// Keywords derived from real scraped Jamaican court offence strings.
-// Priority order: violent → drugs → property → other.
-
-const VIOLENT_KW = [
-  "murder", "attempted murder", "manslaughter",
-  // assault variants
-  // "ass ob" catches "Ass OB Harm" (no periods); "o b harm" catches "O.B Harm" after period→space
-  "assault", "ass ob", "ob harm", "o b harm", "bodily harm",
-  "wounding", "unlawful wounding", "wounding with intent",
-  "shooting", "stabbing", "arson",
-  "robbery", "rape",
-  // "indecent" removed (too broad — matches "Indecent Language"); use specific forms
-  "indecent assault", "gross indecen",
-  "sexual", "grievous",
-  "gun", "firearm", "ammunition",
-  "threat", "threatening", "stone throwing", "abduction",
-  "weapon", "prohibited weapon",
-  "buggery",
-  "sex with",
-  "cruelty",        // "Cruelty to Child"
-  "causing death",  // "Causing Death by Dangerous Driving"
-  // dotted abbreviations after period→space transform:
-  // "G.S.A" → "g s a", "G.B.H.W.I" → "g b h w i", "S.I.W.P.U.S" → "s i w p u s"
-  "g s a", "g b h", "s i w p u s",
-];
-
-const DRUG_KW = [
-  "ganja", "cannabis", "cocaine", "crack",
-  "dangerous drug", "controlled substance",
-  "possession of ganja", "possession of cocaine",
-  "drug trafficking", "trafficking", "traffick",
-  "cultivation",
-  // "conspiracy" removed — too broad (matches "Conspiracy to larceny motor vehicle")
-  "export of", "import of",
-];
-
-const PROPERTY_KW = [
-  "larceny", "praedial larceny",
-  "theft", "stealing", "receiving stolen",
-  "burglary", "housebreaking", "breaking",
-  "fraud", "forgery", "obtaining", "false pretences",
-  // "mal dest" catches "Mal.Dest.of.Property" / "Mal Dest of Property"
-  // "ma dest" catches "Ma. Dest. Of Property" (different abbreviation style)
-  "malicious destruction", "malicious", "mal dest", "ma dest",
-  "toll evasion",
-  "embezzlement", "forged", "uttering", "counterfeit",
-  // ID-info variants: "POSSESSION OF ID INFORMATION", "Poss of ID Info", "Knowingly Poss. Identity Info."
-  "identity information", "id information", "id info", "identity info",
-  "access device",  // "Poss of Access Device" (identity fraud instrument)
-];
-
-function categorise(offence: string | null): "violent" | "property" | "drugs" | "other" {
-  if (!offence) return "other";
-  // Normalise: lowercase, collapse whitespace, strip full-stops from abbreviations
-  const o = offence.toLowerCase().replace(/\./g, " ").replace(/\s{2,}/g, " ").trim();
-  if (VIOLENT_KW.some((k) => o.includes(k)))  return "violent";
-  if (DRUG_KW.some((k)    => o.includes(k)))  return "drugs";
-  if (PROPERTY_KW.some((k) => o.includes(k))) return "property";
-  return "other";
-}
+// ── Offence categorisation display ────────────────────────────────────────────
+// The category itself is computed once, server-side, in
+// backend/src/utils/offence_category.rs — this file just consumes c.category.
 
 // ── Parish name normalisation ─────────────────────────────────────────────────
 // Converts "Saint Andrew", "St Andrew", "ST. ANDREW" → "St. Andrew" so that
@@ -785,7 +727,7 @@ export default function JamaicaMap3D({
     for (const c of analyticsCases) {
       const key = normalizeParish(c.parish);
       if (!map[key]) map[key] = { total: 0, violent: 0, property: 0, drugs: 0, other: 0 };
-      const cat = categorise(c.offence);
+      const cat = c.category.toLowerCase() as "violent" | "property" | "drugs" | "other";
       map[key].total += 1;
       map[key][cat]  += 1;
     }

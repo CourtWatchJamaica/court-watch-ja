@@ -10,20 +10,37 @@ import {
 } from "react";
 import { apiClient } from "./api";
 
+type TrackType = "judgment" | "sitting" | "parish_court";
+
 interface TrackingContextValue {
   judgmentIds: Set<number>;
   sittingIds: Set<number>;
-  isTracked: (id: number, type: "judgment" | "sitting") => boolean;
-  track: (id: number, type: "judgment" | "sitting") => Promise<void>;
+  parishCourtIds: Set<number>;
+  isTracked: (id: number, type: TrackType) => boolean;
+  track: (id: number, type: TrackType) => Promise<void>;
   untrack: (id: number) => Promise<void>;
   toast: string | null;
 }
 
 const TrackingContext = createContext<TrackingContextValue | null>(null);
 
+// Maps a track type to its state setter, so track/untrack don't need a
+// per-type branch for every set.
+function setterFor(
+  type: TrackType,
+  setJudgmentIds: React.Dispatch<React.SetStateAction<Set<number>>>,
+  setSittingIds: React.Dispatch<React.SetStateAction<Set<number>>>,
+  setParishCourtIds: React.Dispatch<React.SetStateAction<Set<number>>>,
+) {
+  if (type === "sitting") return setSittingIds;
+  if (type === "parish_court") return setParishCourtIds;
+  return setJudgmentIds;
+}
+
 export function TrackingProvider({ children }: { children: React.ReactNode }) {
   const [judgmentIds, setJudgmentIds] = useState<Set<number>>(new Set());
   const [sittingIds, setSittingIds] = useState<Set<number>>(new Set());
+  const [parishCourtIds, setParishCourtIds] = useState<Set<number>>(new Set());
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -31,13 +48,16 @@ export function TrackingProvider({ children }: { children: React.ReactNode }) {
     apiClient.getUserCases().then(({ cases }) => {
       const jIds = new Set<number>();
       const sIds = new Set<number>();
+      const pIds = new Set<number>();
       for (const c of cases) {
         if (c.case_id == null) continue; // case_number-only entries have no ID yet
         if (c.case_type === "sitting") sIds.add(c.case_id);
+        else if (c.case_type === "parish_court") pIds.add(c.case_id);
         else jIds.add(c.case_id);
       }
       setJudgmentIds(jIds);
       setSittingIds(sIds);
+      setParishCourtIds(pIds);
     }).catch(() => {/* ignore — user may not be logged in yet */});
   }, []);
 
@@ -48,30 +68,28 @@ export function TrackingProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const isTracked = useCallback(
-    (id: number, type: "judgment" | "sitting") => {
-      return type === "sitting" ? sittingIds.has(id) : judgmentIds.has(id);
+    (id: number, type: TrackType) => {
+      if (type === "sitting") return sittingIds.has(id);
+      if (type === "parish_court") return parishCourtIds.has(id);
+      return judgmentIds.has(id);
     },
-    [judgmentIds, sittingIds],
+    [judgmentIds, sittingIds, parishCourtIds],
   );
 
   const track = useCallback(
-    async (id: number, type: "judgment" | "sitting") => {
+    async (id: number, type: TrackType) => {
+      const setIds = setterFor(type, setJudgmentIds, setSittingIds, setParishCourtIds);
       // Optimistic update
-      if (type === "sitting") {
-        setSittingIds((prev) => new Set(prev).add(id));
-      } else {
-        setJudgmentIds((prev) => new Set(prev).add(id));
-      }
-      showToast("Case tracked — view in Your Docket.");
+      setIds((prev) => new Set(prev).add(id));
+      showToast(
+        type === "parish_court"
+          ? "Case tracked — you'll be notified when its status changes."
+          : "Case tracked — view in Your Docket.",
+      );
       try {
         await apiClient.addUserCase(id, type);
       } catch {
-        // Roll back
-        if (type === "sitting") {
-          setSittingIds((prev) => { const s = new Set(prev); s.delete(id); return s; });
-        } else {
-          setJudgmentIds((prev) => { const s = new Set(prev); s.delete(id); return s; });
-        }
+        setIds((prev) => { const s = new Set(prev); s.delete(id); return s; });
         showToast("Failed to track case. Please try again.");
       }
     },
@@ -80,32 +98,28 @@ export function TrackingProvider({ children }: { children: React.ReactNode }) {
 
   const untrack = useCallback(
     async (id: number) => {
-      // Determine type from current state — needs both sets so both are in deps.
-      const isSitting = sittingIds.has(id);
-      const caseType = isSitting ? "sitting" : "judgment";
+      // Determine type from current state — needs all sets so all are in deps.
+      const type: TrackType = sittingIds.has(id)
+        ? "sitting"
+        : parishCourtIds.has(id)
+        ? "parish_court"
+        : "judgment";
+      const setIds = setterFor(type, setJudgmentIds, setSittingIds, setParishCourtIds);
       // Optimistic remove
-      if (isSitting) {
-        setSittingIds((prev) => { const s = new Set(prev); s.delete(id); return s; });
-      } else {
-        setJudgmentIds((prev) => { const s = new Set(prev); s.delete(id); return s; });
-      }
+      setIds((prev) => { const s = new Set(prev); s.delete(id); return s; });
       try {
-        await apiClient.removeUserCase(id, caseType);
+        await apiClient.removeUserCase(id, type);
       } catch {
         // Roll back on error
-        if (isSitting) {
-          setSittingIds((prev) => new Set(prev).add(id));
-        } else {
-          setJudgmentIds((prev) => new Set(prev).add(id));
-        }
+        setIds((prev) => new Set(prev).add(id));
       }
     },
-    [sittingIds, judgmentIds],
+    [sittingIds, parishCourtIds],
   );
 
   return (
     <TrackingContext.Provider
-      value={{ judgmentIds, sittingIds, isTracked, track, untrack, toast }}
+      value={{ judgmentIds, sittingIds, parishCourtIds, isTracked, track, untrack, toast }}
     >
       {children}
       {toast && (

@@ -1373,7 +1373,7 @@ pub async fn get_co_judges(pool: &PgPool, judge_id: i32) -> sqlx::Result<Vec<CoJ
 pub async fn get_user_cases(pool: &PgPool, user_id: i32) -> sqlx::Result<Vec<UserCase>> {
     sqlx::query_as::<_, UserCase>(
         "SELECT uc.id, uc.user_id, uc.case_id, uc.case_type, uc.case_number,
-                uc.last_event_date, uc.last_event_time, uc.created_at,
+                uc.last_event_date, uc.last_event_time, uc.created_at, uc.last_status,
                 ucs.notify_immediately, ucs.notify_day_before, ucs.notify_morning_of
          FROM user_cases uc
          LEFT JOIN user_case_settings ucs ON ucs.user_case_id = uc.id
@@ -1387,6 +1387,10 @@ pub async fn get_user_cases(pool: &PgPool, user_id: i32) -> sqlx::Result<Vec<Use
 
 /// Insert a tracking entry by case ID.  Returns the new row, or `RowNotFound`
 /// when the conflict index fires (already tracked — treat as success).
+///
+/// When `case_type = 'parish_court'`, seeds `last_status` from the case's
+/// current status so the next `check_notifications` pass diffs against the
+/// real starting point instead of firing a false "changed" notification.
 pub async fn add_user_case(
     pool: &PgPool,
     user_id: i32,
@@ -1394,11 +1398,13 @@ pub async fn add_user_case(
     case_type: &str,
 ) -> sqlx::Result<UserCase> {
     sqlx::query_as::<_, UserCase>(
-        "INSERT INTO user_cases (user_id, case_id, case_type)
-         VALUES ($1, $2, $3)
+        "INSERT INTO user_cases (user_id, case_id, case_type, last_status)
+         VALUES ($1, $2, $3, (
+             SELECT status FROM parish_court_cases WHERE id = $2 AND $3 = 'parish_court'
+         ))
          ON CONFLICT DO NOTHING
          RETURNING id, user_id, case_id, case_type, case_number,
-                   last_event_date, last_event_time, created_at,
+                   last_event_date, last_event_time, created_at, last_status,
                    NULL::boolean AS notify_immediately,
                    NULL::boolean AS notify_day_before,
                    NULL::boolean AS notify_morning_of",
@@ -2266,6 +2272,96 @@ pub async fn check_notifications(pool: &PgPool) {
         );
     }
 
+    // ── Parish Court status-change notifications ──────────────────────────
+    // Unlike judgments/sittings, parish cases have no separate title/court
+    // lookup table to join in get_notifications, so title/message are built
+    // and stored directly on the notification row.
+    #[derive(sqlx::FromRow)]
+    struct ParishStatusChange {
+        uc_id: i32,
+        user_id: i32,
+        case_id: i32,
+        accused_name: Option<String>,
+        parish: String,
+        status: Option<String>,
+    }
+
+    let parish_changed: Vec<ParishStatusChange> = match sqlx::query_as(
+        "SELECT uc.id AS uc_id,
+                uc.user_id,
+                uc.case_id,
+                pcc.accused_name,
+                pcc.parish,
+                pcc.status
+         FROM user_cases uc
+         JOIN parish_court_cases pcc ON pcc.id = uc.case_id
+         LEFT JOIN user_case_settings ucs ON ucs.user_case_id = uc.id
+         WHERE uc.case_type = 'parish_court'
+           AND COALESCE(ucs.notify_immediately, TRUE)
+           AND uc.last_status IS DISTINCT FROM pcc.status
+           AND NOT EXISTS (
+               SELECT 1 FROM notifications n
+               WHERE n.user_id = uc.user_id
+                 AND n.case_id = uc.case_id
+                 AND n.type    = 'parish_status_changed'
+                 AND n.sent_at > NOW() - INTERVAL '23 hours'
+           )",
+    )
+    .fetch_all(pool)
+    .await
+    {
+        Ok(rows) => rows,
+        Err(e) => {
+            tracing::warn!("[Notifications] parish status query failed: {e}");
+            return;
+        }
+    };
+
+    for row in &parish_changed {
+        let name = row.accused_name.as_deref().unwrap_or("This case");
+        let label = crate::db::models::parish_status_label(row.status.as_deref());
+        let title = format!("Case status updated — {}", row.parish);
+        let message =
+            format!("{name}'s case in {} Parish Court is now: {label}.", row.parish);
+        let link = format!("/parish-court/{}", row.case_id);
+
+        let result: sqlx::Result<()> = async {
+            let mut tx = pool.begin().await?;
+            sqlx::query(
+                "INSERT INTO notifications (user_id, case_id, type, title, message, link, severity)
+                 VALUES ($1, $2, 'parish_status_changed', $3, $4, $5, 'info')",
+            )
+            .bind(row.user_id)
+            .bind(row.case_id)
+            .bind(&title)
+            .bind(&message)
+            .bind(&link)
+            .execute(&mut *tx)
+            .await?;
+            sqlx::query("UPDATE user_cases SET last_status = $1 WHERE id = $2")
+                .bind(&row.status)
+                .bind(row.uc_id)
+                .execute(&mut *tx)
+                .await?;
+            tx.commit().await
+        }
+        .await;
+
+        if let Err(e) = result {
+            tracing::warn!(
+                "[Notifications] parish_status_changed tx failed for user {}: {e}",
+                row.user_id
+            );
+        }
+    }
+
+    if !parish_changed.is_empty() {
+        tracing::info!(
+            "[Notifications] {} parish_status_changed notification(s) inserted",
+            parish_changed.len()
+        );
+    }
+
     // ── Sitting reminders — 1 day before ─────────────────────────────────
     #[derive(sqlx::FromRow)]
     struct ReminderPair {
@@ -2882,6 +2978,9 @@ pub struct PendingEmailRow {
     pub event_date: Option<chrono::NaiveDate>,
     pub event_type: Option<String>,
     pub court_division: Option<String>,
+    /// Set directly on the notification row for types (like
+    /// parish_status_changed) that don't join a separate table for a deep link.
+    pub link: Option<String>,
 }
 
 /// Atomically claims notifications that still need an outbound email and
@@ -2913,11 +3012,12 @@ pub async fn claim_notifications_for_email(
                             'case_available',
                             'case_listed',
                             'sitting_reminder_1d',
-                            'sitting_reminder_morning'
+                            'sitting_reminder_morning',
+                            'parish_status_changed'
                           )
                    FOR UPDATE SKIP LOCKED
                )
-               RETURNING n.id, n.user_id, n.case_id, n.type, n.title, n.message
+               RETURNING n.id, n.user_id, n.case_id, n.type, n.title, n.message, n.link
            )
            SELECT u.email,
                   c.type        AS notification_type,
@@ -2926,7 +3026,8 @@ pub async fn claim_notifications_for_email(
                   COALESCE(cs.case_number, j.case_number) AS case_number,
                   cs.event_date,
                   cs.event_type,
-                  cs.court_division
+                  cs.court_division,
+                  c.link
            FROM   claimed c
            JOIN   users u ON u.id = c.user_id
            LEFT JOIN court_sittings cs
@@ -3013,34 +3114,19 @@ pub async fn list_legal_news(
 
 const PC: &str = "id, parish, accused_name, offence, status, week_of, pdf_source_url, created_at, COALESCE(case_type, 'criminal') AS case_type";
 
-/// Return the raw SQL ILIKE fragment for a given category, or `""` if unknown.
-/// The strings are all hardcoded constants — no user input reaches the SQL.
-fn parish_category_clause(category: &str) -> &'static str {
-    match category.to_lowercase().trim() {
-        "violent" => "offence ILIKE ANY(ARRAY[\
-            '%murder%','%manslaughter%','%assault%','%wounding%',\
-            '%robbery%','%rape%','%sexual%','%grievous%',\
-            '%gun%','%firearm%','%ammunition%','%shooting%',\
-            '%stabbing%','%arson%','%abduction%','%threat%'])",
-        "drugs" => "offence ILIKE ANY(ARRAY[\
-            '%ganja%','%cannabis%','%cocaine%','%crack%',\
-            '%dangerous drug%','%controlled substance%',\
-            '%drug trafficking%','%traffick%','%cultivation%'])",
-        "property" => "offence ILIKE ANY(ARRAY[\
-            '%larceny%','%praedial%','%theft%','%stealing%',\
-            '%receiving stolen%','%burglary%','%housebreaking%',\
-            '%fraud%','%forgery%','%obtaining%','%false pretence%',\
-            '%malicious%','%damage%','%embezzlement%','%counterfeit%',\
-            '%identity%','%access device%'])",
-        "other" => "NOT offence ILIKE ANY(ARRAY[\
-            '%murder%','%manslaughter%','%assault%','%wounding%',\
-            '%robbery%','%rape%','%sexual%','%grievous%',\
-            '%gun%','%firearm%','%shooting%','%stabbing%','%arson%',\
-            '%ganja%','%cannabis%','%cocaine%','%drug%','%traffick%',\
-            '%larceny%','%theft%','%burglary%','%housebreaking%',\
-            '%fraud%','%forgery%','%obtaining%','%malicious%'])",
-        _ => "",
-    }
+/// `%keyword%` ILIKE patterns for a category, sourced from the same keyword
+/// lists as `utils::offence_category::categorise` — see that module for why
+/// this consolidation matters. `None` for an unrecognised category string.
+fn parish_category_patterns(category: &str) -> Option<Vec<String>> {
+    use crate::utils::offence_category::{all_categorised_keywords, keywords, Category};
+
+    let cat = Category::from_str_loose(category)?;
+    let kws: Vec<&str> = if cat == Category::Other {
+        all_categorised_keywords()
+    } else {
+        keywords(cat).to_vec()
+    };
+    Some(kws.into_iter().map(|k| format!("%{k}%")).collect())
 }
 
 pub async fn list_parish_cases(
@@ -3055,7 +3141,10 @@ pub async fn list_parish_cases(
 
     let offset = (page - 1).max(0) * limit;
     let search_pattern = q.map(|s| format!("%{}%", s.to_lowercase()));
-    let cat_clause = category.map(parish_category_clause).unwrap_or("");
+    let is_other = category
+        .map(|c| c.to_lowercase().trim() == "other")
+        .unwrap_or(false);
+    let cat_patterns = category.and_then(parish_category_patterns);
 
     // Build shared WHERE fragment via a helper closure that applies conditions
     // to whichever QueryBuilder is passed in.
@@ -3076,8 +3165,18 @@ pub async fn list_parish_cases(
                 }
                 $qb.push(")");
             }
-            if !cat_clause.is_empty() {
-                $qb.push(format!(" AND {cat_clause}"));
+            if let Some(ref patterns) = cat_patterns {
+                if is_other {
+                    // NULL offence categorises as Other client-side, so treat it
+                    // the same way here rather than letting `NOT (NULL)` drop it.
+                    $qb.push(" AND (offence IS NULL OR NOT (offence ILIKE ANY(");
+                    $qb.push_bind(patterns.clone());
+                    $qb.push(")))");
+                } else {
+                    $qb.push(" AND offence ILIKE ANY(");
+                    $qb.push_bind(patterns.clone());
+                    $qb.push(")");
+                }
             }
         }};
     }
@@ -3153,6 +3252,114 @@ pub async fn parish_summary(pool: &PgPool) -> sqlx::Result<Vec<ParishSummary>> {
     )
     .fetch_all(pool)
     .await
+}
+
+// ── Journalist analytics ────────────────────────────────────────────────────
+
+/// Most-charged offence descriptions, optionally scoped to a parish.
+pub async fn parish_offence_leaderboard(
+    pool: &PgPool,
+    parish: Option<&str>,
+    limit: i64,
+) -> sqlx::Result<Vec<crate::db::models::OffenceLeaderboardRow>> {
+    use sqlx::QueryBuilder;
+
+    let mut qb: QueryBuilder<sqlx::Postgres> = QueryBuilder::new(
+        "SELECT offence, COUNT(*) AS count
+         FROM parish_court_cases
+         WHERE offence IS NOT NULL",
+    );
+    if let Some(p) = parish {
+        qb.push(" AND parish = ");
+        qb.push_bind(p);
+    }
+    qb.push(" GROUP BY offence ORDER BY count DESC LIMIT ");
+    qb.push_bind(limit);
+
+    qb.build_query_as::<crate::db::models::OffenceLeaderboardRow>()
+        .fetch_all(pool)
+        .await
+}
+
+/// For each parish, compares case volume in its most recent scraped week
+/// against the week before — a week-over-week spike signal. Compares each
+/// parish against its own last two weeks rather than a shared calendar week,
+/// since parishes are not all scraped on identical publication dates.
+pub async fn parish_weekly_spikes(
+    pool: &PgPool,
+) -> sqlx::Result<Vec<crate::db::models::ParishSpikeRow>> {
+    sqlx::query_as::<_, crate::db::models::ParishSpikeRow>(
+        "WITH ranked AS (
+             SELECT parish, week_of, COUNT(*) AS cnt,
+                    ROW_NUMBER() OVER (PARTITION BY parish ORDER BY week_of DESC) AS rn
+             FROM parish_court_cases
+             WHERE week_of IS NOT NULL
+             GROUP BY parish, week_of
+         )
+         SELECT cur.parish,
+                cur.week_of  AS current_week,
+                cur.cnt      AS current_count,
+                prev.week_of AS previous_week,
+                prev.cnt     AS previous_count
+         FROM ranked cur
+         JOIN ranked prev ON prev.parish = cur.parish AND prev.rn = cur.rn + 1
+         WHERE cur.rn = 1
+         ORDER BY parish",
+    )
+    .fetch_all(pool)
+    .await
+}
+
+/// Charges (accused + parish + offence) that have appeared in 2+ distinct
+/// weekly cause lists — a proxy for court backlog. Also returns a per-parish
+/// flagged count.
+///
+/// Deliberately not filtered on a specific "Adjourned" status code: real
+/// scraped parish court lists use ~30 different status abbreviations
+/// (M, T, RI, DJ, PT, PH, CH, CM, …) that vary by parish and are not
+/// consistently decodable, and none of them is literally "A". Recurrence
+/// across weeks is a status-vocabulary-independent signal that a charge
+/// hasn't been resolved.
+pub async fn parish_backlog(
+    pool: &PgPool,
+    limit: i64,
+) -> sqlx::Result<(
+    Vec<crate::db::models::BacklogRow>,
+    Vec<crate::db::models::ParishBacklogCount>,
+)> {
+    let top = sqlx::query_as::<_, crate::db::models::BacklogRow>(
+        "SELECT accused_name, parish, offence,
+                COUNT(DISTINCT week_of) AS appearance_count,
+                COUNT(*)                AS total_appearances,
+                MIN(week_of)            AS first_seen,
+                MAX(week_of)            AS last_seen
+         FROM parish_court_cases
+         WHERE accused_name IS NOT NULL AND offence IS NOT NULL
+         GROUP BY accused_name, parish, offence
+         HAVING COUNT(DISTINCT week_of) >= 2
+         ORDER BY appearance_count DESC, first_seen ASC NULLS LAST
+         LIMIT $1",
+    )
+    .bind(limit)
+    .fetch_all(pool)
+    .await?;
+
+    let by_parish = sqlx::query_as::<_, crate::db::models::ParishBacklogCount>(
+        "SELECT parish, COUNT(*) AS flagged_count
+         FROM (
+             SELECT parish, accused_name, offence
+             FROM parish_court_cases
+             WHERE accused_name IS NOT NULL AND offence IS NOT NULL
+             GROUP BY parish, accused_name, offence
+             HAVING COUNT(DISTINCT week_of) >= 2
+         ) flagged
+         GROUP BY parish
+         ORDER BY flagged_count DESC",
+    )
+    .fetch_all(pool)
+    .await?;
+
+    Ok((top, by_parish))
 }
 
 pub async fn list_all_charges_for_accused(

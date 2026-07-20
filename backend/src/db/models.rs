@@ -85,6 +85,10 @@ pub struct UserCase {
     pub last_event_date: Option<NaiveDate>,
     pub last_event_time: Option<NaiveTime>,
     pub created_at: NaiveDateTime,
+    /// Last-known parish_court_cases.status, used to detect changes for
+    /// case_type = 'parish_court' tracking. Unused for judgment/sitting rows.
+    #[sqlx(default)]
+    pub last_status: Option<String>,
     /// Joined from user_case_settings — null when no preference row exists yet.
     #[sqlx(default)]
     pub notify_immediately: Option<bool>,
@@ -178,12 +182,96 @@ pub struct ParishCourtCase {
     pub created_at: NaiveDateTime,
     #[sqlx(default)]
     pub case_type: String,
+    /// Not a DB column — populated via `.with_category()` before serialisation.
+    /// See `utils::offence_category` for the single source of truth this derives from.
+    #[sqlx(default)]
+    pub category: String,
+}
+
+impl ParishCourtCase {
+    pub fn with_category(mut self) -> Self {
+        self.category = crate::utils::offence_category::categorise(self.offence.as_deref())
+            .as_str()
+            .to_string();
+        self
+    }
+}
+
+/// Single source of truth for parish court status-code display text
+/// (also used to build notification copy in `queries::check_notifications`).
+///
+/// Real scraped cause lists use ~30 distinct status abbreviations that vary
+/// by parish (RI, DJ, PT, PH, CH, CM, …) and aren't reliably decodable —
+/// only a handful of common codes are confidently known. Falls back to the
+/// raw code itself (matching the frontend's `STATUS_LABELS[x] ?? x` pattern)
+/// rather than guessing at a label we can't verify.
+pub fn parish_status_label(code: Option<&str>) -> String {
+    match code {
+        Some("M") => "Mention".to_string(),
+        Some("H") => "Hearing".to_string(),
+        Some("T") => "Trial".to_string(),
+        Some("A") => "Adjourned".to_string(),
+        Some("C") => "Committed".to_string(),
+        Some("D") => "Dismissed".to_string(),
+        Some("P") => "Plea".to_string(),
+        Some("F") => "Fine Paid".to_string(),
+        Some("E") => "Estreat".to_string(),
+        Some(other) => other.to_string(),
+        None => "—".to_string(),
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct ParishSummary {
     pub name: String,
     pub total_cases: i64,
+}
+
+// ── Parish Court journalist analytics ───────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+pub struct OffenceLeaderboardRow {
+    pub offence: String,
+    pub count: i64,
+    /// Not a DB column — populated via `.with_category()`.
+    #[sqlx(default)]
+    pub category: String,
+}
+
+impl OffenceLeaderboardRow {
+    pub fn with_category(mut self) -> Self {
+        self.category = crate::utils::offence_category::categorise(Some(&self.offence))
+            .as_str()
+            .to_string();
+        self
+    }
+}
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+pub struct ParishSpikeRow {
+    pub parish: String,
+    pub current_week: NaiveDate,
+    pub current_count: i64,
+    pub previous_week: NaiveDate,
+    pub previous_count: i64,
+}
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+pub struct BacklogRow {
+    pub accused_name: String,
+    pub parish: String,
+    pub offence: String,
+    /// Number of distinct weekly cause lists this charge has appeared in.
+    pub appearance_count: i64,
+    pub total_appearances: i64,
+    pub first_seen: Option<NaiveDate>,
+    pub last_seen: Option<NaiveDate>,
+}
+
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+pub struct ParishBacklogCount {
+    pub parish: String,
+    pub flagged_count: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
