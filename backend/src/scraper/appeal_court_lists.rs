@@ -285,6 +285,7 @@ async fn process_pdf_bytes(
             entry.event_time,
             entry.lawyers.as_deref(),
             Some(absolute_url),
+            true,
         )
         .await
         {

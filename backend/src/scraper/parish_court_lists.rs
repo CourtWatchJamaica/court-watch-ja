@@ -313,6 +313,7 @@ async fn process_one_pdf(
             entry.event_time,
             entry.lawyers.as_deref(),
             Some(absolute_url),
+            true,
         )
         .await
         {

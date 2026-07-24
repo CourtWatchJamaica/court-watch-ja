@@ -253,6 +253,7 @@ pub async fn backfill_local_pdfs(
             } else {
                 entry.division.as_deref().or(Some("Civil"))
             };
+            let division_confirmed = is_appeal || entry.division.is_some();
             match queries::upsert_court_sitting(
                 pool,
                 Some(cn),
@@ -264,6 +265,7 @@ pub async fn backfill_local_pdfs(
                 entry.event_time,
                 entry.lawyers.as_deref(),
                 Some(source_url),
+                division_confirmed,
             )
             .await
             {
@@ -342,6 +344,7 @@ async fn process_pdf_bytes(
             }
         }
 
+        let division_confirmed = entry.division.is_some();
         match queries::upsert_court_sitting(
             pool,
             entry.case_number.as_deref(),
@@ -353,6 +356,7 @@ async fn process_pdf_bytes(
             entry.event_time,
             entry.lawyers.as_deref(),
             Some(absolute_url),
+            division_confirmed,
         )
         .await
         {

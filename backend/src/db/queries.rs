@@ -1774,12 +1774,13 @@ pub async fn upsert_court_sitting(
     event_time: Option<NaiveTime>,
     lawyers: Option<&str>,
     pdf_source_url: Option<&str>,
+    division_confirmed: bool,
 ) -> sqlx::Result<Option<CourtSitting>> {
     let sql = format!(
         "INSERT INTO court_sittings
            (case_number, title, judge_name, court_division, event_type,
-            event_date, event_time, lawyers, pdf_source_url)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+            event_date, event_time, lawyers, pdf_source_url, division_confirmed)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
          ON CONFLICT DO NOTHING
          RETURNING {S}"
     );
@@ -1793,6 +1794,7 @@ pub async fn upsert_court_sitting(
         .bind(event_time)
         .bind(lawyers)
         .bind(pdf_source_url)
+        .bind(division_confirmed)
         .fetch_optional(pool)
         .await
 }
@@ -1937,17 +1939,23 @@ pub async fn count_sittings_by_division(pool: &PgPool, division: &str) -> sqlx::
         .await
 }
 
-/// Returns true if there is at least one *current-or-future* 'Civil' row for
-/// this URL.  Unlike `has_only_civil_sittings_for_url`, this fires even when
-/// the URL has a mix of Civil and non-Civil rows (e.g. a backfill migration
-/// fixed some entries but left others as 'Civil').
+/// Returns true if there is at least one *current-or-future*, *unconfirmed*
+/// 'Civil' row for this URL.  Unlike `has_only_civil_sittings_for_url`, this
+/// fires even when the URL has a mix of Civil and non-Civil rows (e.g. a
+/// backfill migration fixed some entries but left others as 'Civil').
+///
+/// `division_confirmed = FALSE` restricts this to rows where the parser never
+/// saw an explicit division header and fell back to the 'Civil' default — a
+/// row from a genuine, header-confirmed "CIVIL DIVISION" cause list must never
+/// match here, or every real Civil cause list gets wiped and re-scraped on
+/// every cron pass forever (it will always look "all Civil").
 ///
 /// Past-dated rows are ignored: they are retained as docket history and must
 /// never trigger (or be destroyed by) an eviction sweep.
 pub async fn has_any_civil_sittings_for_url(pool: &PgPool, url: &str) -> sqlx::Result<bool> {
     let count: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM court_sittings \
-         WHERE pdf_source_url = $1 AND court_division = 'Civil' \
+         WHERE pdf_source_url = $1 AND court_division = 'Civil' AND division_confirmed = FALSE \
            AND (event_date IS NULL OR event_date >= (NOW() AT TIME ZONE 'America/Jamaica')::date)",
     )
     .bind(url)
@@ -1956,66 +1964,132 @@ pub async fn has_any_civil_sittings_for_url(pool: &PgPool, url: &str) -> sqlx::R
     Ok(count > 0)
 }
 
-/// Deletes current-or-future court_sittings rows that came from `url` and have
-/// `court_division = 'Civil'`.  Called before re-scraping a URL whose
-/// division was wrong on the previous parse run, so that `sitting_exists`
-/// (which checks by case_number/event_date/event_type, not division) does
-/// not treat the old wrong-division rows as already-processed duplicates.
+/// Deletes current-or-future, *unconfirmed* court_sittings rows that came from
+/// `url` and have `court_division = 'Civil'`. Called before re-scraping a URL
+/// whose division was wrong on the previous parse run, so that
+/// `sitting_exists` (which checks by case_number/event_date/event_type, not
+/// division) does not treat the old wrong-division rows as already-processed
+/// duplicates.
+///
+/// `division_confirmed = FALSE` scopes this to rows the parser defaulted to
+/// 'Civil' for lack of a detected header — never rows from a confirmed
+/// "CIVIL DIVISION" header, which are legitimate data, not a mislabel.
+///
+/// Any user_cases row still pointing at a row about to be deleted here is
+/// unlinked first (case_id -> NULL) so the case-number rematch in
+/// `check_notifications` can re-bind it once the row is reinserted, instead
+/// of being left pointing at a row that no longer exists.
 ///
 /// Past-dated rows are preserved — they are the sitting history shown in the
 /// docket, and the source PDFs for past weeks are often no longer published,
 /// so a deleted historical row can never be re-scraped.
 pub async fn delete_civil_sittings_for_url(pool: &PgPool, url: &str) -> sqlx::Result<u64> {
+    let mut tx = pool.begin().await?;
     sqlx::query(
+        "UPDATE user_cases SET case_id = NULL \
+         WHERE case_type = 'sitting' AND case_id IN ( \
+             SELECT id FROM court_sittings \
+             WHERE pdf_source_url = $1 AND court_division = 'Civil' AND division_confirmed = FALSE \
+               AND (event_date IS NULL OR event_date >= (NOW() AT TIME ZONE 'America/Jamaica')::date) \
+         )",
+    )
+    .bind(url)
+    .execute(&mut *tx)
+    .await?;
+    let affected = sqlx::query(
         "DELETE FROM court_sittings \
-         WHERE pdf_source_url = $1 AND court_division = 'Civil' \
+         WHERE pdf_source_url = $1 AND court_division = 'Civil' AND division_confirmed = FALSE \
            AND (event_date IS NULL OR event_date >= (NOW() AT TIME ZONE 'America/Jamaica')::date)",
     )
     .bind(url)
-    .execute(pool)
-    .await
-    .map(|r| r.rows_affected())
+    .execute(&mut *tx)
+    .await?
+    .rows_affected();
+    tx.commit().await?;
+    Ok(affected)
 }
 
-/// Deletes current-or-future court_sittings rows that came from `url`,
-/// regardless of division.  Use before re-scraping a URL so that
+/// Deletes current-or-future, *unconfirmed* court_sittings rows that came
+/// from `url`, regardless of division. Use before re-scraping a URL so that
 /// `sitting_exists` (which checks case_number/event_date/event_type without a
 /// division filter) does not treat previously-inserted rows as duplicates and
-/// silently skip re-insertion.  Past-dated rows are preserved as history.
+/// silently skip re-insertion. Past-dated rows are preserved as history.
+///
+/// `division_confirmed = FALSE` excludes rows whose division was confirmed by
+/// an explicit header match — those are legitimate data, not a stale
+/// pre-classification parse. Any user_cases row pointing at a row about to be
+/// deleted is unlinked first so it can rebind on the next successful scrape.
 pub async fn delete_sittings_for_url(pool: &PgPool, url: &str) -> sqlx::Result<u64> {
+    let mut tx = pool.begin().await?;
     sqlx::query(
-        "DELETE FROM court_sittings WHERE pdf_source_url = $1 \
+        "UPDATE user_cases SET case_id = NULL \
+         WHERE case_type = 'sitting' AND case_id IN ( \
+             SELECT id FROM court_sittings \
+             WHERE pdf_source_url = $1 AND division_confirmed = FALSE \
+               AND (event_date IS NULL OR event_date >= (NOW() AT TIME ZONE 'America/Jamaica')::date) \
+         )",
+    )
+    .bind(url)
+    .execute(&mut *tx)
+    .await?;
+    let affected = sqlx::query(
+        "DELETE FROM court_sittings WHERE pdf_source_url = $1 AND division_confirmed = FALSE \
            AND (event_date IS NULL OR event_date >= (NOW() AT TIME ZONE 'America/Jamaica')::date)",
     )
     .bind(url)
-    .execute(pool)
-    .await
-    .map(|r| r.rows_affected())
+    .execute(&mut *tx)
+    .await?
+    .rows_affected();
+    tx.commit().await?;
+    Ok(affected)
 }
 
-/// Deletes current-or-future Civil sittings for every URL whose
+/// Deletes current-or-future, *unconfirmed* Civil sittings for every URL whose
 /// `pdf_source_url` contains `domain`.  Used as a domain-wide sweep when the
 /// processed-URL list is empty and we cannot enumerate individual URLs
 /// (e.g. CoA nuclear eviction with an already-clear list).
+///
+/// `division_confirmed = FALSE` excludes rows from a confirmed division
+/// header — see `delete_civil_sittings_for_url` for why that matters. Any
+/// user_cases row pointing at a row about to be deleted is unlinked first so
+/// it can rebind on the next successful scrape.
 pub async fn delete_civil_sittings_for_domain(pool: &PgPool, domain: &str) -> sqlx::Result<u64> {
+    let pattern = format!("%{domain}%");
+    let mut tx = pool.begin().await?;
     sqlx::query(
+        "UPDATE user_cases SET case_id = NULL \
+         WHERE case_type = 'sitting' AND case_id IN ( \
+             SELECT id FROM court_sittings \
+             WHERE pdf_source_url ILIKE $1 AND court_division = 'Civil' AND division_confirmed = FALSE \
+               AND (event_date IS NULL OR event_date >= (NOW() AT TIME ZONE 'America/Jamaica')::date) \
+         )",
+    )
+    .bind(&pattern)
+    .execute(&mut *tx)
+    .await?;
+    let affected = sqlx::query(
         "DELETE FROM court_sittings \
-         WHERE pdf_source_url ILIKE $1 AND court_division = 'Civil' \
+         WHERE pdf_source_url ILIKE $1 AND court_division = 'Civil' AND division_confirmed = FALSE \
            AND (event_date IS NULL OR event_date >= (NOW() AT TIME ZONE 'America/Jamaica')::date)",
     )
-    .bind(format!("%{domain}%"))
-    .execute(pool)
-    .await
-    .map(|r| r.rows_affected())
+    .bind(&pattern)
+    .execute(&mut *tx)
+    .await?
+    .rows_affected();
+    tx.commit().await?;
+    Ok(affected)
 }
 
-/// Returns true iff there is at least one current-or-future court_sitting for
-/// this URL AND every such sitting has court_division = 'Civil' — indicating a
-/// PDF parsed before detect_division_header() was implemented.  Past-dated
-/// rows are excluded so retained history can't re-trigger eviction forever.
+/// Returns true iff there is at least one current-or-future, *unconfirmed*
+/// court_sitting for this URL AND every such sitting has court_division =
+/// 'Civil' — indicating a PDF parsed before detect_division_header() was
+/// implemented. Past-dated rows are excluded so retained history can't
+/// re-trigger eviction forever. `division_confirmed = FALSE` ensures a
+/// genuine, header-confirmed Civil Division cause list (which will always
+/// look "all Civil") never matches.
 pub async fn has_only_civil_sittings_for_url(pool: &PgPool, url: &str) -> sqlx::Result<bool> {
     let (total, non_civil): (i64, i64) = sqlx::query_as(
-        "SELECT COUNT(*), COUNT(*) FILTER (WHERE court_division <> 'Civil') \
+        "SELECT COUNT(*), COUNT(*) FILTER (WHERE court_division <> 'Civil' OR division_confirmed) \
          FROM court_sittings WHERE pdf_source_url = $1 \
            AND (event_date IS NULL OR event_date >= (NOW() AT TIME ZONE 'America/Jamaica')::date)",
     )
