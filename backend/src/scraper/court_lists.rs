@@ -336,14 +336,11 @@ async fn process_pdf_bytes(
             continue;
         }
 
-        if let (Some(ref cn), Some(event_date)) = (&entry.case_number, entry.event_date) {
-            match queries::sitting_exists(pool, cn, event_date, entry.event_type.as_deref()).await {
-                Ok(true) => continue,
-                Ok(false) => {}
-                Err(e) => warn!("DB check failed: {e}"),
-            }
-        }
-
+        // No skip-if-exists check here: `upsert_court_sitting` corrects an
+        // existing sitting in place (e.g. fixes a wrong division) and never
+        // deletes.  Letting every parsed entry through is what keeps a stored
+        // sitting continuously present — it's updated, never removed and
+        // re-added — so an interrupted re-scrape can't make a hearing vanish.
         let division_confirmed = entry.division.is_some();
         match queries::upsert_court_sitting(
             pool,

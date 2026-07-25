@@ -1761,8 +1761,27 @@ pub async fn get_today_sittings(pool: &PgPool) -> sqlx::Result<Vec<CourtSitting>
     sqlx::query_as::<_, CourtSitting>(&sql).fetch_all(pool).await
 }
 
-/// Insert a sitting, skipping silently if the natural-key unique index fires.
-/// Returns `Some(row)` on a real insert, `None` if already present.
+/// Upsert a sitting **without ever deleting**.  If a sitting with the same
+/// identity (case_number + event_date + event_type) already exists, it is
+/// *corrected in place*; otherwise a new row is inserted.
+///
+/// Returns `Some(row)` only on a genuine new insert (so callers can count /
+/// notify on new sittings); returns `None` when an existing sitting was
+/// corrected in place or nothing changed.
+///
+/// Correction rules are deliberately non-destructive — a re-scrape can only
+/// *improve* a stored sitting, never lose data:
+///   * `court_division` — a later, unconfirmed parse (no division header seen,
+///     so it defaults to 'Civil') can **never** overwrite a division that was
+///     previously confirmed from an explicit header.  Otherwise the newest
+///     parse wins.
+///   * `division_confirmed` — sticky: once TRUE it stays TRUE.
+///   * text fields (title/judge/lawyers/time/source) — only *fill in* values
+///     that are currently NULL; existing non-null data is preserved.
+///
+/// This replaces the old delete-then-reinsert eviction path: sittings are
+/// corrected in place, so an in-flight re-scrape can never make a hearing
+/// disappear (the failure mode that dropped upcoming cases before).
 pub async fn upsert_court_sitting(
     pool: &PgPool,
     case_number: Option<&str>,
@@ -1776,7 +1795,46 @@ pub async fn upsert_court_sitting(
     pdf_source_url: Option<&str>,
     division_confirmed: bool,
 ) -> sqlx::Result<Option<CourtSitting>> {
-    let sql = format!(
+    // 1. Try to correct an existing sitting in place (identity match).
+    //    Same $1..$10 parameter order as the INSERT below.
+    let update_sql = format!(
+        "UPDATE court_sittings SET
+             court_division = CASE
+                 WHEN NOT $10::bool AND division_confirmed THEN court_division
+                 ELSE COALESCE($4, court_division)
+             END,
+             division_confirmed = division_confirmed OR $10,
+             title          = COALESCE(title, $2),
+             judge_name     = COALESCE(judge_name, $3),
+             lawyers        = COALESCE(lawyers, $8),
+             event_time     = COALESCE(event_time, $7),
+             pdf_source_url = COALESCE(pdf_source_url, $9)
+         WHERE case_number = $1
+           AND event_date  = $6
+           AND event_type IS NOT DISTINCT FROM $5
+         RETURNING {S}"
+    );
+    let updated = sqlx::query_as::<_, CourtSitting>(&update_sql)
+        .bind(case_number)
+        .bind(title)
+        .bind(judge_name)
+        .bind(court_division)
+        .bind(event_type)
+        .bind(event_date)
+        .bind(event_time)
+        .bind(lawyers)
+        .bind(pdf_source_url)
+        .bind(division_confirmed)
+        .fetch_optional(pool)
+        .await?;
+    if updated.is_some() {
+        // Existing sitting corrected in place — not a new arrival.
+        return Ok(None);
+    }
+
+    // 2. No existing sitting matched — insert a new one.  ON CONFLICT DO NOTHING
+    //    guards the race where a concurrent scrape inserted the same identity.
+    let insert_sql = format!(
         "INSERT INTO court_sittings
            (case_number, title, judge_name, court_division, event_type,
             event_date, event_time, lawyers, pdf_source_url, division_confirmed)
@@ -1784,7 +1842,7 @@ pub async fn upsert_court_sitting(
          ON CONFLICT DO NOTHING
          RETURNING {S}"
     );
-    sqlx::query_as::<_, CourtSitting>(&sql)
+    sqlx::query_as::<_, CourtSitting>(&insert_sql)
         .bind(case_number)
         .bind(title)
         .bind(judge_name)
@@ -1964,120 +2022,31 @@ pub async fn has_any_civil_sittings_for_url(pool: &PgPool, url: &str) -> sqlx::R
     Ok(count > 0)
 }
 
-/// Deletes current-or-future, *unconfirmed* court_sittings rows that came from
-/// `url` and have `court_division = 'Civil'`. Called before re-scraping a URL
-/// whose division was wrong on the previous parse run, so that
-/// `sitting_exists` (which checks by case_number/event_date/event_type, not
-/// division) does not treat the old wrong-division rows as already-processed
-/// duplicates.
+/// **Deletion is banned — this is now a no-op.**
 ///
-/// `division_confirmed = FALSE` scopes this to rows the parser defaulted to
-/// 'Civil' for lack of a detected header — never rows from a confirmed
-/// "CIVIL DIVISION" header, which are legitimate data, not a mislabel.
-///
-/// Any user_cases row still pointing at a row about to be deleted here is
-/// unlinked first (case_id -> NULL) so the case-number rematch in
-/// `check_notifications` can re-bind it once the row is reinserted, instead
-/// of being left pointing at a row that no longer exists.
-///
-/// Past-dated rows are preserved — they are the sitting history shown in the
-/// docket, and the source PDFs for past weeks are often no longer published,
-/// so a deleted historical row can never be re-scraped.
-pub async fn delete_civil_sittings_for_url(pool: &PgPool, url: &str) -> sqlx::Result<u64> {
-    let mut tx = pool.begin().await?;
-    sqlx::query(
-        "UPDATE user_cases SET case_id = NULL \
-         WHERE case_type = 'sitting' AND case_id IN ( \
-             SELECT id FROM court_sittings \
-             WHERE pdf_source_url = $1 AND court_division = 'Civil' AND division_confirmed = FALSE \
-               AND (event_date IS NULL OR event_date >= (NOW() AT TIME ZONE 'America/Jamaica')::date) \
-         )",
-    )
-    .bind(url)
-    .execute(&mut *tx)
-    .await?;
-    let affected = sqlx::query(
-        "DELETE FROM court_sittings \
-         WHERE pdf_source_url = $1 AND court_division = 'Civil' AND division_confirmed = FALSE \
-           AND (event_date IS NULL OR event_date >= (NOW() AT TIME ZONE 'America/Jamaica')::date)",
-    )
-    .bind(url)
-    .execute(&mut *tx)
-    .await?
-    .rows_affected();
-    tx.commit().await?;
-    Ok(affected)
+/// Previously this deleted current-or-future, unconfirmed 'Civil' rows for a
+/// URL before re-scraping, so the corrected rows could be re-inserted.  That
+/// delete-then-reinsert window is exactly how upcoming hearings could vanish
+/// if a re-scrape failed to complete.  `upsert_court_sitting` now corrects
+/// sittings **in place**, so no deletion is needed: the forced re-scrape
+/// updates the existing rows' division/details directly.  Kept as a no-op so
+/// the eviction call sites still compile and continue to *force* a re-scrape.
+pub async fn delete_civil_sittings_for_url(_pool: &PgPool, _url: &str) -> sqlx::Result<u64> {
+    Ok(0)
 }
 
-/// Deletes current-or-future, *unconfirmed* court_sittings rows that came
-/// from `url`, regardless of division. Use before re-scraping a URL so that
-/// `sitting_exists` (which checks case_number/event_date/event_type without a
-/// division filter) does not treat previously-inserted rows as duplicates and
-/// silently skip re-insertion. Past-dated rows are preserved as history.
-///
-/// `division_confirmed = FALSE` excludes rows whose division was confirmed by
-/// an explicit header match — those are legitimate data, not a stale
-/// pre-classification parse. Any user_cases row pointing at a row about to be
-/// deleted is unlinked first so it can rebind on the next successful scrape.
-pub async fn delete_sittings_for_url(pool: &PgPool, url: &str) -> sqlx::Result<u64> {
-    let mut tx = pool.begin().await?;
-    sqlx::query(
-        "UPDATE user_cases SET case_id = NULL \
-         WHERE case_type = 'sitting' AND case_id IN ( \
-             SELECT id FROM court_sittings \
-             WHERE pdf_source_url = $1 AND division_confirmed = FALSE \
-               AND (event_date IS NULL OR event_date >= (NOW() AT TIME ZONE 'America/Jamaica')::date) \
-         )",
-    )
-    .bind(url)
-    .execute(&mut *tx)
-    .await?;
-    let affected = sqlx::query(
-        "DELETE FROM court_sittings WHERE pdf_source_url = $1 AND division_confirmed = FALSE \
-           AND (event_date IS NULL OR event_date >= (NOW() AT TIME ZONE 'America/Jamaica')::date)",
-    )
-    .bind(url)
-    .execute(&mut *tx)
-    .await?
-    .rows_affected();
-    tx.commit().await?;
-    Ok(affected)
+/// **Deletion is banned — this is now a no-op.**  See
+/// [`delete_civil_sittings_for_url`]: sittings are corrected in place by
+/// `upsert_court_sitting` rather than deleted and re-inserted.
+pub async fn delete_sittings_for_url(_pool: &PgPool, _url: &str) -> sqlx::Result<u64> {
+    Ok(0)
 }
 
-/// Deletes current-or-future, *unconfirmed* Civil sittings for every URL whose
-/// `pdf_source_url` contains `domain`.  Used as a domain-wide sweep when the
-/// processed-URL list is empty and we cannot enumerate individual URLs
-/// (e.g. CoA nuclear eviction with an already-clear list).
-///
-/// `division_confirmed = FALSE` excludes rows from a confirmed division
-/// header — see `delete_civil_sittings_for_url` for why that matters. Any
-/// user_cases row pointing at a row about to be deleted is unlinked first so
-/// it can rebind on the next successful scrape.
-pub async fn delete_civil_sittings_for_domain(pool: &PgPool, domain: &str) -> sqlx::Result<u64> {
-    let pattern = format!("%{domain}%");
-    let mut tx = pool.begin().await?;
-    sqlx::query(
-        "UPDATE user_cases SET case_id = NULL \
-         WHERE case_type = 'sitting' AND case_id IN ( \
-             SELECT id FROM court_sittings \
-             WHERE pdf_source_url ILIKE $1 AND court_division = 'Civil' AND division_confirmed = FALSE \
-               AND (event_date IS NULL OR event_date >= (NOW() AT TIME ZONE 'America/Jamaica')::date) \
-         )",
-    )
-    .bind(&pattern)
-    .execute(&mut *tx)
-    .await?;
-    let affected = sqlx::query(
-        "DELETE FROM court_sittings \
-         WHERE pdf_source_url ILIKE $1 AND court_division = 'Civil' AND division_confirmed = FALSE \
-           AND (event_date IS NULL OR event_date >= (NOW() AT TIME ZONE 'America/Jamaica')::date)",
-    )
-    .bind(&pattern)
-    .execute(&mut *tx)
-    .await?
-    .rows_affected();
-    tx.commit().await?;
-    Ok(affected)
+/// **Deletion is banned — this is now a no-op.**  See
+/// [`delete_civil_sittings_for_url`]: sittings are corrected in place by
+/// `upsert_court_sitting` rather than deleted and re-inserted.
+pub async fn delete_civil_sittings_for_domain(_pool: &PgPool, _domain: &str) -> sqlx::Result<u64> {
+    Ok(0)
 }
 
 /// Returns true iff there is at least one current-or-future, *unconfirmed*
