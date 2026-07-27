@@ -1,7 +1,68 @@
 // Required system packages for OCR: poppler-utils (pdftoppm), tesseract-ocr (tesseract)
 
 use std::io::Write as _;
+use std::time::Duration;
 use tracing::{info, warn};
+
+/// Hard ceiling on a single pdf-extract run. Malformed PDFs can send
+/// pdf-extract into an infinite loop, which would otherwise wedge a
+/// multi-hour scrape on one document.
+const PDF_EXTRACT_TIMEOUT: Duration = Duration::from_secs(120);
+/// Rasterising a large PDF at 300 dpi can legitimately take minutes.
+const PDFTOPPM_TIMEOUT: Duration = Duration::from_secs(300);
+/// Per-page tesseract ceiling; normal pages OCR in a few seconds.
+const TESSERACT_TIMEOUT: Duration = Duration::from_secs(60);
+
+/// Like `Command::output()`, but kills the child and returns `Ok(None)` if it
+/// hasn't exited within `timeout`. Pipes are drained on reader threads so a
+/// chatty child can't deadlock against a full pipe buffer.
+fn output_with_timeout(
+    mut cmd: std::process::Command,
+    timeout: Duration,
+) -> std::io::Result<Option<std::process::Output>> {
+    use std::io::Read as _;
+    use std::process::Stdio;
+    use std::time::Instant;
+
+    cmd.stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let mut child = cmd.spawn()?;
+
+    let mut stdout_pipe = child.stdout.take().expect("stdout piped");
+    let mut stderr_pipe = child.stderr.take().expect("stderr piped");
+    let stdout_reader = std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        let _ = stdout_pipe.read_to_end(&mut buf);
+        buf
+    });
+    let stderr_reader = std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        let _ = stderr_pipe.read_to_end(&mut buf);
+        buf
+    });
+
+    let deadline = Instant::now() + timeout;
+    let status = loop {
+        match child.try_wait()? {
+            Some(status) => break status,
+            None if Instant::now() >= deadline => {
+                let _ = child.kill();
+                let _ = child.wait();
+                let _ = stdout_reader.join();
+                let _ = stderr_reader.join();
+                return Ok(None);
+            }
+            None => std::thread::sleep(Duration::from_millis(100)),
+        }
+    };
+
+    Ok(Some(std::process::Output {
+        status,
+        stdout: stdout_reader.join().unwrap_or_default(),
+        stderr: stderr_reader.join().unwrap_or_default(),
+    }))
+}
 
 /// Download a PDF from a URL using the supplied client and return raw bytes.
 pub async fn download_pdf(client: &reqwest::Client, url: &str) -> anyhow::Result<Vec<u8>> {
@@ -23,18 +84,32 @@ pub async fn download_pdf(client: &reqwest::Client, url: &str) -> anyhow::Result
 /// callers (i.e. `extract_text_safe`) fall through to the OCR pipeline
 /// instead of crashing the whole scraper run.
 pub fn extract_text_from_bytes(bytes: &[u8]) -> anyhow::Result<String> {
-    // `catch_unwind` requires the closure to be `UnwindSafe`.  `&[u8]` satisfies
-    // that constraint, so capturing `bytes` by reference is fine here.
-    let result = std::panic::catch_unwind(|| pdf_extract::extract_text_from_mem(bytes));
+    // pdf-extract can also loop forever on malformed PDFs, so run it on a
+    // watchdog thread and give up after PDF_EXTRACT_TIMEOUT. A timed-out
+    // thread is leaked (Rust can't kill it), which is the lesser evil versus
+    // wedging the whole scrape.
+    let owned = bytes.to_vec();
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let result = std::panic::catch_unwind(|| pdf_extract::extract_text_from_mem(&owned));
+        let _ = tx.send(result);
+    });
 
-    match result {
-        Ok(Ok(text)) => Ok(text),
-        Ok(Err(e)) => Err(anyhow::anyhow!("PDF extraction failed: {e}")),
-        Err(_panic_payload) => {
+    match rx.recv_timeout(PDF_EXTRACT_TIMEOUT) {
+        Ok(Ok(Ok(text))) => Ok(text),
+        Ok(Ok(Err(e))) => Err(anyhow::anyhow!("PDF extraction failed: {e}")),
+        Ok(Err(_panic_payload)) => {
             warn!("pdf-extract panicked (likely unsupported colour space) — falling back to OCR");
             Err(anyhow::anyhow!(
                 "pdf-extract panicked on this PDF (unsupported colour space)"
             ))
+        }
+        Err(_) => {
+            warn!(
+                "pdf-extract exceeded {}s (malformed PDF?) — abandoning it and falling back to OCR",
+                PDF_EXTRACT_TIMEOUT.as_secs()
+            );
+            Err(anyhow::anyhow!("pdf-extract timed out"))
         }
     }
 }
@@ -93,17 +168,16 @@ pub fn extract_text_ocr(pdf_bytes: &[u8]) -> Option<String> {
     }
 
     // --- Step 1: rasterise with pdftoppm ----------------------------------------
-    let pdftoppm = Command::new("pdftoppm")
-        .args([
-            "-png",
-            "-r",
-            "300",
-            pdf_path.to_str().unwrap_or(""),
-            img_prefix.to_str().unwrap_or(""),
-        ])
-        .output();
+    let mut pdftoppm_cmd = Command::new("pdftoppm");
+    pdftoppm_cmd.args([
+        "-png",
+        "-r",
+        "300",
+        pdf_path.to_str().unwrap_or(""),
+        img_prefix.to_str().unwrap_or(""),
+    ]);
 
-    match pdftoppm {
+    match output_with_timeout(pdftoppm_cmd, PDFTOPPM_TIMEOUT) {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             warn!("OCR: pdftoppm not found (install poppler-utils). Skipping OCR.");
             return None;
@@ -112,7 +186,14 @@ pub fn extract_text_ocr(pdf_bytes: &[u8]) -> Option<String> {
             warn!("OCR: pdftoppm failed: {e}");
             return None;
         }
-        Ok(out) if !out.status.success() => {
+        Ok(None) => {
+            warn!(
+                "OCR: pdftoppm killed after {}s timeout. Skipping OCR.",
+                PDFTOPPM_TIMEOUT.as_secs()
+            );
+            return None;
+        }
+        Ok(Some(out)) if !out.status.success() => {
             warn!(
                 "OCR: pdftoppm exited with {}: {}",
                 out.status,
@@ -120,7 +201,7 @@ pub fn extract_text_ocr(pdf_bytes: &[u8]) -> Option<String> {
             );
             return None;
         }
-        Ok(_) => {}
+        Ok(Some(_)) => {}
     }
 
     // --- Step 2: collect page images --------------------------------------------
@@ -147,11 +228,10 @@ pub fn extract_text_ocr(pdf_bytes: &[u8]) -> Option<String> {
     // --- Step 3: OCR each page with tesseract -----------------------------------
     let mut full_text = String::new();
     for img in &page_images {
-        let tess = Command::new("tesseract")
-            .args([img.to_str().unwrap_or(""), "stdout"])
-            .output();
+        let mut tess_cmd = Command::new("tesseract");
+        tess_cmd.args([img.to_str().unwrap_or(""), "stdout"]);
 
-        match tess {
+        match output_with_timeout(tess_cmd, TESSERACT_TIMEOUT) {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
                 warn!("OCR: tesseract not found (install tesseract-ocr). Skipping OCR.");
                 return None;
@@ -160,7 +240,15 @@ pub fn extract_text_ocr(pdf_bytes: &[u8]) -> Option<String> {
                 warn!("OCR: tesseract failed on {:?}: {e}", img.file_name());
                 continue;
             }
-            Ok(out) if !out.status.success() => {
+            Ok(None) => {
+                warn!(
+                    "OCR: tesseract killed after {}s timeout on {:?}; skipping page",
+                    TESSERACT_TIMEOUT.as_secs(),
+                    img.file_name()
+                );
+                continue;
+            }
+            Ok(Some(out)) if !out.status.success() => {
                 warn!(
                     "OCR: tesseract non-zero exit on {:?}: {}",
                     img.file_name(),
@@ -168,7 +256,7 @@ pub fn extract_text_ocr(pdf_bytes: &[u8]) -> Option<String> {
                 );
                 continue;
             }
-            Ok(out) => {
+            Ok(Some(out)) => {
                 let page_text = String::from_utf8_lossy(&out.stdout)
                     .chars()
                     .filter(|&c| c == '\n' || c == '\r' || c == '\t' || !c.is_control())
