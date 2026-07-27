@@ -1398,9 +1398,17 @@ pub async fn add_user_case(
     case_type: &str,
 ) -> sqlx::Result<UserCase> {
     sqlx::query_as::<_, UserCase>(
-        "INSERT INTO user_cases (user_id, case_id, case_type, last_status)
+        // Snapshot the case number at tracking time: judgment/sitting ids are
+        // not stable across re-scrapes, so resolving it lazily through the id
+        // orphans the docket row if the source row is ever re-created.
+        "INSERT INTO user_cases (user_id, case_id, case_type, last_status, case_number)
          VALUES ($1, $2, $3, (
              SELECT status FROM parish_court_cases WHERE id = $2 AND $3 = 'parish_court'
+         ), (
+             CASE $3
+                 WHEN 'judgment' THEN (SELECT case_number FROM judgments WHERE id = $2)
+                 WHEN 'sitting'  THEN (SELECT case_number FROM court_sittings WHERE id = $2)
+             END
          ))
          ON CONFLICT DO NOTHING
          RETURNING id, user_id, case_id, case_type, case_number,
