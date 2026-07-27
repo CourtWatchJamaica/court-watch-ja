@@ -293,6 +293,53 @@ pub async fn backfill_local_pdfs(
     Ok((files_reparsed, total_inserted))
 }
 
+/// One-off Wayback Machine backfill: reads a TSV manifest where each line is
+/// `<local_pdf_path>\t<original_url>` and ingests each file through the normal
+/// court-list pipeline.  The ORIGINAL supremecourt.gov.jm URL is stored as
+/// `pdf_source_url`, so recovered history is indistinguishable from sittings
+/// scraped live — filters, case pages, and eviction date-guards all behave
+/// normally.  Idempotent: `upsert_court_sitting` updates in place and never
+/// duplicates a (case_number, event_date) row.
+///
+/// Returns (files_processed, sittings_inserted).
+pub async fn backfill_wayback_manifest(
+    pool: &PgPool,
+    pdf_dir: &str,
+    manifest_path: &str,
+) -> anyhow::Result<(usize, usize)> {
+    let manifest = tokio::fs::read_to_string(manifest_path).await?;
+    let mut files_processed = 0usize;
+    let mut total_inserted = 0usize;
+
+    for line in manifest.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let Some((path, url)) = line.split_once('\t') else {
+            warn!("[Wayback backfill] Malformed manifest line (expected path<TAB>url): {line}");
+            continue;
+        };
+        let bytes = match tokio::fs::read(path).await {
+            Ok(b) => b,
+            Err(e) => {
+                warn!("[Wayback backfill] Failed to read {path}: {e}");
+                continue;
+            }
+        };
+        match process_pdf_bytes(pool, pdf_dir, url, bytes).await {
+            Ok(inserted) => {
+                files_processed += 1;
+                total_inserted += inserted;
+                info!("[Wayback backfill] {url}: {inserted} new sitting(s)");
+            }
+            Err(e) => warn!("[Wayback backfill] Skipping {url}: {e}"),
+        }
+    }
+
+    Ok((files_processed, total_inserted))
+}
+
 /// Compute a SHA-256 fingerprint of PDF bytes for change detection.
 pub fn compute_pdf_hash(bytes: &[u8]) -> String {
     let mut h = Sha256::new();

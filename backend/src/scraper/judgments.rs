@@ -167,6 +167,149 @@ pub async fn run(
     Ok(())
 }
 
+/// Drupal taxonomy term id for each judgment year on the live site's
+/// exposed filter (`?tid=N`).  Extracted from /content/judgments 2026-07-27.
+/// The unfiltered listing only shows the most recent ~9 pages, so the year
+/// filter is the only way to reach the historical archive (back to 1962).
+const YEAR_TIDS: &[(i32, u32)] = &[
+    (1962, 149), (1963, 148), (1964, 147), (1965, 146), (1966, 145),
+    (1967, 144), (1968, 143), (1969, 142), (1970, 141), (1971, 140),
+    (1972, 139), (1973, 138), (1974, 137), (1975, 136), (1976, 135),
+    (1977, 134), (1978, 133), (1979, 132), (1980, 131), (1981, 130),
+    (1982, 129), (1983, 128), (1984, 127), (1985, 126), (1986, 125),
+    (1987, 124), (1988, 123), (1989, 100), (1990, 99), (1991, 98),
+    (1992, 97), (1993, 96), (1994, 95), (1995, 94), (1996, 93),
+    (1997, 92), (1998, 91), (1999, 90), (2000, 1), (2001, 2),
+    (2002, 3), (2003, 4), (2004, 5), (2005, 6), (2006, 7),
+    (2007, 8), (2008, 9), (2009, 10), (2010, 11), (2011, 12),
+    (2012, 13), (2013, 14), (2014, 15), (2015, 16), (2016, 17),
+    (2017, 18), (2018, 19), (2019, 20), (2020, 21), (2021, 190),
+    (2022, 235), (2023, 264), (2024, 269), (2025, 279), (2026, 280),
+];
+
+/// One-off archive backfill: walks the year-filtered judgments listing
+/// (`?tid=<year term>&page=N`) for every year in `[start_year, end_year]`,
+/// ingesting rows through the same detail-fetch + upsert path as `run`.
+/// Judgments already in the DB with a pdf_url are skipped without hitting
+/// the detail page, so re-runs are cheap and resumable.
+///
+/// Returns (rows_upserted, rows_skipped).
+pub async fn backfill_year_archive(
+    pool: &PgPool,
+    client: &reqwest::Client,
+    start_year: i32,
+    end_year: i32,
+) -> anyhow::Result<(usize, usize)> {
+    let mut upserted = 0usize;
+    let mut skipped = 0usize;
+
+    for &(year, tid) in YEAR_TIDS {
+        if year < start_year || year > end_year {
+            continue;
+        }
+        let mut page = 0u32;
+        loop {
+            let url = format!("{LISTING_URL}?tid={tid}&page={page}");
+            info!("[Judgment backfill] {year} page {page}: {url}");
+
+            let html = match client.get(&url).send().await {
+                Ok(r) if r.status().is_success() => r.text().await?,
+                Ok(r) => {
+                    warn!("[Judgment backfill] {year} page {page} returned {}; moving to next year", r.status());
+                    break;
+                }
+                Err(e) => {
+                    warn!("[Judgment backfill] {year} page {page} request error: {e}; retrying once in 30s");
+                    sleep(Duration::from_secs(30)).await;
+                    match client.get(&url).send().await {
+                        Ok(r) if r.status().is_success() => r.text().await?,
+                        _ => {
+                            warn!("[Judgment backfill] {year} page {page} failed twice; moving to next year");
+                            break;
+                        }
+                    }
+                }
+            };
+
+            let rows = parse_listing_page(&html);
+            if rows.is_empty() {
+                break;
+            }
+
+            for row in rows {
+                let have: Option<(Option<String>,)> = sqlx::query_as(
+                    "SELECT pdf_url FROM judgments WHERE case_number = $1",
+                )
+                .bind(&row.case_number)
+                .fetch_optional(pool)
+                .await?;
+                if matches!(have, Some((Some(_),))) {
+                    skipped += 1;
+                    continue;
+                }
+
+                let source_url = row.detail_url.as_ref().map(|d| {
+                    if d.starts_with("http") {
+                        d.clone()
+                    } else {
+                        format!("{BASE_URL}{d}")
+                    }
+                });
+
+                let (pdf_url, summary, detail_judge) = if let Some(ref full_url) = source_url {
+                    sleep(Duration::from_secs(3)).await;
+                    match judgment_detail::fetch(client, full_url, &row.case_number).await {
+                        Ok(detail) => (detail.pdf_url, detail.summary_text, detail.judge_name),
+                        Err(e) => {
+                            warn!("[Judgment backfill] Detail fetch failed for {} ({full_url}): {e}", row.case_number);
+                            (None, None, None)
+                        }
+                    }
+                } else {
+                    warn!("[Judgment backfill] {} has no detail URL; upserting metadata only", row.case_number);
+                    (None, None, None)
+                };
+
+                let judge_name = row.judge_name.clone().or(detail_judge);
+                if let Some(ref j) = judge_name {
+                    if let Err(e) = queries::upsert_judge(pool, j, Some("Supreme Court")).await {
+                        warn!("[Judgment backfill] Failed to upsert judge {j}: {e}");
+                    }
+                }
+
+                let judgment_tags = tags::detect_tags(row.title.as_deref(), summary.as_deref());
+                match queries::upsert_judgment(
+                    pool,
+                    &row.case_number,
+                    row.title.as_deref(),
+                    judge_name.as_deref(),
+                    Some("Supreme Court"),
+                    row.date,
+                    pdf_url.as_deref(),
+                    None,
+                    summary.as_deref(),
+                    source_url.as_deref(),
+                    judgment_tags,
+                )
+                .await
+                {
+                    Ok(_) => {
+                        upserted += 1;
+                        info!("[Judgment backfill] Upserted {} ({year})", row.case_number);
+                    }
+                    Err(e) => warn!("[Judgment backfill] Failed to upsert {}: {e}", row.case_number),
+                }
+            }
+
+            page += 1;
+            sleep(Duration::from_secs(2)).await;
+        }
+        info!("[Judgment backfill] Year {year} done ({upserted} upserted, {skipped} skipped so far)");
+    }
+
+    Ok((upserted, skipped))
+}
+
 /// Parse the judgments table from an HTML listing page.
 pub fn parse_listing_page(html: &str) -> Vec<JudgmentRow> {
     let doc = Html::parse_document(html);

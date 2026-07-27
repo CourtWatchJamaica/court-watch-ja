@@ -133,6 +133,47 @@ async fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
+    // One-off CLI mode: ingest Wayback-recovered court-list PDFs from a TSV
+    // manifest (local_path<TAB>original_url) and exit.
+    {
+        let args: Vec<String> = std::env::args().collect();
+        if let Some(pos) = args.iter().position(|a| a == "--backfill-wayback") {
+            let manifest = args.get(pos + 1).ok_or_else(|| {
+                anyhow::anyhow!("--backfill-wayback requires a manifest file path")
+            })?;
+            let (files, rows) = scraper::court_lists::backfill_wayback_manifest(
+                &pool,
+                &config.pdf_dir,
+                manifest,
+            )
+            .await?;
+            info!("[Wayback backfill] Done: {files} PDF(s) processed, {rows} sitting(s) inserted");
+            return Ok(());
+        }
+
+        // One-off CLI mode: crawl the year-filtered judgments archive
+        // (`--backfill-judgments [START[-END]]`, default 1962-2026) and exit.
+        if let Some(pos) = args.iter().position(|a| a == "--backfill-judgments") {
+            let (start, end) = match args.get(pos + 1).map(String::as_str) {
+                Some(range) if !range.starts_with("--") => {
+                    match range.split_once('-') {
+                        Some((s, e)) => (s.parse()?, e.parse()?),
+                        None => {
+                            let y: i32 = range.parse()?;
+                            (y, y)
+                        }
+                    }
+                }
+                _ => (1962, 2026),
+            };
+            let client = scraper::http_client()?;
+            let (upserted, skipped) =
+                scraper::judgments::backfill_year_archive(&pool, &client, start, end).await?;
+            info!("[Judgment backfill] Done: {upserted} upserted, {skipped} skipped ({start}-{end})");
+            return Ok(());
+        }
+    }
+
     // Extract judge names from CoA PDFs that are already on disk (fast, no network I/O).
     // Must run before seed_judges_from_judgments so the newly extracted names are included.
     if let Err(e) = scraper::runner::backfill_coa_judge_names(&pool).await {
