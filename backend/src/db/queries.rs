@@ -592,15 +592,6 @@ pub async fn list_judgments(
         dq.push(" ORDER BY ts_rank(search_vector, websearch_to_tsquery('english', ");
         dq.push_bind(query.unwrap().trim());
         dq.push(")) DESC, date DESC NULLS LAST");
-    } else if use_court && court.is_none() {
-        dq.push(
-            " ORDER BY CASE court \
-               WHEN 'Supreme Court'  THEN 1 \
-               WHEN 'Court of Appeal' THEN 2 \
-               WHEN 'Parish Court'   THEN 3 \
-               ELSE 4 \
-             END, date DESC NULLS LAST, created_at DESC",
-        );
     } else {
         dq.push(" ORDER BY date DESC NULLS LAST, created_at DESC");
     }
