@@ -216,7 +216,9 @@ function LandingPage() {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(orgSchema) }}
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(orgSchema).replace(/</g, "\\u003c"),
+        }}
       />
 
       <div className="min-h-screen bg-[#080810] text-white">

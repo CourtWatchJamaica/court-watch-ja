@@ -110,7 +110,9 @@ export default function LegalStructuredData({
   return (
     <script
       type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(buildSchema(data)) }}
+      dangerouslySetInnerHTML={{
+        __html: JSON.stringify(buildSchema(data)).replace(/</g, "\\u003c"),
+      }}
     />
   );
 }
