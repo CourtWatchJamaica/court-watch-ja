@@ -98,7 +98,7 @@ pub async fn run(
                 warn!("[Parish Cases] Write failed {}: {e}", dest.display());
             }
 
-            let raw_text = extract_text_safe(&bytes, pdf_url);
+            let raw_text = extract_text_safe(&bytes, pdf_url).await;
             if raw_text.trim().is_empty() {
                 warn!("[Parish Cases] No text from {filename}");
                 state.mark_parish_case_pdf_processed(pdf_url.clone());
@@ -198,59 +198,68 @@ async fn fetch_text(client: &reqwest::Client, url: &str) -> Option<String> {
 
 // ── Text extraction ───────────────────────────────────────────────────────────
 
-fn extract_text_safe(bytes: &[u8], url: &str) -> String {
+/// Runs on Tokio's blocking-thread pool — pdftotext/pdftoppm/tesseract are
+/// synchronous subprocess calls (with no timeout of their own) that would
+/// otherwise stall an async worker thread indefinitely on a wedged process.
+async fn extract_text_safe(bytes: &[u8], url: &str) -> String {
     use std::process::Command;
 
-    let tmp_dir = std::env::temp_dir();
-    let stem = sanitize_filename(url).replace(".pdf", "");
-    let pdf_path = tmp_dir.join(format!("{stem}_pc.pdf"));
+    let bytes = bytes.to_vec();
+    let url = url.to_string();
+    tokio::task::spawn_blocking(move || {
+        let tmp_dir = std::env::temp_dir();
+        let stem = sanitize_filename(&url).replace(".pdf", "");
+        let pdf_path = tmp_dir.join(format!("{stem}_pc.pdf"));
 
-    if std::fs::write(&pdf_path, bytes).is_err() {
-        return String::new();
-    }
-    let path_str = pdf_path.to_string_lossy().to_string();
-
-    if let Ok(out) = Command::new("pdftotext")
-        .args(["-layout", &path_str, "-"])
-        .output()
-    {
-        if out.status.success() {
-            let text = String::from_utf8_lossy(&out.stdout).to_string();
-            if text.trim().len() > 50 {
-                let _ = std::fs::remove_file(&pdf_path);
-                return text;
-            }
+        if std::fs::write(&pdf_path, &bytes).is_err() {
+            return String::new();
         }
-    }
+        let path_str = pdf_path.to_string_lossy().to_string();
 
-    let png_base = tmp_dir.join(format!("{stem}_pc_page"));
-    let png_base_str = png_base.to_string_lossy().to_string();
-    let _ = Command::new("pdftoppm")
-        .args(["-r", "200", "-l", "5", &path_str, &png_base_str])
-        .output();
-
-    let mut ocr_text = String::new();
-    for i in 1..=5 {
-        let ppm = tmp_dir.join(format!("{stem}_pc_page-{i:04}.ppm"));
-        if !ppm.exists() {
-            break;
-        }
-        if let Ok(out) = Command::new("tesseract")
-            .arg(ppm.to_string_lossy().as_ref())
-            .arg("stdout")
-            .args(["--oem", "1", "--psm", "6"])
+        if let Ok(out) = Command::new("pdftotext")
+            .args(["-layout", &path_str, "-"])
             .output()
         {
             if out.status.success() {
-                ocr_text.push_str(&String::from_utf8_lossy(&out.stdout));
-                ocr_text.push('\n');
+                let text = String::from_utf8_lossy(&out.stdout).to_string();
+                if text.trim().len() > 50 {
+                    let _ = std::fs::remove_file(&pdf_path);
+                    return text;
+                }
             }
         }
-        let _ = std::fs::remove_file(&ppm);
-    }
 
-    let _ = std::fs::remove_file(&pdf_path);
-    ocr_text
+        let png_base = tmp_dir.join(format!("{stem}_pc_page"));
+        let png_base_str = png_base.to_string_lossy().to_string();
+        let _ = Command::new("pdftoppm")
+            .args(["-r", "200", "-l", "5", &path_str, &png_base_str])
+            .output();
+
+        let mut ocr_text = String::new();
+        for i in 1..=5 {
+            let ppm = tmp_dir.join(format!("{stem}_pc_page-{i:04}.ppm"));
+            if !ppm.exists() {
+                break;
+            }
+            if let Ok(out) = Command::new("tesseract")
+                .arg(ppm.to_string_lossy().as_ref())
+                .arg("stdout")
+                .args(["--oem", "1", "--psm", "6"])
+                .output()
+            {
+                if out.status.success() {
+                    ocr_text.push_str(&String::from_utf8_lossy(&out.stdout));
+                    ocr_text.push('\n');
+                }
+            }
+            let _ = std::fs::remove_file(&ppm);
+        }
+
+        let _ = std::fs::remove_file(&pdf_path);
+        ocr_text
+    })
+    .await
+    .unwrap_or_default()
 }
 
 fn normalize_ocr_text(text: &str) -> String {

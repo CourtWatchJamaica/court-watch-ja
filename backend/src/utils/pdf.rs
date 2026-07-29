@@ -275,6 +275,23 @@ pub fn extract_text_ocr(pdf_bytes: &[u8]) -> Option<String> {
     }
 }
 
+/// Runs `extract_text_from_bytes` (falling back to `extract_text_ocr`) on
+/// Tokio's blocking-thread pool. Both do synchronous subprocess/CPU work —
+/// pdf-extract's watchdog thread, pdftoppm, tesseract — that would otherwise
+/// stall an async worker thread for minutes on a scanned or malformed PDF,
+/// starving every other in-flight request sharing that thread.
+pub async fn extract_text_or_ocr(bytes: &[u8]) -> Option<String> {
+    let bytes = bytes.to_vec();
+    tokio::task::spawn_blocking(move || {
+        extract_text_from_bytes(&bytes)
+            .ok()
+            .filter(|t| !t.trim().is_empty())
+            .or_else(|| extract_text_ocr(&bytes))
+    })
+    .await
+    .unwrap_or(None)
+}
+
 /// Returns true when `text` appears to contain `case_number`.
 ///
 /// Three passes, from most to least strict:

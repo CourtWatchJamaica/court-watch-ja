@@ -990,10 +990,7 @@ pub async fn cleanup_mismatched_pdfs(pool: &PgPool) -> anyhow::Result<()> {
             }
         };
 
-        let text_opt = pdf_utils::extract_text_from_bytes(&bytes)
-            .ok()
-            .filter(|t| !t.trim().is_empty())
-            .or_else(|| pdf_utils::extract_text_ocr(&bytes));
+        let text_opt = pdf_utils::extract_text_or_ocr(&bytes).await;
 
         let Some(text) = text_opt else {
             // Can't read text — skip rather than incorrectly nullify.
@@ -1050,12 +1047,21 @@ pub async fn backfill_coa_judge_names(pool: &PgPool) -> anyhow::Result<()> {
             }
         };
 
-        // Try pdftotext first; fall back to OCR.
-        let pdftotext = pdf_utils::extract_text_from_bytes(&bytes)
-            .ok()
-            .filter(|t| !t.trim().is_empty());
-        let used_ocr = pdftotext.is_none();
-        let text_opt = pdftotext.or_else(|| pdf_utils::extract_text_ocr(&bytes));
+        // Try pdftotext first; fall back to OCR. Runs on the blocking-thread
+        // pool since both do synchronous subprocess/CPU work.
+        let (text_opt, used_ocr) = {
+            let bytes = bytes.clone();
+            tokio::task::spawn_blocking(move || {
+                let pdftotext = pdf_utils::extract_text_from_bytes(&bytes)
+                    .ok()
+                    .filter(|t| !t.trim().is_empty());
+                let used_ocr = pdftotext.is_none();
+                let text_opt = pdftotext.or_else(|| pdf_utils::extract_text_ocr(&bytes));
+                (text_opt, used_ocr)
+            })
+            .await
+            .unwrap_or((None, false))
+        };
 
         let Some(ref text) = text_opt else {
             warn!(
@@ -1159,10 +1165,7 @@ async fn download_pending_pdfs(
         match pdf_utils::download_pdf(client, &full_url).await {
             Ok(bytes) => {
                 // Extract text once — used for both verification and judge extraction.
-                let text_opt = pdf_utils::extract_text_from_bytes(&bytes)
-                    .ok()
-                    .filter(|t| !t.trim().is_empty())
-                    .or_else(|| pdf_utils::extract_text_ocr(&bytes));
+                let text_opt = pdf_utils::extract_text_or_ocr(&bytes).await;
 
                 // Verify the PDF belongs to this judgment.
                 // If text extraction failed entirely, assume correct to avoid dropping valid PDFs.

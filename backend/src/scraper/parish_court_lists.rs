@@ -268,7 +268,7 @@ async fn process_one_pdf(
         warn!("[Parish Hearings] Failed to save PDF to disk: {e}");
     }
 
-    let raw_text = extract_text_safe(&bytes, absolute_url);
+    let raw_text = extract_text_safe(&bytes, absolute_url).await;
 
     if raw_text.trim().is_empty() {
         warn!("[Parish Hearings] No extractable text from {filename}, skipping");

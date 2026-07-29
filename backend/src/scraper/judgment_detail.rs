@@ -180,10 +180,7 @@ async fn find_verified_pdf(
             first_downloaded = Some(url.clone());
         }
 
-        let text_opt = pdf_utils::extract_text_from_bytes(&bytes)
-            .ok()
-            .filter(|t| !t.trim().is_empty())
-            .or_else(|| pdf_utils::extract_text_ocr(&bytes));
+        let text_opt = pdf_utils::extract_text_or_ocr(&bytes).await;
 
         let Some(text) = text_opt else {
             tracing::warn!("detail: no text extracted from PDF candidate {url}");

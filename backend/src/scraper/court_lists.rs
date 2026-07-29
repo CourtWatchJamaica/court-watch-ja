@@ -218,7 +218,7 @@ pub async fn backfill_local_pdfs(
             }
         }
 
-        let raw_text = extract_text_safe(&bytes, source_url);
+        let raw_text = extract_text_safe(&bytes, source_url).await;
         if raw_text.trim().is_empty() {
             // Record it so unparseable scans aren't re-attempted every boot.
             let _ = queries::upsert_pdf_ingest_state(
@@ -360,7 +360,7 @@ async fn process_pdf_bytes(
         warn!("Failed to save PDF to disk: {e}");
     }
 
-    let raw_text = extract_text_safe(&bytes, absolute_url);
+    let raw_text = extract_text_safe(&bytes, absolute_url).await;
 
     if raw_text.trim().is_empty() {
         warn!("No extractable text from {absolute_url}, skipping");
@@ -454,25 +454,35 @@ pub fn normalize_ocr_text(text: &str) -> String {
 
 /// Try pdf-extract → OCR (pdftoppm + tesseract) → raw UTF-8 fallback.
 /// All char operations use iterators — never byte-indexed slices.
-pub fn extract_text_safe(bytes: &[u8], url: &str) -> String {
-    match pdf_utils::extract_text_from_bytes(bytes) {
-        Ok(t) if !t.trim().is_empty() => return t,
-        Ok(_) => info!("pdf-extract returned empty text for {url}, trying OCR"),
-        Err(e) => info!("pdf-extract failed for {url} ({e}), trying OCR"),
-    }
-
-    if let Some(t) = pdf_utils::extract_text_ocr(bytes) {
-        if !t.trim().is_empty() {
-            info!("OCR succeeded for {url}");
-            return t;
+///
+/// Runs on Tokio's blocking-thread pool: pdf-extract and OCR both do
+/// synchronous subprocess/CPU work that would otherwise stall an async
+/// worker thread for minutes on a scanned or malformed PDF.
+pub async fn extract_text_safe(bytes: &[u8], url: &str) -> String {
+    let bytes = bytes.to_vec();
+    let url = url.to_string();
+    tokio::task::spawn_blocking(move || {
+        match pdf_utils::extract_text_from_bytes(&bytes) {
+            Ok(t) if !t.trim().is_empty() => return t,
+            Ok(_) => info!("pdf-extract returned empty text for {url}, trying OCR"),
+            Err(e) => info!("pdf-extract failed for {url} ({e}), trying OCR"),
         }
-    }
-    info!("OCR produced no text for {url}, falling back to raw UTF-8");
 
-    String::from_utf8_lossy(bytes)
-        .chars()
-        .filter(|&c| c == '\n' || c == '\r' || c == '\t' || !c.is_control())
-        .collect()
+        if let Some(t) = pdf_utils::extract_text_ocr(&bytes) {
+            if !t.trim().is_empty() {
+                info!("OCR succeeded for {url}");
+                return t;
+            }
+        }
+        info!("OCR produced no text for {url}, falling back to raw UTF-8");
+
+        String::from_utf8_lossy(&bytes)
+            .chars()
+            .filter(|&c| c == '\n' || c == '\r' || c == '\t' || !c.is_control())
+            .collect()
+    })
+    .await
+    .unwrap_or_default()
 }
 
 pub fn extract_pdf_links(html: &str) -> Vec<String> {

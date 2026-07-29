@@ -242,7 +242,7 @@ async fn process_pdf_bytes(
         warn!("[CoA Hearings] Failed to save PDF to disk: {e}");
     }
 
-    let raw_text = extract_text_safe(&bytes, absolute_url);
+    let raw_text = extract_text_safe(&bytes, absolute_url).await;
 
     if raw_text.trim().is_empty() {
         warn!("[CoA Hearings] No extractable text from {filename}, skipping");
