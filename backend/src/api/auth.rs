@@ -58,6 +58,25 @@ fn client_ip(state: &AppState, headers: &HeaderMap, addr: &SocketAddr) -> String
 const DUMMY_BCRYPT_HASH: &str =
     "$2y$12$c50uT1eOfBmwBnV3/04lMuJsL8bVVIG/UkqnQqEfNT1bGmvRYq.cC";
 
+/// bcrypt at DEFAULT_COST is deliberately slow (~100s of ms of pure CPU
+/// work). Run it on Tokio's blocking-thread pool instead of inline in an
+/// async handler — otherwise it monopolizes an async worker thread and
+/// stalls every other in-flight request on that thread for the duration.
+async fn hash_password(password: &str) -> Result<String, bcrypt::BcryptError> {
+    let password = password.to_owned();
+    tokio::task::spawn_blocking(move || bcrypt::hash(password, bcrypt::DEFAULT_COST))
+        .await
+        .expect("bcrypt hash task panicked")
+}
+
+async fn verify_password(password: &str, hash: &str) -> Result<bool, bcrypt::BcryptError> {
+    let password = password.to_owned();
+    let hash = hash.to_owned();
+    tokio::task::spawn_blocking(move || bcrypt::verify(password, &hash))
+        .await
+        .expect("bcrypt verify task panicked")
+}
+
 #[derive(Deserialize)]
 pub struct AuthRequest {
     pub email: String,
@@ -103,7 +122,8 @@ pub async fn signup(
         return Err(AppError::BadRequest("Password must be at least 8 characters".into()));
     }
 
-    let hash = bcrypt::hash(&body.password, bcrypt::DEFAULT_COST)
+    let hash = hash_password(&body.password)
+        .await
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
     let display_name = body.display_name.as_deref().and_then(|s| {
@@ -122,7 +142,8 @@ pub async fn signup(
                 return Err(AppError::BadRequest("Email already registered".into()));
             }
             // Require correct password to prevent abuse of the resend path.
-            let valid = bcrypt::verify(&body.password, &existing.password_hash)
+            let valid = verify_password(&body.password, &existing.password_hash)
+                .await
                 .map_err(|e| AppError::Internal(e.to_string()))?;
             if !valid {
                 return Err(AppError::BadRequest("Email already registered".into()));
@@ -188,14 +209,16 @@ pub async fn login(
         None => {
             // Burn the same bcrypt cost as the found-user path so response
             // timing doesn't reveal whether the email is registered.
-            let _ = bcrypt::verify(&body.password, DUMMY_BCRYPT_HASH);
+            let _ = verify_password(&body.password, DUMMY_BCRYPT_HASH).await;
             return Err(AppError::Unauthorized);
         }
     };
 
     // OAuth-only accounts store a sentinel that is not a valid bcrypt hash;
     // verify() errors on it, which simply means "no password login".
-    let valid = bcrypt::verify(&body.password, &user.password_hash).unwrap_or(false);
+    let valid = verify_password(&body.password, &user.password_hash)
+        .await
+        .unwrap_or(false);
 
     if !valid {
         return Err(AppError::Unauthorized);
@@ -389,13 +412,15 @@ pub async fn request_password_change(
         .await?
         .ok_or(AppError::NotFound)?;
 
-    let valid = bcrypt::verify(&body.current_password, &user.password_hash)
+    let valid = verify_password(&body.current_password, &user.password_hash)
+        .await
         .map_err(|e| AppError::Internal(e.to_string()))?;
     if !valid {
         return Err(AppError::BadRequest("Current password is incorrect".into()));
     }
 
-    let pending_hash = bcrypt::hash(&body.new_password, bcrypt::DEFAULT_COST)
+    let pending_hash = hash_password(&body.new_password)
+        .await
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
     let raw_token = Uuid::new_v4().to_string();
@@ -564,7 +589,8 @@ pub async fn reset_password(
         .await?
         .ok_or_else(|| AppError::BadRequest("Invalid or expired reset link".into()))?;
 
-    let hash = bcrypt::hash(&body.new_password, bcrypt::DEFAULT_COST)
+    let hash = hash_password(&body.new_password)
+        .await
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
     queries::update_user_password(&state.db, user_id, &hash).await?;
@@ -610,7 +636,8 @@ pub async fn update_profile(
         if cp.is_empty() {
             return Err(AppError::BadRequest("Current password is required".into()));
         }
-        let valid = bcrypt::verify(cp, &user.password_hash)
+        let valid = verify_password(cp, &user.password_hash)
+            .await
             .map_err(|e| AppError::Internal(e.to_string()))?;
         if !valid {
             return Err(AppError::BadRequest("Current password is incorrect".into()));
@@ -622,7 +649,8 @@ pub async fn update_profile(
                 ));
             }
             Some(
-                bcrypt::hash(pw, bcrypt::DEFAULT_COST)
+                hash_password(pw)
+                    .await
                     .map_err(|e| AppError::Internal(e.to_string()))?,
             )
         } else {
