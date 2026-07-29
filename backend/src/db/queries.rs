@@ -1532,6 +1532,33 @@ pub async fn upsert_user_case_settings(
     .await
 }
 
+#[derive(sqlx::FromRow)]
+struct NotifyDefaultsRow {
+    notify_immediately: bool,
+    notify_day_before: bool,
+    notify_morning_of: bool,
+}
+
+/// Notification toggles for a tracked case, defaulted to `true` when no
+/// `user_case_settings` row exists yet (matches the dashboard's default).
+pub async fn get_case_notify_settings(
+    pool: &PgPool,
+    user_case_id: i32,
+) -> sqlx::Result<(bool, bool, bool)> {
+    let row = sqlx::query_as::<_, NotifyDefaultsRow>(
+        "SELECT COALESCE(ucs.notify_immediately, TRUE) AS notify_immediately,
+                COALESCE(ucs.notify_day_before, TRUE)  AS notify_day_before,
+                COALESCE(ucs.notify_morning_of, TRUE)  AS notify_morning_of
+         FROM user_cases uc
+         LEFT JOIN user_case_settings ucs ON ucs.user_case_id = uc.id
+         WHERE uc.id = $1",
+    )
+    .bind(user_case_id)
+    .fetch_one(pool)
+    .await?;
+    Ok((row.notify_immediately, row.notify_day_before, row.notify_morning_of))
+}
+
 // ── Notifications ──────────────────────────────────────────────────────────
 
 pub async fn get_notifications(pool: &PgPool, user_id: i32) -> sqlx::Result<Vec<Notification>> {
@@ -2918,11 +2945,15 @@ pub async fn get_docket_list(pool: &PgPool, user_id: i32) -> sqlx::Result<Vec<Do
         r#"SELECT
                uc.id                                                          AS user_case_id,
                COALESCE(uc.case_number, j.case_number, cs_src.case_number)   AS case_number,
+               COALESCE(jt.title, st.title)                                   AS title,
                uc.created_at                                                  AS tracked_at,
                ns.event_date                                                  AS next_event_date,
                ns.event_type                                                  AS next_event_type,
                ns.court_division                                              AS next_court_division,
-               COALESCE(unread.cnt, 0)::BIGINT                                AS unread_count
+               COALESCE(unread.cnt, 0)::BIGINT                                AS unread_count,
+               COALESCE(ucs.notify_immediately, TRUE)                         AS notify_immediately,
+               COALESCE(ucs.notify_day_before, TRUE)                          AS notify_day_before,
+               COALESCE(ucs.notify_morning_of, TRUE)                          AS notify_morning_of
            FROM user_cases uc
            LEFT JOIN judgments j
                   ON j.id = uc.case_id
@@ -2932,6 +2963,7 @@ pub async fn get_docket_list(pool: &PgPool, user_id: i32) -> sqlx::Result<Vec<Do
                   ON cs_src.id = uc.case_id
                  AND uc.case_type = 'sitting'
                  AND uc.case_number IS NULL
+           LEFT JOIN user_case_settings ucs ON ucs.user_case_id = uc.id
            LEFT JOIN LATERAL (
                SELECT event_date, event_type, court_division
                FROM court_sittings
@@ -2940,6 +2972,19 @@ pub async fn get_docket_list(pool: &PgPool, user_id: i32) -> sqlx::Result<Vec<Do
                ORDER BY event_date ASC
                LIMIT 1
            ) ns ON TRUE
+           LEFT JOIN LATERAL (
+               SELECT title FROM judgments
+               WHERE case_number = COALESCE(uc.case_number, j.case_number, cs_src.case_number)
+               ORDER BY date DESC NULLS LAST
+               LIMIT 1
+           ) jt ON TRUE
+           LEFT JOIN LATERAL (
+               SELECT title FROM court_sittings
+               WHERE case_number = COALESCE(uc.case_number, j.case_number, cs_src.case_number)
+                 AND title IS NOT NULL
+               ORDER BY event_date DESC NULLS LAST
+               LIMIT 1
+           ) st ON TRUE
            LEFT JOIN LATERAL (
                SELECT COUNT(*)::BIGINT AS cnt
                FROM notifications n

@@ -16,6 +16,9 @@ pub struct DocketDetail {
     pub user_case_id: i32,
     pub judgment: Option<Judgment>,
     pub sittings: Vec<CourtSitting>,
+    pub notify_immediately: bool,
+    pub notify_day_before: bool,
+    pub notify_morning_of: bool,
 }
 
 pub async fn get_docket_list(
@@ -41,11 +44,16 @@ pub async fn get_docket_detail(
         queries::get_judgment_by_case_number(&state.db, &case_number).await?;
     let sittings =
         queries::get_sittings_for_case(&state.db, &case_number).await?;
+    let (notify_immediately, notify_day_before, notify_morning_of) =
+        queries::get_case_notify_settings(&state.db, user_case_id).await?;
 
     Ok(Json(DocketDetail {
         case_number,
         user_case_id,
         judgment,
         sittings,
+        notify_immediately,
+        notify_day_before,
+        notify_morning_of,
     }))
 }

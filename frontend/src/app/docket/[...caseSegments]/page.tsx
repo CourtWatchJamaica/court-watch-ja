@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -9,31 +9,24 @@ import Navbar from "@/components/Navbar";
 import { apiClient } from "@/lib/api";
 import { formatDateOnly, isPastDateOnly, parseDateOnly } from "@/lib/dates";
 import { DocketDetail } from "@/lib/types";
+import { NotifModal, type NotifSettings } from "@/components/NotifModal";
 import {
   ArrowLeft,
   FileText,
   Calendar,
   Download,
   Gavel,
-  BookOpen,
   MapPin,
   Clock,
   ChevronRight,
   AlertTriangle,
   Trash2,
-  X,
+  Bell,
+  BellOff,
+  Landmark,
 } from "lucide-react";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function formatDate(s: string | null | undefined): string {
-  return formatDateOnly(s, {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-}
 
 function formatDateShort(s: string | null | undefined): string {
   return formatDateOnly(s, {
@@ -51,6 +44,57 @@ function formatTime(s: string | null | undefined): string {
   const ampm = hour >= 12 ? "PM" : "AM";
   const h12 = hour % 12 || 12;
   return `${h12}:${m} ${ampm}`;
+}
+
+function notifSettingsOf(d: DocketDetail): NotifSettings {
+  return {
+    notify_immediately: d.notify_immediately,
+    notify_day_before: d.notify_day_before,
+    notify_morning_of: d.notify_morning_of,
+  };
+}
+
+// ── Merged history timeline ────────────────────────────────────────────────────
+
+type TimelineEntry =
+  | { kind: "hearing"; date: string | null; sortKey: number; id: number; eventType: string | null; time: string | null; judge: string | null; division: string | null; isPast: boolean }
+  | { kind: "judgment"; date: string | null; sortKey: number; id: number; title: string | null; judge: string | null; court: string | null; summary: string | null; pdfUrl: string | null; tags: string[] };
+
+function buildTimeline(detail: DocketDetail): TimelineEntry[] {
+  const entries: TimelineEntry[] = [];
+
+  for (const s of detail.sittings) {
+    entries.push({
+      kind: "hearing",
+      date: s.event_date,
+      sortKey: s.event_date ? parseDateOnly(s.event_date).getTime() : -Infinity,
+      id: s.id,
+      eventType: s.event_type,
+      time: s.event_time,
+      judge: s.judge_name,
+      division: s.court_division,
+      isPast: isPastDateOnly(s.event_date),
+    });
+  }
+
+  if (detail.judgment) {
+    const j = detail.judgment;
+    entries.push({
+      kind: "judgment",
+      date: j.date,
+      sortKey: j.date ? parseDateOnly(j.date).getTime() : -Infinity,
+      id: j.id,
+      title: j.title ?? "Judgment delivered",
+      judge: j.judge_name,
+      court: j.court,
+      summary: j.summary_text ?? null,
+      pdfUrl: j.pdf_url ?? (j.local_pdf_path ? `/api/pdf/judgment/${j.id}` : null),
+      tags: j.tags ?? [],
+    });
+  }
+
+  // Newest / upcoming first; undated entries sink to the bottom.
+  return entries.sort((a, b) => b.sortKey - a.sortKey);
 }
 
 // ── Untrack confirmation modal ────────────────────────────────────────────────
@@ -77,7 +121,7 @@ function UntrackModal({
           onClick={onCancel}
           className="absolute right-4 top-4 rounded-lg p-1 text-muted-foreground/50 hover:text-foreground hover:bg-muted transition-colors"
         >
-          <X className="h-4 w-4" />
+          <ArrowLeft className="h-4 w-4 rotate-45" />
         </button>
 
         <div className="flex items-center gap-3 mb-4">
@@ -114,269 +158,196 @@ function UntrackModal({
   );
 }
 
-// ── Tab strip ─────────────────────────────────────────────────────────────────
+// ── Alert pill (shared look with /docket list) ──────────────────────────────────
 
-type Tab = "judgment" | "sittings";
+function AlertPill({ settings, onClick }: { settings: NotifSettings; onClick: () => void }) {
+  const n = Object.values(settings).filter(Boolean).length;
 
-function TabStrip({
-  active,
-  onChange,
-  hasJudgment,
-  sittingsCount,
-}: {
-  active: Tab;
-  onChange: (t: Tab) => void;
-  hasJudgment: boolean;
-  sittingsCount: number;
-}) {
-  return (
-    <div className="flex gap-1 p-1 rounded-xl bg-muted/40 border border-border">
-      <button
-        onClick={() => onChange("judgment")}
-        className={`flex-1 flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
-          active === "judgment"
-            ? "bg-card shadow-sm text-foreground border border-border/60"
-            : "text-muted-foreground hover:text-foreground"
-        }`}
-      >
-        <FileText className="h-3.5 w-3.5" />
-        Judgment
-        {hasJudgment && (
-          <span className="rounded-full bg-[#009B3A]/20 px-1.5 py-px text-[10px] font-bold text-[#009B3A]">
-            1
-          </span>
-        )}
-      </button>
-      <button
-        onClick={() => onChange("sittings")}
-        className={`flex-1 flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
-          active === "sittings"
-            ? "bg-card shadow-sm text-foreground border border-border/60"
-            : "text-muted-foreground hover:text-foreground"
-        }`}
-      >
-        <Calendar className="h-3.5 w-3.5" />
-        Sittings
-        {sittingsCount > 0 && (
-          <span className="rounded-full bg-muted px-1.5 py-px text-[10px] font-semibold text-muted-foreground">
-            {sittingsCount}
-          </span>
-        )}
-      </button>
-    </div>
-  );
-}
-
-// ── Judgment tab ──────────────────────────────────────────────────────────────
-
-function JudgmentTab({ detail }: { detail: DocketDetail }) {
-  const j = detail.judgment;
-
-  if (!j) {
+  if (n === 0) {
     return (
-      <div className="rounded-lg border border-border bg-card p-8 text-center">
-        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-lg bg-muted/30">
-          <BookOpen className="h-6 w-6 text-muted-foreground/30" />
-        </div>
-        <p className="text-sm font-medium text-muted-foreground">
-          No judgment on record
-        </p>
-        <p className="mt-1 text-xs text-muted-foreground/60 max-w-[220px] mx-auto">
-          When a judgment for{" "}
-          <span className="font-mono font-semibold">{detail.case_number}</span>{" "}
-          is published, it will appear here.
-        </p>
-      </div>
+      <button
+        onClick={onClick}
+        className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-bold text-foreground/25 hover:text-foreground/50 hover:border-foreground/20 transition-colors"
+      >
+        <BellOff className="h-3.5 w-3.5" />
+        Muted
+      </button>
     );
   }
-
+  if (n === 3) {
+    return (
+      <button
+        onClick={onClick}
+        className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border border-accent/30 bg-accent/[0.14] px-3 py-2 text-xs font-bold text-accent hover:bg-accent/[0.22] transition-colors"
+      >
+        <Bell className="h-3.5 w-3.5" />
+        Alerts on
+      </button>
+    );
+  }
   return (
-    <div className="space-y-4">
-      {/* Main judgment card */}
-      <div className="rounded-lg border border-border bg-card overflow-hidden">
-        <div className="px-5 py-4 border-b border-border bg-muted/10">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/60 mb-1">
-                Judgment
-              </p>
-              <h2 className="text-base font-semibold text-foreground leading-snug">
-                {j.title ?? detail.case_number}
-              </h2>
-            </div>
-            {(j.pdf_url || j.local_pdf_path) && (
-              <a
-                href={j.pdf_url ?? `/api/pdf/judgment/${j.id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="shrink-0 flex items-center gap-1.5 rounded-xl bg-[#009B3A]/10 border border-[#009B3A]/30 px-3 py-2 text-xs font-semibold text-[#009B3A] hover:bg-[#009B3A]/20 transition-colors"
-              >
-                <Download className="h-3.5 w-3.5" />
-                PDF
-              </a>
-            )}
-          </div>
-        </div>
-
-        <div className="px-5 py-4 space-y-3">
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <p className="text-[11px] text-muted-foreground/60 uppercase tracking-wider font-medium mb-0.5">
-                Judge
-              </p>
-              <p className="font-medium text-foreground">
-                {j.judge_name ?? "—"}
-              </p>
-            </div>
-            <div>
-              <p className="text-[11px] text-muted-foreground/60 uppercase tracking-wider font-medium mb-0.5">
-                Court
-              </p>
-              <p className="font-medium text-foreground">{j.court ?? "—"}</p>
-            </div>
-            <div>
-              <p className="text-[11px] text-muted-foreground/60 uppercase tracking-wider font-medium mb-0.5">
-                Date
-              </p>
-              <p className="font-medium text-foreground">
-                {j.date ? formatDateShort(j.date) : "—"}
-              </p>
-            </div>
-            <div>
-              <p className="text-[11px] text-muted-foreground/60 uppercase tracking-wider font-medium mb-0.5">
-                Case Number
-              </p>
-              <p className="font-mono font-semibold text-foreground">
-                {j.case_number}
-              </p>
-            </div>
-          </div>
-
-          {j.tags && j.tags.length > 0 && (
-            <div className="pt-2 border-t border-border/50">
-              <div className="flex flex-wrap gap-1.5">
-                {j.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground capitalize"
-                  >
-                    {tag.replace(/_/g, " ")}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Summary */}
-      {j.summary_text && (
-        <div className="rounded-lg border border-border bg-card p-5">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60 mb-3">
-            Summary
-          </p>
-          <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-line">
-            {j.summary_text}
-          </p>
-        </div>
-      )}
-    </div>
+    <button
+      onClick={onClick}
+      className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-bold text-foreground/45 hover:text-foreground hover:border-accent/35 transition-colors"
+    >
+      <Bell className="h-3.5 w-3.5" />
+      {n}/3 alerts
+    </button>
   );
 }
 
-// ── Sittings tab ──────────────────────────────────────────────────────────────
+// ── History timeline ──────────────────────────────────────────────────────────
 
-function SittingsTab({ detail }: { detail: DocketDetail }) {
-  const { sittings } = detail;
+function HistoryTimeline({ detail }: { detail: DocketDetail }) {
+  const entries = useMemo(() => buildTimeline(detail), [detail]);
 
-  if (sittings.length === 0) {
+  if (entries.length === 0) {
     return (
       <div className="rounded-lg border border-border bg-card p-8 text-center">
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-lg bg-muted/30">
           <Calendar className="h-6 w-6 text-muted-foreground/30" />
         </div>
-        <p className="text-sm font-medium text-muted-foreground">
-          No court sittings found
-        </p>
+        <p className="text-sm font-medium text-muted-foreground">No history yet</p>
         <p className="mt-1 text-xs text-muted-foreground/60">
-          Sittings will appear here as they are listed.
+          Hearings and judgments for{" "}
+          <span className="font-mono font-semibold">{detail.case_number}</span>{" "}
+          will appear here as they&apos;re listed.
         </p>
       </div>
     );
   }
 
   return (
-    <div className="rounded-lg border border-border bg-card overflow-hidden">
-      {sittings.map((s, i) => {
-        const isPast = isPastDateOnly(s.event_date);
+    <div>
+      {entries.map((entry, i) => {
+        const isLast = i === entries.length - 1;
+        const isJudgment = entry.kind === "judgment";
+        const isUpcoming = entry.kind === "hearing" && !entry.isPast;
+
         return (
-          <div
-            key={s.id}
-            className={`flex items-start gap-4 px-5 py-4 border-b last:border-0 border-border/50 transition-opacity ${
-              isPast ? "opacity-50" : "bg-[#009B3A]/[0.03]"
-            }`}
-          >
-            {/* Date column */}
-            <div className="shrink-0 w-24 text-right">
-              {s.event_date ? (
-                <>
-                  <p className={`text-sm font-bold ${isPast ? "text-foreground/60" : "text-[#009B3A]"}`}>
-                    {formatDateOnly(s.event_date, { month: "short", day: "numeric" })}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground/60">
-                    {parseDateOnly(s.event_date).getFullYear()}
-                  </p>
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground">—</p>
-              )}
+          <div key={`${entry.kind}-${entry.id}`} className="relative flex items-start gap-4 pb-6 last:pb-0">
+            {/* Rail */}
+            <div className="flex flex-col items-center self-stretch shrink-0 w-3 pt-1.5">
+              <div
+                className={`h-2.5 w-2.5 shrink-0 rounded-full ring-4 ring-background ${
+                  isJudgment
+                    ? "bg-accent"
+                    : isUpcoming
+                      ? "bg-primary"
+                      : "bg-muted-foreground/25"
+                }`}
+              />
+              {!isLast && <div className="mt-1 w-px flex-1 bg-border/60" />}
             </div>
 
-            {/* Timeline dot + connector */}
-            <div className="flex flex-col items-center pt-1.5 self-stretch">
-              <div className={`h-2 w-2 shrink-0 rounded-full ${isPast ? "bg-muted-foreground/25" : "bg-[#009B3A]"}`} />
-              {i < sittings.length - 1 && (
-                <div className="mt-1 w-px flex-1 bg-border/60" />
-              )}
-            </div>
-
-            {/* Details */}
-            <div className="flex-1 min-w-0 pb-1">
-              <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mb-1">
-                <span className={`text-sm font-semibold ${isPast ? "text-foreground/60" : "text-foreground"}`}>
-                  {s.event_type ?? "Hearing"}
+            {/* Card */}
+            <div
+              className={`flex-1 min-w-0 rounded-lg border bg-card p-4 transition-opacity ${
+                isJudgment
+                  ? "border-accent/25"
+                  : isUpcoming
+                    ? "border-primary/25 shadow-sm"
+                    : "border-border/70 opacity-60"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-3 flex-wrap mb-1.5">
+                <span className="text-xs font-bold text-foreground font-mono tabular-nums">
+                  {entry.date ? formatDateShort(entry.date) : "Date TBD"}
                 </span>
-                {isPast ? (
-                  <span className="rounded-sm bg-muted/60 px-1.5 py-px text-[10px] font-medium text-muted-foreground/70 uppercase tracking-wide">
-                    Past
+                {isJudgment ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-accent">
+                    <Gavel className="h-2.5 w-2.5" />
+                    Judgment
                   </span>
-                ) : (
-                  <span className="rounded-full bg-[#009B3A]/15 px-2 py-px text-[10px] font-bold text-[#009B3A]">
+                ) : isUpcoming ? (
+                  <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
                     Upcoming
                   </span>
+                ) : (
+                  <span className="rounded-sm bg-muted/60 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">
+                    Past
+                  </span>
                 )}
               </div>
 
-              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                {s.event_time && (
-                  <span className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {formatTime(s.event_time)}
-                  </span>
-                )}
-                {s.judge_name && (
-                  <span className="flex items-center gap-1">
-                    <Gavel className="h-3 w-3" />
-                    {s.judge_name}
-                  </span>
-                )}
-                {s.court_division && (
-                  <span className="flex items-center gap-1">
-                    <MapPin className="h-3 w-3" />
-                    {s.court_division}
-                  </span>
-                )}
-              </div>
+              {entry.kind === "hearing" ? (
+                <>
+                  <p className="text-sm font-semibold text-foreground">
+                    {entry.eventType ?? "Hearing"}
+                  </p>
+                  <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    {entry.time && (
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {formatTime(entry.time)}
+                      </span>
+                    )}
+                    {entry.judge && (
+                      <span className="flex items-center gap-1">
+                        <Gavel className="h-3 w-3" />
+                        {entry.judge}
+                      </span>
+                    )}
+                    {entry.division && (
+                      <span className="flex items-center gap-1">
+                        <MapPin className="h-3 w-3" />
+                        {entry.division}
+                      </span>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-semibold text-foreground leading-snug">
+                    {entry.title}
+                  </p>
+                  <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    {entry.judge && (
+                      <span className="flex items-center gap-1">
+                        <Gavel className="h-3 w-3" />
+                        {entry.judge}
+                      </span>
+                    )}
+                    {entry.court && (
+                      <span className="flex items-center gap-1">
+                        <Landmark className="h-3 w-3" />
+                        {entry.court}
+                      </span>
+                    )}
+                  </div>
+
+                  {entry.tags.length > 0 && (
+                    <div className="mt-2.5 flex flex-wrap gap-1.5">
+                      {entry.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground capitalize"
+                        >
+                          {tag.replace(/_/g, " ")}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {entry.summary && (
+                    <p className="mt-2.5 pt-2.5 border-t border-border/50 text-xs leading-relaxed text-foreground/75 whitespace-pre-line">
+                      {entry.summary}
+                    </p>
+                  )}
+
+                  {entry.pdfUrl && (
+                    <a
+                      href={entry.pdfUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-accent/30 bg-accent/10 px-2.5 py-1.5 text-[11px] font-semibold text-accent hover:bg-accent/20 transition-colors"
+                    >
+                      <Download className="h-3 w-3" />
+                      Download judgment PDF
+                    </a>
+                  )}
+                </>
+              )}
             </div>
           </div>
         );
@@ -391,7 +362,6 @@ function Skeleton() {
   return (
     <div className="animate-pulse space-y-4">
       <div className="h-8 w-48 rounded-lg bg-muted" />
-      <div className="h-11 w-full rounded-xl bg-muted/60" />
       <div className="rounded-lg border border-border bg-card p-5 space-y-3">
         <div className="h-4 w-32 rounded bg-muted" />
         <div className="h-5 w-64 rounded bg-muted/70" />
@@ -422,17 +392,15 @@ export default function DocketDetailPage({
   const [detail, setDetail] = useState<DocketDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [notTracking, setNotTracking] = useState(false);
-  const [activeTab, setActiveTab] = useState<Tab>("sittings");
   const [showUntrack, setShowUntrack] = useState(false);
   const [untracking, setUntracking] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
 
   const fetchDetail = useCallback(async () => {
     setLoading(true);
     try {
       const data = await apiClient.getDocketDetail(caseNumber);
       setDetail(data);
-      // Default to judgment tab if one exists, otherwise sittings
-      if (data.judgment) setActiveTab("judgment");
     } catch (err: unknown) {
       const status = (err as { status?: number })?.status;
       if (status === 404 || status === 401) {
@@ -457,6 +425,8 @@ export default function DocketDetailPage({
     }
   };
 
+  const caseTitle = detail?.judgment?.title ?? null;
+
   return (
     <AuthGuard>
       <div className="min-h-screen bg-background">
@@ -468,6 +438,15 @@ export default function DocketDetailPage({
             onConfirm={handleUntrack}
             onCancel={() => setShowUntrack(false)}
             loading={untracking}
+          />
+        )}
+
+        {notifOpen && detail && (
+          <NotifModal
+            rowId={detail.user_case_id}
+            initial={notifSettingsOf(detail)}
+            caseLabel={caseTitle ? `${caseNumber} · ${caseTitle}` : caseNumber}
+            onClose={() => { setNotifOpen(false); fetchDetail(); }}
           />
         )}
 
@@ -521,38 +500,53 @@ export default function DocketDetailPage({
           {!loading && !notTracking && detail && (
             <>
               {/* Case header */}
-              <div className="mb-5 flex items-start justify-between gap-3">
-                <div>
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div className="min-w-0">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-muted-foreground/60 mb-1">
                     Case File
                   </p>
                   <h1 className="font-mono text-xl font-bold tracking-tight text-foreground">
                     {caseNumber}
                   </h1>
+                  {caseTitle && (
+                    <p className="mt-1 text-sm text-muted-foreground truncate">{caseTitle}</p>
+                  )}
                 </div>
 
-                <button
-                  onClick={() => setShowUntrack(true)}
-                  className="shrink-0 flex items-center gap-1.5 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-500 hover:bg-red-500/20 transition-colors"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Untrack
-                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <AlertPill settings={notifSettingsOf(detail)} onClick={() => setNotifOpen(true)} />
+                  <button
+                    onClick={() => setShowUntrack(true)}
+                    className="flex items-center gap-1.5 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-500 hover:bg-red-500/20 transition-colors"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Untrack
+                  </button>
+                </div>
               </div>
 
-              {/* Tab strip */}
-              <div className="mb-5">
-                <TabStrip
-                  active={activeTab}
-                  onChange={setActiveTab}
-                  hasJudgment={detail.judgment !== null}
-                  sittingsCount={detail.sittings.length}
-                />
+              {/* Quick stats */}
+              <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-lg border border-border bg-card px-4 py-3 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <FileText className="h-3.5 w-3.5" />
+                  {detail.sittings.length} hearing{detail.sittings.length !== 1 ? "s" : ""}
+                </span>
+                {detail.judgment && (
+                  <>
+                    <span className="text-foreground/15">·</span>
+                    <span className="flex items-center gap-1.5">
+                      <Gavel className="h-3.5 w-3.5" />
+                      Judgment on record
+                    </span>
+                  </>
+                )}
               </div>
 
-              {/* Tab content */}
-              {activeTab === "judgment" && <JudgmentTab detail={detail} />}
-              {activeTab === "sittings" && <SittingsTab detail={detail} />}
+              {/* History */}
+              <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground/60">
+                History
+              </p>
+              <HistoryTimeline detail={detail} />
             </>
           )}
         </main>

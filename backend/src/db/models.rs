@@ -294,11 +294,15 @@ pub struct Promo {
 pub struct DocketListItem {
     pub user_case_id: i32,
     pub case_number: String,
+    pub title: Option<String>,
     pub next_event_date: Option<NaiveDate>,
     pub next_event_type: Option<String>,
     pub next_court_division: Option<String>,
     pub unread_count: i64,
     pub tracked_at: NaiveDateTime,
+    pub notify_immediately: bool,
+    pub notify_day_before: bool,
+    pub notify_morning_of: bool,
 }
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]

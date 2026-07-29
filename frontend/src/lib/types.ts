@@ -195,11 +195,15 @@ export interface CoJudge {
 export interface DocketListItem {
   user_case_id: number;
   case_number: string;
+  title: string | null;
   next_event_date: string | null;
   next_event_type: string | null;
   next_court_division: string | null;
   unread_count: number;
   tracked_at: string;
+  notify_immediately: boolean;
+  notify_day_before: boolean;
+  notify_morning_of: boolean;
 }
 
 export interface DocketDetail {
@@ -207,6 +211,9 @@ export interface DocketDetail {
   user_case_id: number;
   judgment: Judgment | null;
   sittings: CourtSitting[];
+  notify_immediately: boolean;
+  notify_day_before: boolean;
+  notify_morning_of: boolean;
 }
 
 export interface Notification {
