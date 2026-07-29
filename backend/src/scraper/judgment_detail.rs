@@ -144,65 +144,41 @@ fn parse_page(html: &str, is_coa: bool) -> ParsedPage {
     ParsedPage { pdf_candidates, summary_text, judge_name }
 }
 
-/// Download each PDF candidate and return the first whose text contains `case_number`.
+/// Return the first reachable PDF candidate, trusting selector specificity
+/// rather than downloading and OCR-verifying each one's text content.
 ///
-/// Fallback strategy (in priority order):
-///   1. Positively verified: PDF text contains the case number.
-///   2. First successfully-downloaded candidate if no candidate verifies — a
-///      wrong-PDF warning in the logs is better than a silent NULL.  Because the
-///      candidate list is ordered with the most-specific selector first (the
-///      actual judgment attachment span), the first downloaded candidate is
-///      almost always the correct judgment PDF even when verification fails.
+/// This used to download every candidate and run `extract_text_or_ocr` on it
+/// to confirm `case_number` appeared in the text, only falling back to the
+/// first-downloaded candidate when nothing verified. For scanned judgments
+/// with no text layer (common pre-2000s, before documents were born-digital)
+/// that meant a full pdf-extract pass (120s malformed-PDF watchdog) plus an
+/// OCR attempt (pdftoppm rasterisation) per candidate, on the request path of
+/// a user clicking "Original Judgment" — multiple minutes of latency, or an
+/// effective hang, to reach a fallback the candidate list already made
+/// obvious. The list is ordered with the most-specific selector first (the
+/// actual judgment attachment span), so the first reachable one is already
+/// almost always correct — a HEAD check is enough.
 async fn find_verified_pdf(
     client: &reqwest::Client,
     candidates: &[String],
     case_number: &str,
 ) -> Option<String> {
-    use crate::utils::pdf as pdf_utils;
-
-    // First candidate that downloads successfully (set before text extraction).
-    let mut first_downloaded: Option<String> = None;
-
     for url in candidates {
         if !url.starts_with("http") {
             continue;
         }
-        let bytes = match pdf_utils::download_pdf(client, url).await {
-            Ok(b) => b,
-            Err(e) => {
-                tracing::warn!("detail: failed to fetch PDF candidate {url}: {e}");
-                continue;
+        match client.head(url).send().await {
+            Ok(r) if r.status().is_success() || r.status().is_redirection() => {
+                return Some(url.clone());
             }
-        };
-
-        // Record the first candidate that downloads, regardless of what happens next.
-        if first_downloaded.is_none() {
-            first_downloaded = Some(url.clone());
+            Ok(r) => tracing::warn!(
+                "detail: PDF candidate {url} for case {case_number} returned {}",
+                r.status()
+            ),
+            Err(e) => tracing::warn!("detail: failed to reach PDF candidate {url}: {e}"),
         }
-
-        let text_opt = pdf_utils::extract_text_or_ocr(&bytes).await;
-
-        let Some(text) = text_opt else {
-            tracing::warn!("detail: no text extracted from PDF candidate {url}");
-            continue;
-        };
-
-        if pdf_utils::pdf_contains_case_number(&text, case_number) {
-            return Some(url.clone());
-        }
-
-        tracing::warn!(
-            "detail: PDF {url} does not contain case number {case_number} — trying next"
-        );
     }
-
-    // No positive match — fall back to the first downloaded candidate.
-    if let Some(ref fallback) = first_downloaded {
-        tracing::warn!(
-            "detail: no verified PDF for {case_number} — using first downloaded as fallback: {fallback}"
-        );
-    }
-    first_downloaded
+    None
 }
 
 // ── CoA URL normalisation ─────────────────────────────────────────────────────
