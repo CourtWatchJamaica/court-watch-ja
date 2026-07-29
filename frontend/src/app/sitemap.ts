@@ -10,6 +10,7 @@ async function fetchIds<T>(
   try {
     const res = await fetch(`${API_BASE}${path}`, {
       next: { revalidate: 86400 },
+      signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) return [];
     const data = await res.json();
