@@ -2094,6 +2094,24 @@ pub async fn has_only_civil_sittings_for_url(pool: &PgPool, url: &str) -> sqlx::
     Ok(total > 0 && non_civil == 0)
 }
 
+/// Returns true iff this URL has at least one court_sitting row and every row
+/// is past-dated (none current-or-future, none undated). Catches the case
+/// `has_only_civil_sittings_for_url` cannot: a URL whose upcoming-or-undated
+/// row count is already zero returns `false` there, so a Civil-division cause
+/// list that has gone entirely stale (the court reused the URL for a new week
+/// but the scraper never revisited it) is never flagged for re-fetch. This
+/// check has no division filter, so it also catches that case directly.
+pub async fn has_only_past_sittings_for_url(pool: &PgPool, url: &str) -> sqlx::Result<bool> {
+    let (total, upcoming_or_undated): (i64, i64) = sqlx::query_as(
+        "SELECT COUNT(*), COUNT(*) FILTER (WHERE event_date IS NULL OR event_date >= (NOW() AT TIME ZONE 'America/Jamaica')::date) \
+         FROM court_sittings WHERE pdf_source_url = $1",
+    )
+    .bind(url)
+    .fetch_one(pool)
+    .await?;
+    Ok(total > 0 && upcoming_or_undated == 0)
+}
+
 /// Full-text search across court_sittings; returns ranked results with snippets.
 pub async fn search_court_sittings(
     pool: &PgPool,

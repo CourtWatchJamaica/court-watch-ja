@@ -1355,6 +1355,32 @@ async fn evict_stale_court_list_pdfs(
         }
     }
 
+    // ── Pass 4: fully-stale URL refresh (catches Civil, no keyword needed) ────
+    // Same rationale as Pass 1b, but division-agnostic: a URL whose rows are
+    // *all* past-dated has clearly gone stale (the court reused it for a new
+    // week) yet neither Pass 1's count==0 check nor Pass 3's Civil check would
+    // ever flag it, since Pass 3 only fires on a URL with upcoming Civil rows.
+    for url in state
+        .processed_pdf_urls
+        .iter()
+        .filter(|u| u.contains("supremecourt.gov.jm"))
+        .filter(|u| !sc_to_evict.contains(*u))
+        .cloned()
+        .collect::<Vec<_>>()
+    {
+        match queries::has_only_past_sittings_for_url(pool, &url).await {
+            Ok(true) => {
+                info!(
+                    "Eviction: {} — all rows past-dated, clearing for re-download",
+                    url.rsplit('/').next().unwrap_or(&url)
+                );
+                sc_to_evict.insert(url);
+            }
+            Ok(false) => {}
+            Err(e) => warn!("DB check failed for {url}: {e}"),
+        }
+    }
+
     if !sc_to_evict.is_empty() {
         state.processed_pdf_urls.retain(|u| !sc_to_evict.contains(u));
     }
