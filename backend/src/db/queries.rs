@@ -712,6 +712,21 @@ pub async fn judgments_needing_pdf(pool: &PgPool) -> sqlx::Result<Vec<Judgment>>
     sqlx::query_as::<_, Judgment>(&sql).fetch_all(pool).await
 }
 
+/// Clear `local_pdf_path` only, keeping `pdf_url` intact — for when the file
+/// is confirmed missing from disk (e.g. Render's filesystem is ephemeral and
+/// wipes downloaded PDFs on every redeploy/restart, while the DB row still
+/// points at the old path). This makes `judgments_needing_pdf` pick the row
+/// back up for a fresh download on the next run, instead of leaving it
+/// permanently stuck — `local_pdf_path IS NULL` is exactly what that query
+/// gates on.
+pub async fn clear_local_pdf_path(pool: &PgPool, id: i32) -> sqlx::Result<()> {
+    sqlx::query("UPDATE judgments SET local_pdf_path = NULL, updated_at = NOW() WHERE id = $1")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
 /// Clear pdf_url and local_pdf_path when the downloaded content doesn't match the case.
 pub async fn nullify_judgment_pdf(pool: &PgPool, id: i32) -> sqlx::Result<()> {
     sqlx::query(

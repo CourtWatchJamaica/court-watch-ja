@@ -1030,6 +1030,20 @@ pub async fn cleanup_mismatched_pdfs(pool: &PgPool) -> anyhow::Result<()> {
         let Some(ref path) = judgment.local_pdf_path else { continue };
         let bytes = match tokio::fs::read(path).await {
             Ok(b) => b,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                // File is gone (ephemeral disk wiped on redeploy) but the DB
+                // row still claims it exists. Clear local_pdf_path so
+                // judgments_needing_pdf re-downloads it next run instead of
+                // this judgment being silently stuck forever.
+                warn!(
+                    "[Cleanup] {} — {path} no longer on disk, clearing local_pdf_path for re-download",
+                    judgment.case_number
+                );
+                if let Err(e) = queries::clear_local_pdf_path(pool, judgment.id).await {
+                    error!("[Cleanup] {} — failed to clear local_pdf_path: {e}", judgment.case_number);
+                }
+                continue;
+            }
             Err(e) => {
                 warn!("[Cleanup] {} — cannot read {path}: {e}", judgment.case_number);
                 continue;
@@ -1086,6 +1100,20 @@ pub async fn backfill_coa_judge_names(pool: &PgPool) -> anyhow::Result<()> {
         let Some(ref path) = judgment.local_pdf_path else { continue };
         let bytes = match tokio::fs::read(path).await {
             Ok(b) => b,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                // Same ephemeral-disk situation as cleanup_mismatched_pdfs above:
+                // clear local_pdf_path so this judgment is re-downloaded (and this
+                // backfill retried) on a future run instead of failing forever.
+                warn!(
+                    "[CoA] {} — {path} no longer on disk, clearing local_pdf_path for re-download",
+                    judgment.case_number
+                );
+                if let Err(e) = queries::clear_local_pdf_path(pool, judgment.id).await {
+                    error!("[CoA] {} — failed to clear local_pdf_path: {e}", judgment.case_number);
+                }
+                no_text += 1;
+                continue;
+            }
             Err(e) => {
                 warn!("[CoA] {} — could not read PDF {path}: {e}", judgment.case_number);
                 no_text += 1;
