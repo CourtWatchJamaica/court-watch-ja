@@ -37,7 +37,15 @@ pub async fn run(
     cutoff: NaiveDate,
     client: &reqwest::Client,
 ) -> anyhow::Result<()> {
-    let start_page = state.next_judgment_page;
+    // The unfiltered listing is newest-first (new judgments are prepended at
+    // page 0), so a page cursor that only ever advances forward eventually
+    // walks past the site's shallow "recent" window and finds nothing but
+    // empty pages forever after — it can never see new judgments again, since
+    // those appear at the front, not the tail. Always restart from page 0;
+    // the cutoff-date stop below and the already-known-row skip inside the
+    // loop keep each run's work bounded to what's actually new.
+    state.next_judgment_page = 0;
+    let start_page = 0;
     let end_page = start_page + MAX_PAGES_PER_RUN;
 
     for page in start_page..end_page {
@@ -74,6 +82,20 @@ pub async fn run(
                     hit_cutoff = true;
                     break;
                 }
+            }
+
+            // Skip judgments already fully captured (row exists with a pdf_url) —
+            // restarting at page 0 every run means the same front pages are
+            // walked repeatedly, so this keeps runs fast instead of re-fetching
+            // every detail page every time.
+            let already_have: Option<(Option<String>,)> = sqlx::query_as(
+                "SELECT pdf_url FROM judgments WHERE case_number = $1",
+            )
+            .bind(&row.case_number)
+            .fetch_optional(pool)
+            .await?;
+            if matches!(already_have, Some((Some(_),))) {
+                continue;
             }
 
             // Resolve detail URL to an absolute source URL; warn if missing.

@@ -6,7 +6,10 @@
 /// Judges scraper: Monday only (once per week is sufficient).
 use chrono::{Duration, NaiveDate, Utc};
 use sqlx::PgPool;
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 use tokio_cron_scheduler::{Job, JobScheduler};
 use tracing::{error, info, warn};
 
@@ -16,22 +19,53 @@ use super::{
 };
 use crate::{config::Config, db::queries};
 
-pub async fn start(pool: PgPool, config: Arc<Config>) -> anyhow::Result<()> {
+/// Atomically claims `flag` (false → true) and runs `fut` if successful,
+/// releasing it afterwards. If `flag` is already true — a manual "Run Now" /
+/// "Deep Scrape" or another cron job is still mid-run — logs and skips
+/// instead of racing it. `ScraperState::save_to_db` is a last-write-wins
+/// overwrite of a single row, so two concurrent runs silently clobber each
+/// other's pagination cursors and processed-PDF tracking; this is the only
+/// thing preventing that.
+async fn guarded_run<Fut>(flag: &Arc<AtomicBool>, label: &str, fut: Fut)
+where
+    Fut: std::future::Future<Output = ()>,
+{
+    if flag
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        warn!("{label}: skipped — a scraper run is already in progress");
+        return;
+    }
+    fut.await;
+    flag.store(false, Ordering::SeqCst);
+}
+
+pub async fn start(
+    pool: PgPool,
+    config: Arc<Config>,
+    scraper_running: Arc<AtomicBool>,
+) -> anyhow::Result<()> {
     let sched = JobScheduler::new().await?;
 
     // ── Mon / Wed / Fri at 11:00 UTC (6 am Jamaica) — full scrape ────────────
     {
         let pool = pool.clone();
         let config = config.clone();
+        let flag = scraper_running.clone();
 
         let job = Job::new_async("0 0 11 * * Mon,Wed,Fri", move |_uuid, _lock| {
             let pool = pool.clone();
             let config = config.clone();
+            let flag = flag.clone();
             Box::pin(async move {
-                info!("=== Scheduled scrape starting ===");
-                if let Err(e) = run_all(&pool, &config).await {
-                    error!("Scraper run failed: {e}");
-                }
+                guarded_run(&flag, "Scheduled scrape", async {
+                    info!("=== Scheduled scrape starting ===");
+                    if let Err(e) = run_all(&pool, &config).await {
+                        error!("Scraper run failed: {e}");
+                    }
+                })
+                .await;
             })
         })?;
 
@@ -44,15 +78,20 @@ pub async fn start(pool: PgPool, config: Arc<Config>) -> anyhow::Result<()> {
     {
         let pool = pool.clone();
         let config = config.clone();
+        let flag = scraper_running.clone();
 
         let job = Job::new_async("0 0 11 * * Tue,Thu", move |_uuid, _lock| {
             let pool = pool.clone();
             let config = config.clone();
+            let flag = flag.clone();
             Box::pin(async move {
-                info!("=== Court-lists refresh starting ===");
-                if let Err(e) = run_court_lists(&pool, &config).await {
-                    error!("Court-lists refresh failed: {e}");
-                }
+                guarded_run(&flag, "Court-lists refresh", async {
+                    info!("=== Court-lists refresh starting ===");
+                    if let Err(e) = run_court_lists(&pool, &config).await {
+                        error!("Court-lists refresh failed: {e}");
+                    }
+                })
+                .await;
             })
         })?;
 
@@ -64,17 +103,22 @@ pub async fn start(pool: PgPool, config: Arc<Config>) -> anyhow::Result<()> {
     {
         let pool = pool.clone();
         let config = config.clone();
+        let flag = scraper_running.clone();
 
         let job = Job::new_async(
             "0 0 15,19 * * Mon,Tue,Wed,Thu,Fri",
             move |_uuid, _lock| {
                 let pool = pool.clone();
                 let config = config.clone();
+                let flag = flag.clone();
                 Box::pin(async move {
-                    info!("=== Court-lists refresh starting ===");
-                    if let Err(e) = run_court_lists(&pool, &config).await {
-                        error!("Court-lists refresh failed: {e}");
-                    }
+                    guarded_run(&flag, "Court-lists refresh", async {
+                        info!("=== Court-lists refresh starting ===");
+                        if let Err(e) = run_court_lists(&pool, &config).await {
+                            error!("Court-lists refresh failed: {e}");
+                        }
+                    })
+                    .await;
                 })
             },
         )?;
@@ -83,6 +127,8 @@ pub async fn start(pool: PgPool, config: Arc<Config>) -> anyhow::Result<()> {
     }
 
     // ── Daily RSS news feed at 08:00 UTC ─────────────────────────────────
+    // Not gated by scraper_running: it never touches scraper_state, so it
+    // can't race the court/judgment scrapers.
     {
         let pool = pool.clone();
         let job = Job::new_async("0 0 8 * * *", move |_uuid, _lock| {

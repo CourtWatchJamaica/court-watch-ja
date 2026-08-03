@@ -241,6 +241,7 @@ async fn main() -> anyhow::Result<()> {
         rate_limiter,
         service_alert: Arc::new(Mutex::new(None)),
     };
+    let scraper_running = state.scraper_running.clone();
 
     // ── CORS ──────────────────────────────────────────────────────────────
     let cors = CorsLayer::new()
@@ -273,11 +274,21 @@ async fn main() -> anyhow::Result<()> {
     {
         let pool_bg = pool.clone();
         let config_bg = config.clone();
+        let scraper_running_bg = scraper_running.clone();
         tokio::spawn(async move {
+            // Same flag the admin "Run Now" / "Deep Scrape" triggers use — held
+            // for the whole catch-up check so a manual trigger fired during boot
+            // can't race it and clobber shared scraper_state (last-write-wins,
+            // see ScraperState::save_to_db).
+            scraper_running_bg.store(true, std::sync::atomic::Ordering::SeqCst);
             if let Err(e) = scraper::runner::run_catchup_check(&pool_bg, &config_bg).await {
                 tracing::error!("Startup catch-up check failed: {e}");
             }
-            if let Err(e) = scraper::runner::start(pool_bg, config_bg).await {
+            scraper_running_bg.store(false, std::sync::atomic::Ordering::SeqCst);
+
+            if let Err(e) =
+                scraper::runner::start(pool_bg, config_bg, scraper_running_bg).await
+            {
                 tracing::error!("Scheduler failed to start: {e}");
             }
         });
