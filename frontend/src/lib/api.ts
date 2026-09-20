@@ -44,6 +44,23 @@ export class ApiError extends Error {
   }
 }
 
+function isAdminDashboardStats(value: unknown): value is AdminDashboardStats {
+  if (!value || typeof value !== "object") return false;
+  const stats = value as Record<string, unknown>;
+  return [
+    "user_count",
+    "active_trackers",
+    "emails_sent_this_month",
+    "upcoming_sittings",
+    "pending_notifications",
+    "judgment_count",
+    "sittings_count",
+  ].every((key) => typeof stats[key] === "number")
+    && (stats.last_scrape_at === null || typeof stats.last_scrape_at === "string")
+    && Array.isArray(stats.users_per_week)
+    && Array.isArray(stats.emails_per_day);
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token =
     typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -565,7 +582,17 @@ export const apiClient = {
   },
 
   async adminGetStats(): Promise<AdminDashboardStats> {
-    return request("/admin/stats");
+    const response = await request<AdminDashboardStats | { stats: AdminDashboardStats }>(
+      "/admin/stats",
+    );
+    const stats =
+      response && typeof response === "object" && "stats" in response && response.stats
+        ? response.stats
+        : response;
+    if (!isAdminDashboardStats(stats)) {
+      throw new Error("Invalid admin stats response: required metrics are missing");
+    }
+    return stats;
   },
 
   async adminGetAuditLogs(opts?: {
