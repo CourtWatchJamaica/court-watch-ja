@@ -5,6 +5,7 @@ import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { apiClient } from "@/lib/api";
 import { Scale, CheckCircle } from "lucide-react";
+import CourtroomBackground from "@/components/CourtroomBackground";
 
 const googleEnabled = process.env.NEXT_PUBLIC_GOOGLE_OAUTH_ENABLED === "true";
 
@@ -39,21 +40,25 @@ export default function SignupPage() {
   };
 
   const inputCls =
-    "w-full rounded-md border border-white/15 bg-black/30 px-3.5 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#009B3A]/70 transition-colors";
+    "w-full rounded-md border border-amber-200/15 bg-black/40 px-3.5 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-amber-400/70 focus:ring-1 focus:ring-amber-400/20 transition-colors";
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#080810] px-4">
+      <div className="relative min-h-screen flex items-center justify-center bg-[#07060a] px-4 overflow-hidden">
+        <div className="fixed inset-0 z-0 pointer-events-none">
+          <CourtroomBackground />
+        </div>
         <div
-          className="fixed top-0 left-0 right-0 h-[3px] z-50"
+          className="fixed inset-0 z-[1] pointer-events-none"
           style={{
             background:
-              "linear-gradient(to right, #111111 33.33%, #009B3A 33.33%, #009B3A 66.66%, #FED100 66.66%)",
+              "radial-gradient(ellipse at 50% 40%, transparent 30%, rgba(0,0,0,0.55) 100%)",
           }}
         />
-        <div className="w-full max-w-sm text-center">
+
+        <div className="relative z-10 w-full max-w-sm text-center">
           <div className="mb-6 flex justify-center">
-            <CheckCircle className="h-8 w-8 text-[#009B3A]" />
+            <CheckCircle className="h-8 w-8 text-amber-400" />
           </div>
           <h1 className="font-heading text-xl font-semibold text-white mb-2">Check your inbox</h1>
           <p className="text-sm text-white/50 mb-6">
@@ -63,7 +68,7 @@ export default function SignupPage() {
           </p>
           <Link
             href="/auth/login"
-            className="text-sm font-medium text-[#009B3A] hover:text-[#009B3A]/80 transition-colors"
+            className="text-sm font-medium text-amber-400 hover:text-amber-300 transition-colors"
           >
             Back to sign in
           </Link>
@@ -73,18 +78,21 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#080810] px-4">
+    <div className="relative min-h-screen flex items-center justify-center bg-[#07060a] px-4 overflow-hidden">
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <CourtroomBackground />
+      </div>
       <div
-        className="fixed top-0 left-0 right-0 h-[3px] z-50"
+        className="fixed inset-0 z-[1] pointer-events-none"
         style={{
           background:
-            "linear-gradient(to right, #111111 33.33%, #009B3A 33.33%, #009B3A 66.66%, #FED100 66.66%)",
+            "radial-gradient(ellipse at 50% 40%, transparent 30%, rgba(0,0,0,0.55) 100%)",
         }}
       />
 
-      <div className="w-full max-w-sm">
+      <div className="relative z-10 w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-3">
-          <Scale className="h-7 w-7 text-[#009B3A]" />
+          <Scale className="h-7 w-7 text-amber-400" />
           <div className="text-center">
             <h1 className="font-heading text-2xl font-semibold tracking-tight text-white">
               CourtWatch JA
@@ -93,7 +101,7 @@ export default function SignupPage() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-white/10 bg-[#0e0e1a] p-6">
+        <div className="rounded-lg border border-amber-200/20 bg-black/50 backdrop-blur-md p-6 shadow-[0_30px_80px_rgba(0,0,0,0.55)]">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-medium text-white/70 mb-1.5">
@@ -163,7 +171,7 @@ export default function SignupPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 rounded-md bg-[#009B3A] py-2.5 text-sm font-medium text-white hover:bg-[#009B3A]/85 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full flex items-center justify-center gap-2 rounded-md bg-gradient-to-b from-amber-300 to-amber-600 py-2.5 text-sm font-semibold uppercase tracking-wide text-black/80 hover:brightness-105 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               {loading ? "Creating account…" : "Create Account"}
             </button>
@@ -177,7 +185,7 @@ export default function SignupPage() {
                   <div className="w-full border-t border-white/[0.08]" />
                 </div>
                 <div className="relative flex justify-center">
-                  <span className="bg-[#0e0e1a] px-3 text-[11px] text-white/55">
+                  <span className="bg-black/50 px-3 text-[11px] text-white/55">
                     or continue with
                   </span>
                 </div>
@@ -217,7 +225,7 @@ export default function SignupPage() {
             Already have an account?{" "}
             <Link
               href="/auth/login"
-              className="font-medium text-[#009B3A] hover:text-[#009B3A]/80 transition-colors"
+              className="font-medium text-amber-400 hover:text-amber-300 transition-colors"
             >
               Sign in
             </Link>
