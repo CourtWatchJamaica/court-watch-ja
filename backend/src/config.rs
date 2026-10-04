@@ -16,6 +16,10 @@ pub struct Config {
     /// Trust the X-Forwarded-For header for client IPs (set when deployed
     /// behind a reverse proxy / load balancer that appends the real client IP).
     pub trust_proxy: bool,
+    /// Shared secret from the Next.js proxy. When a request carries a matching
+    /// X-Proxy-Secret, its X-Client-IP is used for rate limiting (otherwise every
+    /// user would share the Next.js server's IP). Header is ignored when unset.
+    pub proxy_secret: Option<String>,
 }
 
 /// The old hardcoded fallback — explicitly rejected so a deployment that
@@ -68,6 +72,10 @@ impl Config {
             );
         }
 
+        let proxy_secret = env::var("PROXY_SECRET")
+            .ok()
+            .filter(|s| s.trim().len() >= 32);
+
         let trust_proxy = env::var("TRUST_PROXY")
             .map(|v| matches!(v.trim(), "1" | "true" | "TRUE" | "yes"))
             .unwrap_or(false);
@@ -93,6 +101,7 @@ impl Config {
             resend_api_key,
             oauth_exchange_secret,
             trust_proxy,
+            proxy_secret,
         })
     }
 }

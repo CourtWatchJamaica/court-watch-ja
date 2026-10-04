@@ -20,6 +20,7 @@ import {
   Activity,
   Bug,
 } from "lucide-react";
+import { logout } from "@/lib/session";
 
 const NAV = [
   { href: "/admin", label: "Overview", icon: Scale, exact: true },
@@ -44,8 +45,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const isActive = (href: string, exact?: boolean) =>
     exact ? pathname === href : pathname.startsWith(href);
 
-  const handleLogout = () => {
-    localStorage.removeItem("token");
+  const handleLogout = async () => {
+    await logout();
     router.push("/auth/login");
   };
 

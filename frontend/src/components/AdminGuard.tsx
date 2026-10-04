@@ -3,14 +3,14 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api";
+import { isLoggedIn } from "@/lib/session";
 
 export default function AdminGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [authorized, setAuthorized] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
+    if (!isLoggedIn()) {
       router.replace("/auth/login");
       return;
     }

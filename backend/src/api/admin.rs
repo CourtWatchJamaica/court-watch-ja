@@ -711,6 +711,7 @@ fn format_broadcast_html(title: &str, message: &str) -> String {
     let app_url = std::env::var("APP_URL")
         .unwrap_or_else(|_| "https://courtwatchjamaica.com".into());
     let app_url_trimmed = app_url.trim_end_matches('/');
+    let title = html_escape(title);
     let message_html = html_escape(message).replace('\n', "<br>");
     format!(
         r#"<!DOCTYPE html>
@@ -956,7 +957,7 @@ async fn build_sql_backup(pool: &PgPool) -> anyhow::Result<String> {
          FROM information_schema.tables
          WHERE table_schema = 'public'
            AND table_type   = 'BASE TABLE'
-           AND table_name  != '_sqlx_migrations'
+           AND table_name NOT IN ('_sqlx_migrations', 'verification_tokens')
          ORDER BY table_name",
     )
     .fetch_all(pool)

@@ -3,19 +3,10 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Wrench } from "lucide-react";
+import { getStoredRole } from "@/lib/session";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
 
-function getRoleFromToken(): string | null {
-  try {
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-    if (!token) return null;
-    const b64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
-    return JSON.parse(atob(b64))?.role ?? null;
-  } catch {
-    return null;
-  }
-}
 
 export default function MaintenanceGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -39,7 +30,7 @@ export default function MaintenanceGate({ children }: { children: React.ReactNod
 
   if (!checked) return <>{children}</>;
 
-  const role = getRoleFromToken();
+  const role = getStoredRole();
   const isAdmin = role === "admin" || role === "super_admin";
 
   if (maintenance && !isAdmin) {

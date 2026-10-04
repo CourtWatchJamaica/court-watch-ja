@@ -32,17 +32,8 @@ import {
   CartesianGrid,
 } from "recharts";
 import { ScraperStatus } from "@/lib/types";
+import { getStoredRole } from "@/lib/session";
 
-function getRoleFromToken(): string | null {
-  try {
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-    if (!token) return null;
-    const b64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
-    return JSON.parse(atob(b64))?.role ?? null;
-  } catch {
-    return null;
-  }
-}
 
 function StatTile({
   label,
@@ -106,7 +97,7 @@ export default function AdminOverviewPage() {
   const [loading, setLoading] = useState(true);
   const [maintenance, setMaintenance] = useState<boolean | null>(null);
   const [togglingMaintenance, setTogglingMaintenance] = useState(false);
-  const role = getRoleFromToken();
+  const role = getStoredRole();
   const isSuperAdmin = role === "super_admin";
 
   const fetchAll = useCallback(async () => {

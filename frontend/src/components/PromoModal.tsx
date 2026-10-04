@@ -4,15 +4,14 @@ import { useEffect, useState } from "react";
 import { X, ExternalLink, Megaphone } from "lucide-react";
 import { apiClient } from "@/lib/api";
 import type { Promo } from "@/lib/types";
+import { isLoggedIn } from "@/lib/session";
 
 export default function PromoModal() {
   const [promo, setPromo] = useState<Promo | null>(null);
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    const token =
-      typeof window !== "undefined" ? localStorage.getItem("token") : null;
-    if (!token) return;
+    if (!isLoggedIn()) return;
 
     let timer: ReturnType<typeof setTimeout>;
 

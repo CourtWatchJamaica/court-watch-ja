@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Scale, Loader2, CheckCircle, AlertTriangle } from "lucide-react";
 import { apiClient } from "@/lib/api";
+import { markLoggedIn } from "@/lib/session";
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
@@ -22,8 +23,8 @@ function VerifyEmailContent() {
 
     apiClient
       .verifyEmail(token)
-      .then(({ token: jwt }) => {
-        localStorage.setItem("token", jwt);
+      .then(({ role }) => {
+        markLoggedIn(role);
         // TODO: replace REPLACE_WITH_CONVERSION_LABEL with your Google Ads conversion label
         const w = window as Window & { gtag?: (...args: unknown[]) => void };
         w.gtag?.("event", "conversion", { send_to: "AW-18168669700/REPLACE_WITH_CONVERSION_LABEL" });

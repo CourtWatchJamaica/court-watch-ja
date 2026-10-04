@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Scale, Loader2 } from "lucide-react";
+import { markLoggedIn } from "@/lib/session";
 
 export default function OAuthCallbackPage() {
   const { data: session, status } = useSession();
@@ -24,8 +25,8 @@ export default function OAuthCallbackPage() {
       fetch("/api/oauth-exchange", { method: "POST" })
         .then((res) => res.json())
         .then((data) => {
-          if (data.token) {
-            localStorage.setItem("token", data.token);
+          if (data.session) {
+            markLoggedIn(data.role);
             // TODO: replace REPLACE_WITH_CONVERSION_LABEL with your Google Ads conversion label
             // Note: fires for all OAuth sign-ins; add isNewUser from backend to restrict to new accounts only
             const w = window as Window & { gtag?: (...args: unknown[]) => void };

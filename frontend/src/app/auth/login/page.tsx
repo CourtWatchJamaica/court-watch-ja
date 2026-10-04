@@ -6,6 +6,7 @@ import { signIn } from "next-auth/react";
 import { apiClient, ApiError } from "@/lib/api";
 import { Scale, Loader2 } from "lucide-react";
 import CourtroomBackground from "@/components/CourtroomBackground";
+import { markLoggedIn } from "@/lib/session";
 
 const googleEnabled = process.env.NEXT_PUBLIC_GOOGLE_OAUTH_ENABLED === "true";
 const appleEnabled = process.env.NEXT_PUBLIC_APPLE_OAUTH_ENABLED === "true";
@@ -34,8 +35,8 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const { token } = await apiClient.login(email, password);
-      localStorage.setItem("token", token);
+      const { role } = await apiClient.login(email, password);
+      markLoggedIn(role);
       window.location.href = "/";
     } catch (err) {
       if (err instanceof ApiError && err.data?.email_verified === false) {

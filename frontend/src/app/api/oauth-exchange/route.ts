@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { roleFromJwt, setSessionCookie } from "@/lib/session-server";
 
 // Exchanges the NextAuth server session for a backend JWT.
 //
@@ -57,5 +58,8 @@ export async function POST() {
     return NextResponse.json({ error: "Exchange failed" }, { status: 502 });
   }
 
-  return NextResponse.json({ token: data.token });
+  // The backend JWT goes straight into the httpOnly cookie — never to the browser JS.
+  const out = NextResponse.json({ session: true, role: roleFromJwt(data.token) });
+  setSessionCookie(out, data.token);
+  return out;
 }

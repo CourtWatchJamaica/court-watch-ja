@@ -38,6 +38,30 @@ fn check_rate_limit(state: &AppState, ip: &str) -> Result<(), AppError> {
 /// (supplied by the client), so a spoofed header can't rotate buckets to
 /// bypass the limit.
 fn client_ip(state: &AppState, headers: &HeaderMap, addr: &SocketAddr) -> String {
+    // Requests relayed by our own Next.js proxy: trust X-Client-IP only when
+    // the shared secret matches (constant-time compare).
+    if let Some(ref expected) = state.config.proxy_secret {
+        let provided = headers
+            .get("x-proxy-secret")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+        let ok = provided.len() == expected.len()
+            && provided
+                .bytes()
+                .zip(expected.bytes())
+                .fold(0u8, |acc, (a, b)| acc | (a ^ b))
+                == 0;
+        if ok {
+            if let Some(ip) = headers
+                .get("x-client-ip")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty() && s.len() <= 45)
+            {
+                return ip.to_string();
+            }
+        }
+    }
     if state.config.trust_proxy {
         if let Some(ip) = headers
             .get("x-forwarded-for")

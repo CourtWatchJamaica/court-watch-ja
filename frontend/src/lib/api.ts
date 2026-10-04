@@ -1,3 +1,4 @@
+import { clearSessionHint, isLoggedIn, markLoggedIn } from "./session";
 import {
   ActivityLogRow,
   AdminDashboardStats,
@@ -31,7 +32,10 @@ import {
   UserCase,
 } from "./types";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
+const DIRECT_API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
+// In the browser every call goes through the same-origin proxy, which attaches
+// the httpOnly session cookie. During SSR (public data only) call the API directly.
+const BASE_URL = typeof window !== "undefined" ? "/api/proxy" : DIRECT_API_URL;
 
 export class ApiError extends Error {
   status: number;
@@ -62,11 +66,8 @@ function isAdminDashboardStats(value: unknown): value is AdminDashboardStats {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token =
-    typeof window !== "undefined" ? localStorage.getItem("token") : null;
   const headers: HeadersInit = {
     "Content-Type": "application/json",
-    ...(token && { Authorization: `Bearer ${token}` }),
     ...(BASE_URL.includes("ngrok-free.app") && { "ngrok-skip-browser-warning": "true" }),
     ...options.headers,
   };
@@ -76,8 +77,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
     if (res.status === 401) {
       if (typeof window !== "undefined") {
-        const hadToken = !!localStorage.getItem("token");
-        localStorage.removeItem("token");
+        const hadToken = isLoggedIn();
+        clearSessionHint();
         // Only hard-redirect when a token existed (session expired) and we're
         // not already on an auth page — prevents the infinite reload loop that
         // occurs when unauthenticated calls fire from root-layout providers.
@@ -121,16 +122,16 @@ export const apiClient = {
     });
   },
 
-  async verifyEmail(token: string): Promise<{ token: string }> {
+  async verifyEmail(token: string): Promise<{ session: boolean; role: string | null }> {
     // POST, not GET: email link-scanners prefetch GETs and were consuming the
     // one-shot token before the user clicked.
-    return request<{ token: string }>("/auth/verify-email", {
+    return request<{ session: boolean; role: string | null }>("/auth/verify-email", {
       method: "POST",
       body: JSON.stringify({ token }),
     });
   },
 
-  async login(email: string, password: string): Promise<{ token: string }> {
+  async login(email: string, password: string): Promise<{ session: boolean; role: string | null }> {
     return request("/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
@@ -147,15 +148,15 @@ export const apiClient = {
     email?: string;
     current_password?: string;
     new_password?: string;
-  }): Promise<User & { token?: string }> {
-    const res = await request<User & { token?: string }>("/user/profile", {
+  }): Promise<User & { session?: boolean; role?: string | null }> {
+    const res = await request<User & { session?: boolean; role?: string | null }>("/user/profile", {
       method: "PUT",
       body: JSON.stringify(body),
     });
-    // Credential changes revoke the old token; the backend returns a
-    // replacement so this session keeps working.
-    if (res.token && typeof window !== "undefined") {
-      localStorage.setItem("token", res.token);
+    // Credential changes revoke the old token; the proxy has already swapped
+    // the replacement into the httpOnly cookie. Just refresh the UI hint.
+    if (res.session && typeof window !== "undefined") {
+      markLoggedIn(res.role);
     }
     return res;
   },
@@ -802,14 +803,7 @@ export const apiClient = {
 
   // Returns { blob, filename } — caller triggers the browser download.
   async adminDownloadBackup(): Promise<{ blob: Blob; filename: string; retryAfterSecs?: number }> {
-    const token =
-      typeof window !== "undefined" ? localStorage.getItem("token") : null;
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
-    const res = await fetch(`${apiBase}/admin/backup`, {
-      headers: {
-        ...(token && { Authorization: `Bearer ${token}` }),
-      },
-    });
+    const res = await fetch(`${BASE_URL}/admin/backup`);
 
     if (res.status === 429) {
       const body = await res.json().catch(() => ({}));

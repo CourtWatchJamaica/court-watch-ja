@@ -31,6 +31,7 @@ import {
   type Court,
 } from "@/lib/court-context";
 import { useChambers } from "@/lib/chambers-context";
+import { getStoredRole, logout } from "@/lib/session";
 
 const DESKTOP_LINKS = [
   { href: "/", label: "Dashboard" },
@@ -39,18 +40,6 @@ const DESKTOP_LINKS = [
   { href: "/docket", label: "My Docket" },
 ];
 
-function getRoleFromToken(): string | null {
-  try {
-    const token =
-      typeof window !== "undefined" ? localStorage.getItem("token") : null;
-    if (!token) return null;
-    const b64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
-    const payload = JSON.parse(atob(b64));
-    return payload.role ?? null;
-  } catch {
-    return null;
-  }
-}
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -67,7 +56,7 @@ export default function Navbar() {
   const moreRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setRole(getRoleFromToken());
+    setRole(getStoredRole());
   }, []);
 
   useEffect(() => {
@@ -111,8 +100,8 @@ export default function Navbar() {
     };
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem("token");
+  const handleLogout = async () => {
+    await logout();
     router.push("/auth/login");
   };
 

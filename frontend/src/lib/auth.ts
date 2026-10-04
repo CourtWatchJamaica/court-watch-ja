@@ -18,6 +18,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     error: "/auth/login",
   },
   callbacks: {
+    async signIn({ account, profile }) {
+      // The backend links OAuth logins to accounts by email, so only accept
+      // providers that assert the email is verified.
+      if (account?.provider === "google") {
+        return (profile as { email_verified?: boolean } | undefined)?.email_verified === true;
+      }
+      if (account?.provider === "apple") {
+        const v = (profile as { email_verified?: boolean | string } | undefined)?.email_verified;
+        return v === true || v === "true";
+      }
+      return false;
+    },
     async jwt({ token, account, profile }) {
       if (account) {
         token.provider = account.provider;

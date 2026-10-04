@@ -3,14 +3,14 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api";
+import { clearSessionHint, isLoggedIn } from "@/lib/session";
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
+    if (!isLoggedIn()) {
       router.replace("/auth/login");
       return;
     }
@@ -25,7 +25,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         }
       })
       .catch(() => {
-        localStorage.removeItem("token");
+        clearSessionHint();
         router.replace("/auth/login");
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps

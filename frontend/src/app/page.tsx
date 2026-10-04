@@ -15,6 +15,7 @@ import {
 import { apiClient } from "@/lib/api";
 import { Judgment, CourtSitting } from "@/lib/types";
 import Dashboard from "@/components/Dashboard";
+import { clearSessionHint, isLoggedIn } from "@/lib/session";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -475,8 +476,7 @@ export default function Home() {
   const [pageState, setPageState] = useState<PageState>("loading");
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
+    if (!isLoggedIn()) {
       setPageState("guest");
       return;
     }
@@ -490,7 +490,7 @@ export default function Home() {
         }
       })
       .catch(() => {
-        localStorage.removeItem("token");
+        clearSessionHint();
         setPageState("guest");
       });
   }, [router]);

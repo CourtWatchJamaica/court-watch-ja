@@ -19,6 +19,7 @@ import {
   Pencil,
   Trash2,
 } from "lucide-react";
+import { logout } from "@/lib/session";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -280,7 +281,7 @@ function ProfilePage() {
     setDeleteFeedback(null);
     try {
       await apiClient.deleteAccount();
-      localStorage.removeItem("token");
+      await logout();
       setShowDeleteModal(false);
       setDeleteGoodbye(true);
       setTimeout(() => router.push("/"), 2000);
