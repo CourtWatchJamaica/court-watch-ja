@@ -7,7 +7,8 @@ const securityHeaders = [
     key: "Content-Security-Policy-Report-Only",
     value:
       "default-src 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline'; " +
-      "script-src 'self' 'unsafe-inline'; connect-src 'self' https:; " +
+      "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://static.cloudflareinsights.com; " +
+      "connect-src 'self' https:; " +
       "frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'",
   },
   { key: "X-Frame-Options", value: "DENY" },
