@@ -16,7 +16,7 @@ interface CaseCardProps {
 export default function CaseCard({ judgment, onClick, isTracked, onTrack }: CaseCardProps) {
   return (
     <Card
-      className="group relative bg-card border border-border cursor-pointer overflow-hidden transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-lg"
+      className="group relative rounded-3xl solid-panel cursor-pointer overflow-hidden transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-lg"
       onClick={onClick}
     >
       {/* Ghost case number watermark */}

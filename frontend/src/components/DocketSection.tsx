@@ -133,7 +133,7 @@ function DocketCard({
   };
 
   return (
-    <div className="relative overflow-hidden rounded-xl">
+    <div className="relative overflow-hidden rounded-2xl">
       {/* Swipe-reveal remove button */}
       <div className="absolute inset-y-0 right-0 flex w-20 items-center justify-center rounded-r-xl bg-red-500/90">
         <button
@@ -148,7 +148,7 @@ function DocketCard({
 
       {/* Card */}
       <div
-        className="group relative flex rounded-xl border border-border bg-card transition-all duration-200 hover:border-foreground/[0.12] hover:bg-card/80 overflow-hidden cursor-pointer"
+        className="group relative flex rounded-2xl solid-panel transition-all duration-200 hover:border-foreground/[0.12] hover:bg-card/80 overflow-hidden cursor-pointer"
         style={{
           transform: `translateX(${offsetX}px)`,
           transition: startXRef.current === null ? "transform 0.25s ease-out" : "none",
@@ -354,7 +354,7 @@ export function AddByNumberForm({ onRefresh }: { onRefresh: () => void }) {
     : 0;
 
   return (
-    <div className="rounded-xl border border-border bg-card px-3 py-2.5">
+    <div className="rounded-[28px] glass-panel px-3 py-3 sm:px-4">
       <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-foreground/30">
         Track by Case Number
       </p>
@@ -366,12 +366,12 @@ export function AddByNumberForm({ onRefresh }: { onRefresh: () => void }) {
           onBlur={() => setTimeout(() => setShowPreview(false), 150)}
           onFocus={() => { if (value.trim().length >= 3 && preview) setShowPreview(true); }}
           placeholder="e.g. HCV/01234/2025"
-          className="flex-1 min-w-0 rounded-lg border border-border bg-foreground/[0.04] px-3 py-2 text-[12px] text-foreground placeholder:text-foreground/20 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 transition-colors min-h-[44px]"
+          className="flex-1 min-w-0 rounded-full border border-border bg-foreground/[0.04] px-4 py-2 text-[12px] text-foreground placeholder:text-foreground/20 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 transition-colors min-h-[44px]"
         />
         <button
           type="submit"
           disabled={loading || !value.trim()}
-          className="flex shrink-0 items-center gap-1 rounded-lg bg-accent/10 border border-accent/20 px-3 py-2 text-[11px] font-semibold text-accent hover:bg-accent/15 disabled:opacity-40 disabled:cursor-not-allowed transition-colors min-h-[44px]"
+          className="flex shrink-0 items-center gap-1 rounded-full bg-accent/10 border border-accent/20 px-3 py-2 text-[11px] font-semibold text-accent hover:bg-accent/15 disabled:opacity-40 disabled:cursor-not-allowed transition-colors min-h-[44px]"
         >
           {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
           Track
@@ -381,7 +381,7 @@ export function AddByNumberForm({ onRefresh }: { onRefresh: () => void }) {
       {/* Live preview dropdown */}
       {showPreview && value.trim().length >= 3 && (
         <div
-          className="mt-1.5 rounded-xl border border-border bg-card overflow-hidden shadow-xl"
+          className="mt-1.5 rounded-2xl glass-bar overflow-hidden"
           onMouseDown={(e) => e.preventDefault()}
         >
           {previewLoading ? (
@@ -513,7 +513,7 @@ export function AddByNumberForm({ onRefresh }: { onRefresh: () => void }) {
 function DocketEmpty({ onRefresh }: { onRefresh: () => void }) {
   const router = useRouter();
   return (
-    <div className="flex flex-col items-center justify-center rounded-lg border border-border bg-card py-10 text-center px-4">
+    <div className="flex flex-col items-center justify-center rounded-3xl solid-panel py-10 text-center px-4">
       <svg
         viewBox="0 0 64 64"
         className="mb-4 h-12 w-12 text-foreground/10"
@@ -535,7 +535,7 @@ function DocketEmpty({ onRefresh }: { onRefresh: () => void }) {
       <Button
         size="sm"
         onClick={() => router.push("/cases")}
-        className="h-11 sm:h-8 bg-primary px-4 text-xs text-white hover:bg-primary/85"
+        className="h-11 sm:h-9 rounded-full glass-btn-green px-5 text-xs font-semibold hover:bg-transparent"
       >
         Browse Cases
       </Button>
@@ -551,7 +551,7 @@ function DocketSkeleton() {
       {[1, 2, 3].map((i) => (
         <div
           key={i}
-          className="flex rounded-xl border border-border bg-card overflow-hidden animate-pulse"
+          className="flex rounded-2xl solid-panel overflow-hidden animate-pulse"
         >
           <div className="w-1 bg-foreground/[0.06]" />
           <div className="flex-1 px-4 py-3 space-y-2">

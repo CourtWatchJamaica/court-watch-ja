@@ -28,7 +28,7 @@ function AnnouncementBanner({
   onDismiss: () => void;
 }) {
   return (
-    <div className="mb-6 flex items-start gap-3 rounded-lg border border-accent/[0.18] bg-accent/[0.04] px-4 py-3.5">
+    <div className="mb-6 flex items-start gap-3 rounded-2xl glass-panel border-accent/[0.25] px-4 py-3.5">
       <Megaphone className="h-4 w-4 text-accent shrink-0 mt-0.5" />
       <div className="flex-1 min-w-0">
         {notif.title && (
@@ -100,7 +100,7 @@ function TodaySittings({ sittings, loading }: TodaySittingsProps) {
           ))}
         </div>
       ) : display.length > 0 ? (
-        <div className="rounded-lg border border-border bg-card overflow-hidden divide-y divide-border">
+        <div className="rounded-3xl solid-panel overflow-hidden divide-y divide-border">
           {display.map((sitting) => (
             <div
               key={sitting.id}
@@ -151,7 +151,7 @@ function TodaySittings({ sittings, loading }: TodaySittingsProps) {
           ))}
         </div>
       ) : (
-        <div className="relative overflow-hidden flex flex-col items-center justify-center rounded-lg border border-border bg-card py-12 text-center px-6">
+        <div className="relative overflow-hidden flex flex-col items-center justify-center rounded-3xl solid-panel py-12 text-center px-6">
           <span className="pointer-events-none absolute inset-0 flex items-center justify-center font-heading font-bold text-[6rem] text-foreground/[0.02] select-none">
             NONE
           </span>
@@ -249,10 +249,11 @@ export default function Dashboard() {
   const todaySittingsCount = sittings.filter((s) => s.event_date === todayStr).length;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="relative min-h-screen bg-background">
+      <div className="glass-backdrop" aria-hidden="true" />
       <Navbar />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-32 md:pb-16">
+      <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-32 md:pb-16">
         {announcements
           .filter((n) => !dismissedIds.has(n.id))
           .map((n) => (
@@ -274,7 +275,7 @@ export default function Dashboard() {
           <p className="text-[13px] font-medium uppercase tracking-[0.18em] text-foreground/40 mb-1">
             {getGreeting()}
           </p>
-          <h1 className="font-heading font-bold leading-none tracking-tight text-foreground text-[3rem] sm:text-[4rem] lg:text-[5rem]">
+          <h1 className="font-sans font-extrabold leading-none tracking-[-0.04em] text-foreground text-[3rem] sm:text-[4rem] lg:text-[5rem]">
             {user?.display_name || "Counsellor"}<span className="text-primary">.</span>
           </h1>
           <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.18em] text-foreground/30">
@@ -288,46 +289,46 @@ export default function Dashboard() {
         </div>
 
         {/* ── Stats strip ───────────────────────────────────────────────── */}
-        <div className="mb-10 -mx-4 sm:mx-0">
-          <div className="grid grid-cols-2 sm:grid-cols-4 border border-border rounded-lg overflow-hidden bg-card divide-x divide-border">
+        <div className="mb-10">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
             {loading ? (
               [1, 2, 3, 4].map((i) => (
-                <div key={i} className="px-6 py-6 space-y-3">
+                <div key={i} className="glass-panel rounded-3xl px-6 py-6 space-y-3">
                   <Skeleton className="h-9 w-16 bg-foreground/[0.05]" />
                   <Skeleton className="h-2 w-20 bg-foreground/[0.04]" />
                 </div>
               ))
             ) : (
               <>
-                <div className="relative px-5 sm:px-6 py-6">
-                  <div className="absolute top-0 left-5 sm:left-6 right-5 sm:right-6 h-[1.5px] bg-primary/60" />
-                  <p className="font-heading font-bold text-[2.2rem] sm:text-[2.5rem] text-foreground leading-none tabular-nums">
+                <div className="glass-panel rounded-3xl relative overflow-hidden px-5 sm:px-6 py-6">
+                  <div className="absolute top-0 left-6 right-6 h-[2px] rounded-full bg-primary/70" />
+                  <p className="font-sans font-extrabold tracking-[-0.03em] text-[2.2rem] sm:text-[2.5rem] text-foreground leading-none tabular-nums">
                     {allJudgments.length}+
                   </p>
                   <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-foreground/30">
                     Judgments
                   </p>
                 </div>
-                <div className="px-5 sm:px-6 py-6">
-                  <p className="font-heading font-bold text-[2.2rem] sm:text-[2.5rem] text-foreground leading-none tabular-nums">
+                <div className="glass-panel rounded-3xl px-5 sm:px-6 py-6">
+                  <p className="font-sans font-extrabold tracking-[-0.03em] text-[2.2rem] sm:text-[2.5rem] text-foreground leading-none tabular-nums">
                     {trackedCases.length}
                   </p>
                   <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-foreground/30">
                     Tracked
                   </p>
                 </div>
-                <div className="px-5 sm:px-6 py-6">
-                  <p className="font-heading font-bold text-[2.2rem] sm:text-[2.5rem] text-foreground leading-none tabular-nums">
+                <div className="glass-panel rounded-3xl px-5 sm:px-6 py-6">
+                  <p className="font-sans font-extrabold tracking-[-0.03em] text-[2.2rem] sm:text-[2.5rem] text-foreground leading-none tabular-nums">
                     {todaySittingsCount}
                   </p>
                   <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-foreground/30">
                     Today
                   </p>
                 </div>
-                <div className="px-5 sm:px-6 py-6">
+                <div className="glass-panel rounded-3xl px-5 sm:px-6 py-6">
                   <div className="flex items-center gap-2 mb-2">
                     <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-                    <p className="font-heading font-bold text-[1.4rem] text-primary leading-none">
+                    <p className="font-sans font-extrabold text-[1.4rem] text-primary leading-none">
                       Live
                     </p>
                   </div>
@@ -359,7 +360,7 @@ export default function Dashboard() {
                 <Skeleton className="h-3 w-28 bg-foreground/[0.05]" />
                 <Skeleton className="h-3 w-20 bg-foreground/[0.04]" />
               </div>
-              <Skeleton className="h-[168px] sm:h-[200px] rounded-lg bg-foreground/[0.04]" />
+              <Skeleton className="h-[168px] sm:h-[200px] rounded-3xl bg-foreground/[0.04]" />
             </div>
           ) : (
             <JudgmentCarousel judgments={latestJudgments} />

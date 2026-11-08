@@ -20,7 +20,7 @@ function CarouselCard({ judgment }: { judgment: Judgment }) {
 
   return (
     <div
-      className="group relative h-full w-full rounded-lg border border-border bg-card cursor-pointer overflow-hidden p-5 flex flex-col justify-between transition-colors duration-200 hover:border-primary/40"
+      className="group relative h-full w-full rounded-3xl solid-panel cursor-pointer overflow-hidden p-5 flex flex-col justify-between transition-colors duration-200 hover:border-primary/40"
       onClick={() => router.push(`/cases/${judgment.id}`)}
     >
       {/* Top row */}
@@ -199,7 +199,7 @@ export default function JudgmentCarousel({ judgments }: JudgmentCarouselProps) {
         </button>
       </div>
 
-      <div className="relative overflow-hidden rounded-lg">
+      <div className="relative overflow-hidden rounded-3xl">
         <button
           onClick={() => scrollToIndex((activeIndex - 1 + total) % total)}
           className="absolute left-2 top-1/2 z-10 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full bg-card/90 border border-border text-muted-foreground opacity-0 hover:opacity-100 hover:text-foreground hover:bg-card transition-all duration-200 focus:opacity-100 md:group-hover:opacity-100 carousel-arrow"

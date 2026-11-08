@@ -35,7 +35,7 @@ export default function SittingCard({ sitting, onClick, isTracked, onTrack }: Si
 
   return (
     <Card
-      className="group relative bg-card cursor-pointer overflow-hidden transition-all duration-300 hover:-translate-y-0.5"
+      className="group relative rounded-3xl solid-panel cursor-pointer overflow-hidden transition-all duration-300 hover:-translate-y-0.5"
       style={{
         border: "1px solid var(--border)",
         transition: "transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease",

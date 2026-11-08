@@ -14,10 +14,10 @@ function ConstellationSkeleton() {
     <div className="flex flex-col" style={{ height: "calc(100vh - 8rem)" }}>
       {/* Search bar skeleton */}
       <div className="px-1 pb-4 shrink-0">
-        <Skeleton className="h-11 w-full rounded-xl bg-white/[0.05]" />
+        <Skeleton className="h-11 w-full rounded-full bg-white/[0.05]" />
       </div>
       {/* Canvas skeleton */}
-      <div className="relative flex-1 rounded-lg overflow-hidden border border-white/[0.05] bg-[#050510]">
+      <div className="relative flex-1 rounded-[28px] overflow-hidden border border-white/[0.08] bg-[#050510]">
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
           <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/[0.08] border-t-[#009B3A]" />
           <p className="text-[11px] text-white/50">Loading judicial constellation…</p>
@@ -58,10 +58,11 @@ export default function JudgesPage() {
 
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-[#080810]">
+      <div className="relative min-h-screen bg-[#080810]">
+        <div className="dark" aria-hidden="true"><div className="glass-backdrop" /></div>
         <Navbar />
 
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-28 md:pb-10">
+        <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-28 md:pb-10">
           {/* ── Header ── */}
           <div className="mb-5">
             <div className="mb-2 flex items-center gap-2">
@@ -71,7 +72,7 @@ export default function JudgesPage() {
               </span>
             </div>
             <div className="flex items-end justify-between gap-4">
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+              <h1 className="text-[2rem] sm:text-[2.8rem] font-extrabold leading-none tracking-[-0.04em] text-white">
                 The Judicial Constellation
               </h1>
               {!loading && (

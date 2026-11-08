@@ -132,7 +132,7 @@ function TimelineItem({
       </div>
 
       {/* Icon */}
-      <div className={`mt-1.5 shrink-0 rounded-lg p-1.5 h-fit ${meta.bg}`}>
+      <div className={`mt-1.5 shrink-0 rounded-xl p-1.5 h-fit ${meta.bg}`}>
         <Icon className={`h-3.5 w-3.5 ${meta.text}`} />
       </div>
 
@@ -171,7 +171,7 @@ function TimelineItem({
       {/* Archive button */}
       <button
         onClick={() => onArchive(notif.id)}
-        className="mt-1.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 flex items-center justify-center rounded-md hover:bg-muted text-muted-foreground/50 hover:text-muted-foreground"
+        className="mt-1.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 flex items-center justify-center rounded-full hover:bg-muted text-muted-foreground/50 hover:text-muted-foreground"
         title="Dismiss"
       >
         <X className="h-3.5 w-3.5" />
@@ -197,7 +197,7 @@ function CaseGroupCard({
   const unread = notifications.filter((n) => n.read_at === null).length;
 
   return (
-    <div className="rounded-lg border border-border bg-card overflow-hidden">
+    <div className="rounded-3xl solid-panel overflow-hidden">
       {/* Card header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-muted/20">
         <div className="flex-1 flex items-center gap-2 min-w-0">
@@ -218,7 +218,7 @@ function CaseGroupCard({
         </a>
         <button
           onClick={() => setCollapsed((c) => !c)}
-          className="shrink-0 h-6 w-6 flex items-center justify-center rounded-md hover:bg-muted text-muted-foreground/60 hover:text-foreground transition-colors"
+          className="shrink-0 h-6 w-6 flex items-center justify-center rounded-full hover:bg-muted text-muted-foreground/60 hover:text-foreground transition-colors"
         >
           {collapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
         </button>
@@ -270,7 +270,7 @@ function SystemRow({
           : <span className="h-2 w-2 rounded-full border border-border bg-background" />
         }
       </div>
-      <div className={`shrink-0 rounded-lg p-1.5 h-fit ${meta.bg}`}>
+      <div className={`shrink-0 rounded-xl p-1.5 h-fit ${meta.bg}`}>
         <Icon className={`h-3.5 w-3.5 ${meta.text}`} />
       </div>
       <button onClick={handleClick} className="flex-1 min-w-0 text-left">
@@ -291,7 +291,7 @@ function SystemRow({
       </button>
       <button
         onClick={() => onArchive(notif.id)}
-        className="mt-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 flex items-center justify-center rounded-md hover:bg-muted text-muted-foreground/50 hover:text-foreground"
+        className="mt-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 flex items-center justify-center rounded-full hover:bg-muted text-muted-foreground/50 hover:text-foreground"
         title="Dismiss"
       >
         <X className="h-3.5 w-3.5" />
@@ -304,7 +304,7 @@ function SystemRow({
 
 function SkeletonCard() {
   return (
-    <div className="rounded-lg border border-border bg-card overflow-hidden animate-pulse">
+    <div className="rounded-3xl solid-panel overflow-hidden animate-pulse">
       <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-muted/20">
         <div className="h-4 w-28 rounded bg-muted" />
         <div className="h-4 w-12 rounded-full bg-muted ml-1" />
@@ -312,7 +312,7 @@ function SkeletonCard() {
       {[0, 1].map((i) => (
         <div key={i} className="flex items-start gap-3 px-4 py-3 border-b border-border/40 last:border-0">
           <div className="mt-3 h-2 w-2 rounded-full bg-muted shrink-0 ml-0.5" />
-          <div className="h-7 w-7 rounded-lg bg-muted shrink-0 mt-1.5" />
+          <div className="h-7 w-7 rounded-xl bg-muted shrink-0 mt-1.5" />
           <div className="flex-1 space-y-1.5">
             <div className="flex gap-2"><div className="h-3.5 w-20 rounded-full bg-muted" /><div className="h-3.5 w-10 rounded bg-muted/60" /></div>
             <div className="h-3.5 w-3/4 rounded bg-muted/60" />
@@ -341,7 +341,7 @@ function SortButton({ sort, onChange }: { sort: SortMode; onChange: (s: SortMode
     <div className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 rounded-xl bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+        className="flex items-center gap-1.5 rounded-full glass-panel px-3.5 py-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
       >
         <ArrowUpDown className="h-3.5 w-3.5" />
         {SORT_LABELS[sort]}
@@ -349,7 +349,7 @@ function SortButton({ sort, onChange }: { sort: SortMode; onChange: (s: SortMode
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-1 z-20 min-w-[140px] rounded-xl border border-border bg-card shadow-lg py-1 overflow-hidden">
+          <div className="absolute right-0 top-full mt-1 z-20 min-w-[140px] rounded-2xl glass-bar py-1 overflow-hidden">
             {modes.map((m) => (
               <button
                 key={m}
@@ -460,9 +460,10 @@ export default function NotificationsPage() {
 
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-background">
+      <div className="relative min-h-screen bg-background">
+        <div className="glass-backdrop" aria-hidden="true" />
         <Navbar />
-        <main className="max-w-2xl mx-auto px-4 sm:px-6 py-8 pb-32 md:pb-16">
+        <main className="relative z-10 max-w-2xl mx-auto px-4 sm:px-6 py-8 pb-32 md:pb-16">
 
           {/* Page header */}
           <div className="mb-6 flex items-center justify-between gap-3">
@@ -473,7 +474,7 @@ export default function NotificationsPage() {
                   Alerts
                 </span>
               </div>
-              <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              <h1 className="text-[2.2rem] sm:text-[2.8rem] font-extrabold leading-none tracking-[-0.04em] text-foreground">
                 Notifications
                 {unreadCount > 0 && (
                   <span className="ml-2.5 inline-flex items-center justify-center rounded-full bg-[#009B3A]/20 px-2 py-0.5 text-sm font-semibold text-[#009B3A]">
@@ -489,7 +490,7 @@ export default function NotificationsPage() {
                 <button
                   onClick={handleMarkAllRead}
                   disabled={marking}
-                  className="flex items-center gap-1.5 rounded-xl bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-50 transition-colors"
+                  className="flex items-center gap-1.5 rounded-full glass-panel px-3.5 py-2 text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors"
                 >
                   <CheckCheck className="h-3.5 w-3.5" />
                   Mark all read
@@ -508,8 +509,8 @@ export default function NotificationsPage() {
 
           {/* Empty state */}
           {isEmpty && (
-            <div className="rounded-lg border border-border bg-card flex flex-col items-center justify-center py-20 text-center">
-              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-muted/30">
+            <div className="rounded-3xl solid-panel flex flex-col items-center justify-center py-20 text-center">
+              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted/30">
                 <Bell className="h-7 w-7 text-muted-foreground/30" />
               </div>
               <p className="text-sm font-medium text-muted-foreground">No notifications yet</p>
@@ -518,7 +519,7 @@ export default function NotificationsPage() {
               </p>
               <button
                 onClick={() => router.push("/cases")}
-                className="mt-4 rounded-xl border border-border bg-muted/30 px-4 py-2.5 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                className="mt-4 rounded-full glass-panel px-4 py-2.5 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
               >
                 Browse Cases
               </button>
@@ -550,7 +551,7 @@ export default function NotificationsPage() {
                 </span>
                 <div className="flex-1 h-px bg-border" />
               </div>
-              <div className="rounded-lg border border-border bg-card overflow-hidden divide-y divide-border/50">
+              <div className="rounded-3xl solid-panel overflow-hidden divide-y divide-border/50">
                 {systemNotifs.map((n) => (
                   <SystemRow
                     key={n.id}

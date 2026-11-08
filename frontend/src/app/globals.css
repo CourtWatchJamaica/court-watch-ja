@@ -204,3 +204,73 @@ main {
     height: 1px;
     flex-shrink: 0;
 }
+
+/* ── Glass UI (matches the landing page test design) ─────────────────────── */
+:root {
+    --glass-bg: rgba(255, 255, 255, 0.62);
+    --glass-bg-strong: rgba(255, 255, 255, 0.78);
+    --glass-line: rgba(12, 12, 24, 0.08);
+    --glass-shine: rgba(255, 255, 255, 0.9);
+    --glass-shadow: 0 8px 30px rgba(12, 12, 24, 0.06);
+    --glass-glow-1: rgba(0, 155, 58, 0.14);
+    --glass-glow-2: rgba(184, 130, 10, 0.08);
+}
+.dark {
+    --glass-bg: rgba(255, 255, 255, 0.045);
+    --glass-bg-strong: rgba(20, 20, 34, 0.62);
+    --glass-line: rgba(255, 255, 255, 0.1);
+    --glass-shine: rgba(255, 255, 255, 0.12);
+    --glass-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+    --glass-glow-1: rgba(0, 155, 58, 0.26);
+    --glass-glow-2: rgba(240, 192, 64, 0.1);
+}
+
+@layer components {
+/* soft coloured light behind glass surfaces */
+.glass-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(40% 35% at 10% 0%, var(--glass-glow-1), transparent 70%),
+        radial-gradient(35% 30% at 95% 25%, var(--glass-glow-2), transparent 70%),
+        radial-gradient(45% 40% at 70% 100%, var(--glass-glow-1), transparent 70%);
+}
+
+/* frosted surface for headers, tiles and forms */
+.glass-panel {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-line);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    backdrop-filter: blur(18px) saturate(160%);
+    box-shadow: inset 0 1px 0 var(--glass-shine), var(--glass-shadow);
+}
+
+/* floating pill bars (top nav, mobile bottom nav) */
+.glass-bar {
+    background: var(--glass-bg-strong);
+    border: 1px solid var(--glass-line);
+    -webkit-backdrop-filter: blur(20px) saturate(170%);
+    backdrop-filter: blur(20px) saturate(170%);
+    box-shadow: inset 0 1px 0 var(--glass-shine), var(--glass-shadow);
+}
+
+/* solid card for lists and dense text — readable, no blur cost */
+.solid-panel {
+    background: var(--card);
+    border: 1px solid var(--glass-line);
+    box-shadow: var(--glass-shadow);
+}
+
+/* green glass button */
+.glass-btn-green {
+    background: linear-gradient(180deg, rgba(0, 196, 74, 0.92), rgba(0, 155, 58, 0.88));
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 8px 24px rgba(0, 155, 58, 0.3);
+    text-shadow: 0 1px 1px rgba(0, 40, 15, 0.25);
+    transition: filter 0.15s;
+}
+.glass-btn-green:hover { filter: brightness(1.08); }
+}

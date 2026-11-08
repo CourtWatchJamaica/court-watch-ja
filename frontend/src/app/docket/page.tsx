@@ -125,7 +125,7 @@ function CaseCard({
   const upcoming = hasUpcoming && isUpcoming(item.next_event_date);
 
   return (
-    <div className="group relative overflow-hidden rounded-lg border border-border bg-card hover:border-primary/20 hover:shadow-lg transition-all duration-250 p-5 hover:-translate-y-0.5">
+    <div className="group relative overflow-hidden rounded-3xl solid-panel hover:border-primary/20 hover:shadow-lg transition-all duration-250 p-5 hover:-translate-y-0.5">
       {/* Ghost case number watermark */}
       <span
         aria-hidden
@@ -217,7 +217,7 @@ function CaseCard({
 
 function SkeletonCard() {
   return (
-    <div className="rounded-lg border border-border bg-card p-5 animate-pulse">
+    <div className="rounded-3xl solid-panel p-5 animate-pulse">
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 space-y-3">
           <div className="flex gap-2 mb-1">
@@ -277,9 +277,10 @@ export default function DocketPage() {
 
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-background">
+      <div className="relative min-h-screen bg-background">
+        <div className="glass-backdrop" aria-hidden="true" />
         <Navbar />
-        <main className="max-w-2xl mx-auto px-4 sm:px-6 py-8 pb-32 md:pb-16">
+        <main className="relative z-10 max-w-2xl mx-auto px-4 sm:px-6 py-8 pb-32 md:pb-16">
 
           {/* Header */}
           <div className="mb-8 flex items-start justify-between gap-6">
@@ -290,7 +291,7 @@ export default function DocketPage() {
                   Case Files
                 </span>
               </div>
-              <h1 className="font-heading font-bold text-[2.8rem] sm:text-[3.5rem] leading-none tracking-tight text-foreground mb-2">
+              <h1 className="font-sans font-extrabold text-[2.8rem] sm:text-[3.5rem] leading-none tracking-[-0.04em] text-foreground mb-2">
                 My Docket<span className="text-primary">.</span>
               </h1>
               {!loading && items.length > 0 && (
@@ -314,7 +315,7 @@ export default function DocketPage() {
 
             <button
               onClick={() => router.push("/cases")}
-              className="shrink-0 flex items-center gap-1.5 rounded-xl border border-primary/22 bg-primary/[0.06] px-4 py-2.5 text-xs font-semibold text-primary hover:bg-primary/[0.12] hover:border-primary/[0.32] transition-all"
+              className="shrink-0 flex items-center gap-1.5 rounded-full glass-btn-green px-4 py-2.5 text-xs font-semibold"
             >
               <Plus className="h-3.5 w-3.5" />
               Track new
@@ -324,13 +325,13 @@ export default function DocketPage() {
           {/* Search */}
           {!loading && items.length > 0 && (
             <div className="relative mb-6">
-              <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-foreground/30" />
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 z-10 -translate-y-1/2 h-3.5 w-3.5 text-foreground/30" />
               <input
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search by case number or party name…"
-                className="w-full rounded-xl border border-border bg-card pl-10 pr-9 py-2.5 text-[13px] text-foreground placeholder:text-foreground/30 outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/[0.14] transition-all"
+                className="w-full rounded-full glass-panel pl-10 pr-9 py-2.5 text-[13px] text-foreground placeholder:text-foreground/30 outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/[0.14] transition-all"
               />
               {query && (
                 <button
@@ -353,15 +354,15 @@ export default function DocketPage() {
 
           {/* Empty (no tracked cases at all) */}
           {!loading && items.length === 0 && (
-            <div className="relative overflow-hidden rounded-lg border border-border bg-card flex flex-col items-center justify-center py-24 text-center px-8">
+            <div className="relative overflow-hidden rounded-3xl solid-panel flex flex-col items-center justify-center py-24 text-center px-8">
               <span className="pointer-events-none select-none absolute inset-0 flex items-center justify-center font-heading font-bold text-[7rem] text-foreground/[0.02] overflow-hidden">
                 EMPTY
               </span>
               <div className="relative z-10">
-                <div className="mb-5 mx-auto flex h-16 w-16 items-center justify-center rounded-lg border border-border bg-muted">
+                <div className="mb-5 mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-border bg-muted">
                   <FolderOpen className="h-7 w-7 text-foreground/[0.18]" />
                 </div>
-                <h2 className="font-heading font-bold text-xl text-foreground/75 mb-2">
+                <h2 className="font-sans font-extrabold tracking-[-0.02em] text-xl text-foreground/75 mb-2">
                   Your docket is empty
                 </h2>
                 <p className="text-[13px] text-foreground/30 max-w-[240px] leading-relaxed mb-6">
@@ -369,7 +370,7 @@ export default function DocketPage() {
                 </p>
                 <button
                   onClick={() => router.push("/cases")}
-                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-black hover:bg-primary/90 transition-colors active:scale-[0.98]"
+                  className="inline-flex items-center gap-2 rounded-full glass-btn-green px-6 py-2.5 text-sm font-semibold active:scale-[0.98]"
                 >
                   <Plus className="h-4 w-4" />
                   Browse Cases
@@ -380,7 +381,7 @@ export default function DocketPage() {
 
           {/* No search results */}
           {!loading && items.length > 0 && filteredItems.length === 0 && (
-            <div className="rounded-lg border border-dashed border-border py-14 text-center px-8">
+            <div className="rounded-3xl border border-dashed border-border py-14 text-center px-8">
               <p className="text-[13px] text-foreground/40">
                 No cases match &ldquo;<span className="font-mono text-foreground/70">{trimmedQuery}</span>&rdquo;.
               </p>

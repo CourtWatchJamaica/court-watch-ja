@@ -120,7 +120,7 @@ function sortByEventDate(items: CourtSitting[]): CourtSitting[] {
 
 function TabToggle({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) {
   return (
-    <div className="flex rounded-lg bg-foreground/[0.03] border border-border p-1 gap-1">
+    <div className="flex rounded-full glass-panel p-1 gap-1">
       {(
         [
           { id: "judgments" as Tab, icon: Scale, label: "Judgments", sub: "Past decisions" },
@@ -131,10 +131,10 @@ function TabToggle({ active, onChange }: { active: Tab; onChange: (t: Tab) => vo
           key={id}
           onClick={() => onChange(id)}
           className={[
-            "flex flex-1 items-center justify-center gap-3 rounded-xl px-5 py-3.5",
+            "flex flex-1 items-center justify-center gap-3 rounded-full px-5 py-3",
             "transition-all duration-200 active:scale-[0.98]",
             active === id
-              ? "bg-card text-foreground shadow-[0_2px_12px_rgba(0,0,0,0.4)]"
+              ? "bg-card text-foreground shadow-[0_4px_16px_rgba(0,0,0,0.12)] ring-1 ring-foreground/[0.06]"
               : "text-foreground/40 hover:text-foreground/65",
           ].join(" ")}
         >
@@ -199,7 +199,7 @@ function JudgeInput({ value, onChange }: { value: string; onChange: (v: string) 
         autoComplete="off"
       />
       {open && suggestions.length > 0 && (
-        <ul className="absolute z-50 mt-1.5 w-full rounded-xl border border-border bg-card shadow-2xl overflow-hidden">
+        <ul className="absolute z-50 mt-1.5 w-full rounded-2xl glass-bar overflow-hidden">
           {suggestions.map((name) => (
             <li key={name}>
               <button
@@ -249,7 +249,7 @@ function FilterPanel({
         open ? "max-h-[600px] opacity-100" : "max-h-0 opacity-0",
       ].join(" ")}
     >
-      <div className="rounded-lg border border-border bg-card p-5 mt-3">
+      <div className="rounded-3xl glass-panel p-5 mt-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
           <div>
@@ -396,7 +396,7 @@ function ActiveChips({
 
 function SkeletonCard() {
   return (
-    <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+    <div className="rounded-3xl solid-panel p-4 space-y-3">
       <div className="flex justify-between items-start gap-3">
         <Skeleton className="h-3.5 w-2/3 bg-foreground/[0.05]" />
         <Skeleton className="h-5 w-20 rounded-md bg-foreground/[0.04] shrink-0" />
@@ -431,12 +431,12 @@ function EmptyState({
       ? "This case number does not appear in our Supreme Court or Court of Appeal listings. Parish Court cases are tracked separately."
       : "Try different keywords or adjust your filters.";
     return (
-      <div className="col-span-full relative overflow-hidden flex flex-col items-center justify-center rounded-lg border border-border bg-card py-20 text-center px-8">
+      <div className="col-span-full relative overflow-hidden flex flex-col items-center justify-center rounded-3xl solid-panel py-20 text-center px-8">
         <span className="pointer-events-none select-none absolute inset-0 flex items-center justify-center font-heading font-bold text-[7rem] text-foreground/[0.02] overflow-hidden">
           {headline.split(" ")[0].toUpperCase()}
         </span>
         <div className="relative z-10">
-          <div className="mb-4 mx-auto flex h-14 w-14 items-center justify-center rounded-lg border border-border bg-muted">
+          <div className="mb-4 mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-muted">
             <SearchX className="h-7 w-7 text-foreground/20" />
           </div>
           <p className="font-heading font-semibold text-[15px] text-foreground/65">{headline}</p>
@@ -445,7 +445,7 @@ function EmptyState({
           </p>
           <button
             onClick={onClear}
-            className="mt-5 rounded-xl border border-primary/25 bg-primary/[0.07] px-5 py-2 text-xs font-semibold text-primary hover:bg-primary/[0.12] transition-colors"
+            className="mt-5 rounded-full border border-primary/25 bg-primary/[0.07] px-5 py-2 text-xs font-semibold text-primary hover:bg-primary/[0.12] transition-colors"
           >
             Clear search &amp; filters
           </button>
@@ -454,12 +454,12 @@ function EmptyState({
     );
   }
   return (
-    <div className="col-span-full relative overflow-hidden flex flex-col items-center justify-center rounded-lg border border-border bg-card py-20 text-center px-8">
+    <div className="col-span-full relative overflow-hidden flex flex-col items-center justify-center rounded-3xl solid-panel py-20 text-center px-8">
       <span className="pointer-events-none select-none absolute inset-0 flex items-center justify-center font-heading font-bold text-[7rem] text-foreground/[0.02] overflow-hidden">
         {tab === "judgments" ? "CASES" : "LISTS"}
       </span>
       <div className="relative z-10">
-        <div className="mb-4 mx-auto flex h-14 w-14 items-center justify-center rounded-lg border border-border bg-primary/[0.05]">
+        <div className="mb-4 mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-primary/[0.05]">
           {tab === "judgments" ? <Scale className="h-7 w-7 text-primary/40" /> : <Calendar className="h-7 w-7 text-primary/40" />}
         </div>
         <p className="font-heading font-semibold text-[15px] text-foreground/55">
@@ -499,7 +499,7 @@ function Pagination({
       </p>
       <div className="flex flex-wrap items-center justify-center gap-1.5">
         <button onClick={() => onPageChange(page - 1)} disabled={page === 1 || disabled} aria-label="Previous page"
-          className="flex min-h-[44px] items-center gap-1 rounded-xl border border-border bg-card px-3 text-[13px] text-foreground/50 transition-all hover:bg-foreground/[0.05] hover:text-foreground hover:border-foreground/10 disabled:cursor-not-allowed disabled:opacity-30">
+          className="flex min-h-[44px] items-center gap-1 rounded-full glass-panel px-3.5 text-[13px] text-foreground/50 transition-all hover:bg-foreground/[0.05] hover:text-foreground hover:border-foreground/10 disabled:cursor-not-allowed disabled:opacity-30">
           <ChevronLeft className="h-4 w-4" /><span className="hidden sm:inline">Prev</span>
         </button>
         {pageList.map((n, i) =>
@@ -508,7 +508,7 @@ function Pagination({
           ) : (
             <button key={n} onClick={() => onPageChange(n as number)} disabled={disabled}
               aria-current={n === page ? "page" : undefined}
-              className={["flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border text-[13px] font-medium transition-all",
+              className={["flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full border text-[13px] font-medium transition-all",
                 n === page
                   ? "border-primary/35 bg-primary/10 text-primary"
                   : "border-border bg-card text-foreground/50 hover:bg-foreground/[0.05] hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"].join(" ")}>
@@ -517,7 +517,7 @@ function Pagination({
           )
         )}
         <button onClick={() => onPageChange(page + 1)} disabled={page === totalPages || disabled} aria-label="Next page"
-          className="flex min-h-[44px] items-center gap-1 rounded-xl border border-border bg-card px-3 text-[13px] text-foreground/50 transition-all hover:bg-foreground/[0.05] hover:text-foreground hover:border-foreground/10 disabled:cursor-not-allowed disabled:opacity-30">
+          className="flex min-h-[44px] items-center gap-1 rounded-full glass-panel px-3.5 text-[13px] text-foreground/50 transition-all hover:bg-foreground/[0.05] hover:text-foreground hover:border-foreground/10 disabled:cursor-not-allowed disabled:opacity-30">
           <span className="hidden sm:inline">Next</span><ChevronRight className="h-4 w-4" />
         </button>
       </div>
@@ -741,9 +741,10 @@ export default function CasesPage() {
 
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-background">
+      <div className="relative min-h-screen bg-background">
+        <div className="glass-backdrop" aria-hidden="true" />
         <Navbar />
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-28 md:pb-12">
+        <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-28 md:pb-12">
 
           {/* Header */}
           <div className="mb-6">
@@ -753,7 +754,7 @@ export default function CasesPage() {
                 Case Registry
               </span>
             </div>
-            <h1 className="font-heading font-bold text-[2.4rem] sm:text-[3.2rem] leading-none tracking-tight text-foreground mb-6">
+            <h1 className="font-sans font-extrabold text-[2.4rem] sm:text-[3.2rem] leading-none tracking-[-0.04em] text-foreground mb-6">
               Search Cases<span className="text-primary">.</span>
             </h1>
             <TabToggle active={activeTab} onChange={handleTabChange} />
@@ -791,10 +792,10 @@ export default function CasesPage() {
                 type="button"
                 onClick={() => setFiltersOpen((o) => !o)}
                 className={[
-                  "inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition-all",
+                  "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition-all",
                   activeFilterCount > 0
                     ? "border-primary/35 bg-primary/[0.08] text-primary hover:bg-primary/[0.14]"
-                    : "border-border bg-card text-foreground/50 hover:text-foreground/80 hover:bg-foreground/[0.04]",
+                    : "glass-panel text-foreground/50 hover:text-foreground/80",
                 ].join(" ")}
               >
                 <SlidersHorizontal className="h-4 w-4" />
@@ -906,7 +907,7 @@ export default function CasesPage() {
                   <button
                     onClick={handleLoadMore}
                     disabled={loadingMore}
-                    className="flex items-center gap-2 rounded-xl border border-border bg-card px-6 py-3 text-sm font-semibold text-foreground/50 hover:bg-foreground/[0.05] hover:text-foreground hover:border-foreground/10 active:scale-[0.98] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center gap-2 rounded-full glass-panel px-6 py-3 text-sm font-semibold text-foreground/50 hover:bg-foreground/[0.05] hover:text-foreground hover:border-foreground/10 active:scale-[0.98] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {loadingMore ? (
                       <><Loader2 className="h-4 w-4 animate-spin" />Loading…</>

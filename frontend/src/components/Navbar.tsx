@@ -119,8 +119,8 @@ export default function Navbar() {
         </div>
       )}
 
-      <nav className="sticky top-0 z-50 border-b border-border bg-background/92 backdrop-blur-2xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <nav className="sticky top-0 z-50 px-3 pt-3 sm:px-6 lg:px-8">
+        <div className="glass-bar max-w-7xl mx-auto rounded-full pl-5 pr-2">
           <div className="flex h-14 items-center justify-between gap-2">
 
             {/* Logo + Court Tabs */}
@@ -145,16 +145,13 @@ export default function Navbar() {
                       }
                     }}
                     className={[
-                      "relative px-3 py-2 text-[11px] font-semibold transition-all duration-150 whitespace-nowrap",
+                      "relative px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all duration-150 whitespace-nowrap",
                       selectedCourt === court
-                        ? "text-primary"
-                        : "text-foreground/35 hover:text-foreground/65",
+                        ? "text-primary bg-primary/[0.1]"
+                        : "text-foreground/40 hover:text-foreground/70 hover:bg-foreground/[0.05]",
                     ].join(" ")}
                   >
                     {court}
-                    {selectedCourt === court && (
-                      <span className="absolute bottom-0 left-2 right-2 h-px bg-primary rounded-full" />
-                    )}
                   </button>
                 ))}
               </div>
@@ -166,9 +163,9 @@ export default function Navbar() {
                 <Link
                   key={href}
                   href={href}
-                  className={`relative px-3 py-1.5 text-[13px] font-medium transition-all duration-150 rounded-lg ${
+                  className={`relative px-3.5 py-1.5 text-[13px] font-medium transition-all duration-150 rounded-full ${
                     isActive(href)
-                      ? "text-foreground bg-foreground/[0.05]"
+                      ? "text-foreground bg-foreground/[0.07]"
                       : "text-foreground/40 hover:text-foreground/70 hover:bg-foreground/[0.04]"
                   }`}
                 >
@@ -178,7 +175,7 @@ export default function Navbar() {
               {isAdmin && (
                 <Link
                   href="/admin"
-                  className={`relative px-3 py-1.5 text-[13px] font-medium transition-all duration-150 rounded-lg flex items-center gap-1.5 ${
+                  className={`relative px-3.5 py-1.5 text-[13px] font-medium transition-all duration-150 rounded-full flex items-center gap-1.5 ${
                     isActive("/admin")
                       ? "text-accent bg-accent/[0.06]"
                       : "text-foreground/40 hover:text-foreground/70 hover:bg-foreground/[0.04]"
@@ -195,7 +192,7 @@ export default function Navbar() {
               {/* Mobile court selector pill */}
               <button
                 onClick={() => setCourtSheetOpen(true)}
-                className="lg:hidden flex items-center gap-1 rounded-lg border border-primary/25 bg-primary/[0.06] px-2.5 py-1.5 text-[11px] font-semibold text-primary hover:bg-primary/10 transition-colors min-h-[44px]"
+                className="lg:hidden flex items-center gap-1 rounded-full border border-primary/25 bg-primary/[0.08] px-2.5 py-1.5 text-[11px] font-semibold text-primary hover:bg-primary/10 transition-colors min-h-[44px]"
               >
                 <span className="max-w-[68px] truncate hidden sm:inline">
                   {selectedCourt}
@@ -213,7 +210,7 @@ export default function Navbar() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="relative h-8 w-8 min-h-[44px] rounded-lg text-foreground/35 hover:text-foreground/80 hover:bg-foreground/[0.05] transition-all"
+                  className="relative h-8 w-8 min-h-[44px] rounded-full text-foreground/35 hover:text-foreground/80 hover:bg-foreground/[0.05] transition-all"
                 >
                   <Bell className="h-4 w-4" />
                   {unreadCount > 0 && (
@@ -229,7 +226,7 @@ export default function Navbar() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className={`h-8 w-8 min-h-[44px] rounded-lg transition-all ${
+                  className={`h-8 w-8 min-h-[44px] rounded-full transition-all ${
                     pathname.startsWith("/profile")
                       ? "text-primary bg-primary/[0.08]"
                       : "text-foreground/35 hover:text-foreground/80 hover:bg-foreground/[0.05]"
@@ -244,7 +241,7 @@ export default function Navbar() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 rounded-lg text-foreground/35 hover:text-foreground/80 hover:bg-foreground/[0.05] transition-all"
+                  className="h-8 w-8 rounded-full text-foreground/35 hover:text-foreground/80 hover:bg-foreground/[0.05] transition-all"
                 >
                   <Settings className="h-4 w-4" />
                 </Button>
@@ -257,7 +254,7 @@ export default function Navbar() {
                 variant="ghost"
                 size="icon"
                 onClick={handleLogout}
-                className="hidden sm:flex h-8 w-8 rounded-lg text-foreground/30 hover:text-red-400 hover:bg-red-500/[0.08] transition-all"
+                className="hidden sm:flex h-8 w-8 rounded-full text-foreground/30 hover:text-red-400 hover:bg-red-500/[0.08] transition-all"
               >
                 <LogOut className="h-4 w-4" />
               </Button>
@@ -268,14 +265,14 @@ export default function Navbar() {
                   variant="ghost"
                   size="icon"
                   onClick={() => setMoreOpen((v) => !v)}
-                  className="h-8 w-8 min-h-[44px] rounded-lg text-foreground/35 hover:text-foreground/80 hover:bg-foreground/[0.05]"
+                  className="h-8 w-8 min-h-[44px] rounded-full text-foreground/35 hover:text-foreground/80 hover:bg-foreground/[0.05]"
                   aria-label="More options"
                 >
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
 
                 {moreOpen && (
-                  <div className="absolute right-0 top-full mt-1.5 w-44 rounded-lg border border-border bg-card shadow-2xl overflow-hidden z-[100]">
+                  <div className="absolute right-0 top-full mt-1.5 w-44 rounded-2xl glass-bar overflow-hidden z-[100]">
                     <div className="flex items-center justify-between px-3 py-2 border-b border-border">
                       <span className="text-[11px] text-foreground/35">Theme</span>
                       <ThemeToggle />
@@ -316,7 +313,7 @@ export default function Navbar() {
       {/* Mobile bottom nav */}
       <div className="md:hidden fixed bottom-0 inset-x-0 z-50 flex justify-center pointer-events-none">
         <nav
-          className="pointer-events-auto flex items-center gap-0 rounded-[22px] border border-border bg-card px-1 py-2 shadow-xl"
+          className="pointer-events-auto flex items-center gap-0 rounded-full glass-bar px-1.5 py-1.5"
           style={{ marginBottom: "env(safe-area-inset-bottom, 0px)" }}
         >
           {[
@@ -330,7 +327,7 @@ export default function Navbar() {
               <Link
                 key={href}
                 href={href}
-                className={`relative flex flex-col items-center gap-[3px] rounded-[14px] px-[13px] py-2 transition-all duration-200 ${
+                className={`relative flex flex-col items-center gap-[3px] rounded-full px-[13px] py-2 transition-all duration-200 ${
                   active
                     ? "bg-primary/10 text-primary"
                     : "text-foreground/30 hover:text-foreground/65 hover:bg-foreground/[0.05]"
@@ -356,7 +353,7 @@ export default function Navbar() {
 
           <button
             onClick={openChambers}
-            className="relative flex flex-col items-center gap-[3px] rounded-[14px] px-[13px] py-2 transition-all duration-200 text-foreground/30 hover:text-foreground/65 hover:bg-foreground/[0.05]"
+            className="relative flex flex-col items-center gap-[3px] rounded-full px-[13px] py-2 transition-all duration-200 text-foreground/30 hover:text-foreground/65 hover:bg-foreground/[0.05]"
           >
             <CourtroomIcon className="h-[19px] w-[19px]" />
             <span className="text-[9.5px] font-semibold tracking-wide leading-none">
@@ -374,7 +371,7 @@ export default function Navbar() {
             onClick={() => setCourtSheetOpen(false)}
           />
           <div
-            className="fixed bottom-0 inset-x-0 z-[75] rounded-t-2xl bg-card border-t border-border px-5 pt-5"
+            className="fixed bottom-0 inset-x-0 z-[75] rounded-t-[28px] glass-bar px-5 pt-5"
             style={{
               paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom, 0px))",
             }}
@@ -422,7 +419,7 @@ export default function Navbar() {
       {/* New notification toast */}
       {notifToast && (
         <div className="fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-[200] pointer-events-none">
-          <div className="flex items-center gap-2.5 rounded-lg border border-primary/20 bg-card px-4 py-3 shadow-2xl animate-in fade-in slide-in-from-bottom-2">
+          <div className="flex items-center gap-2.5 rounded-full glass-bar px-5 py-3 animate-in fade-in slide-in-from-bottom-2">
             <Bell className="h-4 w-4 text-primary shrink-0" />
             <p className="text-sm text-foreground/85">{notifToast}</p>
           </div>
