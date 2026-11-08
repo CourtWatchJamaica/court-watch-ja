@@ -286,7 +286,6 @@ export default function DocketPage() {
           <div className="mb-8 flex items-start justify-between gap-6">
             <div>
               <div className="flex items-center gap-3 mb-5">
-                <div className="h-px w-8 bg-primary/45" />
                 <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-primary/65">
                   Case Files
                 </span>

@@ -45,7 +45,7 @@ function formatTime(s: string | null | undefined): string {
 function SittingsTimeline({ sittings }: { sittings: CourtSitting[] }) {
   if (sittings.length === 0) {
     return (
-      <div className="rounded-lg border border-border bg-card p-8 text-center">
+      <div className="rounded-3xl solid-panel p-8 text-center">
         <Calendar className="h-8 w-8 text-muted-foreground/20 mx-auto mb-3" />
         <p className="text-sm text-muted-foreground">No court sittings on record for this case.</p>
       </div>
@@ -53,7 +53,7 @@ function SittingsTimeline({ sittings }: { sittings: CourtSitting[] }) {
   }
 
   return (
-    <div className="rounded-lg border border-border bg-card overflow-hidden">
+    <div className="rounded-3xl solid-panel overflow-hidden">
       {sittings.map((s, i) => {
         const isPast = isPastDateOnly(s.event_date);
         return (
@@ -134,7 +134,7 @@ function SittingsTimeline({ sittings }: { sittings: CourtSitting[] }) {
 function JudgmentCard({ judgment, caseNumber }: { judgment: Judgment | null; caseNumber: string }) {
   if (!judgment) {
     return (
-      <div className="rounded-lg border border-border bg-card p-6 text-center">
+      <div className="rounded-3xl solid-panel p-6 text-center">
         <BookOpen className="h-7 w-7 text-muted-foreground/20 mx-auto mb-2" />
         <p className="text-sm text-muted-foreground">No judgment on record for{" "}
           <span className="font-mono font-semibold">{caseNumber}</span>.
@@ -144,7 +144,7 @@ function JudgmentCard({ judgment, caseNumber }: { judgment: Judgment | null; cas
   }
 
   return (
-    <div className="rounded-lg border border-border bg-card overflow-hidden">
+    <div className="rounded-3xl solid-panel overflow-hidden">
       <div className="px-5 py-4 border-b border-border bg-muted/10 flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 mb-1">Judgment</p>
@@ -155,7 +155,7 @@ function JudgmentCard({ judgment, caseNumber }: { judgment: Judgment | null; cas
             href={judgment.pdf_url ?? `/api/pdf/judgment/${judgment.id}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="shrink-0 flex items-center gap-1.5 rounded-xl bg-[#009B3A]/10 border border-[#009B3A]/30 px-3 py-2 text-xs font-semibold text-[#009B3A] hover:bg-[#009B3A]/20 transition-colors"
+            className="shrink-0 flex items-center gap-1.5 rounded-2xl bg-[#009B3A]/10 border border-[#009B3A]/30 px-3 py-2 text-xs font-semibold text-[#009B3A] hover:bg-[#009B3A]/20 transition-colors"
           >
             <Download className="h-3.5 w-3.5" />
             PDF
@@ -187,10 +187,10 @@ function JudgmentCard({ judgment, caseNumber }: { judgment: Judgment | null; cas
 function PageSkeleton() {
   return (
     <div className="animate-pulse space-y-4">
-      <div className="h-8 w-48 rounded-lg bg-muted" />
-      <div className="h-12 w-full rounded-lg bg-muted/60" />
-      <div className="h-32 w-full rounded-lg bg-muted/40" />
-      <div className="h-48 w-full rounded-lg bg-muted/40" />
+      <div className="h-8 w-48 rounded-2xl bg-muted" />
+      <div className="h-12 w-full rounded-2xl bg-muted/60" />
+      <div className="h-32 w-full rounded-2xl bg-muted/40" />
+      <div className="h-48 w-full rounded-2xl bg-muted/40" />
     </div>
   );
 }
@@ -251,9 +251,10 @@ export default function CaseHistoryPage({
   ).length;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="relative min-h-screen bg-background">
+        <div className="glass-backdrop" aria-hidden="true" />
       <Navbar />
-      <main className="max-w-2xl mx-auto px-4 sm:px-6 py-8 pb-32 md:pb-16">
+      <main className="relative z-10 max-w-2xl mx-auto px-4 sm:px-6 py-8 pb-32 md:pb-16">
 
         {/* Back */}
         <div className="mb-5">
@@ -269,14 +270,14 @@ export default function CaseHistoryPage({
         {loading && <PageSkeleton />}
 
         {!loading && notFound && (
-          <div className="rounded-lg border border-border bg-card p-10 text-center">
+          <div className="rounded-3xl solid-panel p-10 text-center">
             <p className="text-sm font-medium text-foreground">Case not found</p>
             <p className="mt-1 text-xs text-muted-foreground/60">
               No records found for <span className="font-mono font-semibold">{caseNumber}</span>.
             </p>
             <Link
               href="/cases?tab=sittings"
-              className="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-[#009B3A] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#009B3A]/90 transition-colors"
+              className="mt-5 inline-flex items-center gap-1.5 rounded-full glass-btn-green px-4 py-2.5 text-sm font-semibold transition-colors"
             >
               Browse Court Lists
             </Link>
@@ -291,7 +292,7 @@ export default function CaseHistoryPage({
                 <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground/60 mb-1">
                   Case File
                 </p>
-                <h1 className="font-mono text-xl font-bold tracking-tight text-foreground">
+                <h1 className="font-mono text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
                   {caseNumber}
                 </h1>
                 <p className="mt-1 text-xs text-muted-foreground/50">
@@ -307,7 +308,7 @@ export default function CaseHistoryPage({
               {alreadyTracked ? (
                 <button
                   onClick={() => router.push(`/docket/${encodeURIComponent(caseNumber)}`)}
-                  className="shrink-0 flex items-center gap-1.5 rounded-xl border border-[#009B3A]/30 bg-[#009B3A]/10 px-4 py-2.5 text-xs font-semibold text-[#009B3A] hover:bg-[#009B3A]/20 transition-colors"
+                  className="shrink-0 flex items-center gap-1.5 rounded-full border border-[#009B3A]/30 bg-[#009B3A]/10 px-4 py-2.5 text-xs font-semibold text-[#009B3A] hover:bg-[#009B3A]/20 transition-colors"
                 >
                   <CheckCircle2 className="h-3.5 w-3.5" />
                   View My Docket
@@ -316,7 +317,7 @@ export default function CaseHistoryPage({
                 <button
                   onClick={handleTrack}
                   disabled={tracking}
-                  className="shrink-0 flex items-center gap-1.5 rounded-xl border border-border bg-card px-4 py-2.5 text-xs font-semibold text-foreground/70 hover:border-[#009B3A]/40 hover:text-[#009B3A] hover:bg-[#009B3A]/[0.06] disabled:opacity-60 transition-colors"
+                  className="shrink-0 flex items-center gap-1.5 rounded-3xl solid-panel px-4 py-2.5 text-xs font-semibold text-foreground/70 hover:border-[#009B3A]/40 hover:text-[#009B3A] hover:bg-[#009B3A]/[0.06] disabled:opacity-60 transition-colors"
                 >
                   <ListPlus className="h-3.5 w-3.5" />
                   {tracking ? "Adding…" : "Track in My Docket"}
@@ -325,10 +326,10 @@ export default function CaseHistoryPage({
             </div>
 
             {/* Tab strip */}
-            <div className="flex gap-1 p-1 rounded-xl bg-muted/40 border border-border mb-5">
+            <div className="flex gap-1 p-1 rounded-full glass-panel mb-5">
               <button
                 onClick={() => setActiveTab("sittings")}
-                className={`flex-1 flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+                className={`flex-1 flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all ${
                   activeTab === "sittings"
                     ? "bg-card shadow-sm text-foreground border border-border/60"
                     : "text-muted-foreground hover:text-foreground"
@@ -344,7 +345,7 @@ export default function CaseHistoryPage({
               </button>
               <button
                 onClick={() => setActiveTab("judgment")}
-                className={`flex-1 flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+                className={`flex-1 flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all ${
                   activeTab === "judgment"
                     ? "bg-card shadow-sm text-foreground border border-border/60"
                     : "text-muted-foreground hover:text-foreground"
@@ -366,7 +367,7 @@ export default function CaseHistoryPage({
 
             {/* Docket CTA banner */}
             {!alreadyTracked && (
-              <div className="mt-5 rounded-lg border border-[#009B3A]/20 bg-[#009B3A]/[0.04] p-4 flex items-center justify-between gap-4">
+              <div className="mt-5 rounded-3xl border border-[#009B3A]/20 bg-[#009B3A]/[0.04] p-4 flex items-center justify-between gap-4">
                 <div>
                   <p className="text-sm font-semibold text-foreground">Get notified about updates</p>
                   <p className="text-xs text-muted-foreground/60 mt-0.5">
@@ -376,7 +377,7 @@ export default function CaseHistoryPage({
                 <button
                   onClick={handleTrack}
                   disabled={tracking}
-                  className="shrink-0 flex items-center gap-1.5 rounded-xl bg-[#009B3A] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#009B3A]/90 disabled:opacity-60 transition-colors"
+                  className="shrink-0 flex items-center gap-1.5 rounded-full glass-btn-green px-4 py-2.5 text-xs font-semibold disabled:opacity-60 transition-colors"
                 >
                   <ListPlus className="h-3.5 w-3.5" />
                   {tracking ? "Adding…" : "Track Case"}

@@ -19,23 +19,23 @@ function ResetPasswordContent() {
   const [errorMessage, setErrorMessage] = useState("");
 
   const inputCls =
-    "w-full rounded-md border border-white/15 bg-black/30 px-3.5 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#009B3A]/70 transition-colors";
+    "w-full rounded-full border border-white/15 bg-white/[0.05] backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] px-4 py-3 text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#009B3A]/70 transition-colors";
 
   if (!token) {
     return (
       <div className="text-center space-y-4">
         <div className="flex justify-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-amber-500/10 ring-1 ring-amber-500/30">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10 ring-1 ring-amber-500/30">
             <AlertTriangle className="h-7 w-7 text-amber-400" />
           </div>
         </div>
-        <h1 className="font-heading text-xl font-semibold text-white">Invalid reset link</h1>
+        <h1 className="text-xl font-extrabold tracking-[-0.03em] text-white">Invalid reset link</h1>
         <p className="text-sm text-white/50">
           This password reset link is missing a token. Please request a new one.
         </p>
         <Link
           href="/forgot-password"
-          className="inline-block w-full rounded-md bg-[#009B3A] py-2.5 text-sm font-medium text-white hover:bg-[#009B3A]/85 transition-colors text-center"
+          className="inline-block w-full rounded-full glass-btn-green py-3 text-sm font-semibold text-center"
         >
           Request New Link
         </Link>
@@ -51,7 +51,7 @@ function ResetPasswordContent() {
             <CheckCircle className="h-7 w-7 text-[#009B3A]" />
           </div>
         </div>
-        <h1 className="font-heading text-xl font-semibold text-white">Password reset!</h1>
+        <h1 className="text-xl font-extrabold tracking-[-0.03em] text-white">Password reset!</h1>
         <p className="text-sm text-white/50">
           Your password has been updated. Redirecting you to sign in…
         </p>
@@ -137,7 +137,7 @@ function ResetPasswordContent() {
       </div>
 
       {(errorMessage || status === "error") && (
-        <div className="rounded-md bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-400 space-y-2">
+        <div className="rounded-2xl bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-400 space-y-2">
           <p>{errorMessage || "Something went wrong."}</p>
           {status === "error" && (
             <Link
@@ -153,7 +153,7 @@ function ResetPasswordContent() {
       <button
         type="submit"
         disabled={loading || status === "error"}
-        className="w-full flex items-center justify-center gap-2 rounded-md bg-[#009B3A] py-2.5 text-sm font-medium text-white hover:bg-[#009B3A]/85 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        className="w-full flex items-center justify-center gap-2 rounded-full glass-btn-green py-3 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {loading ? (
           <>
@@ -179,7 +179,8 @@ function ResetPasswordContent() {
 
 export default function ResetPasswordPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#080810] px-4">
+    <div className="min-h-screen flex items-center justify-center bg-[#080810] relative overflow-hidden px-4">
+      <div className="dark" aria-hidden="true"><div className="glass-backdrop" /></div>
       <div
         className="fixed top-0 left-0 right-0 h-[3px] z-50"
         style={{
@@ -188,20 +189,20 @@ export default function ResetPasswordPage() {
         }}
       />
 
-      <div className="w-full max-w-sm">
+      <div className="relative z-10 w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-3">
           <div className="flex items-center justify-center">
             <Scale className="h-6 w-6 text-[#009B3A]" />
           </div>
           <div className="text-center">
-            <h1 className="font-heading text-2xl font-semibold tracking-tight text-white">
+            <h1 className="text-2xl font-extrabold tracking-[-0.03em] text-white">
               CourtWatch JA
             </h1>
             <p className="mt-1 text-sm text-white/70">Set a new password</p>
           </div>
         </div>
 
-        <div className="rounded-lg border border-white/10 bg-[#0e0e1a] p-6">
+        <div className="rounded-[28px] border border-white/10 bg-white/[0.045] backdrop-blur-2xl backdrop-saturate-150 shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_30px_80px_rgba(0,0,0,0.5)] p-6 sm:p-7">
           <Suspense
             fallback={
               <div className="flex justify-center py-8">

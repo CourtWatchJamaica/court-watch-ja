@@ -43,9 +43,10 @@ export default function SettingsPage() {
 
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-background">
+      <div className="relative min-h-screen bg-background">
+        <div className="glass-backdrop" aria-hidden="true" />
         <Navbar />
-        <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-28 md:pb-12">
+        <main className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-28 md:pb-12">
           <div className="mb-8">
             <div className="mb-3 flex items-center gap-2">
               <SettingsIcon className="h-4 w-4 text-[#009B3A]" />
@@ -53,7 +54,7 @@ export default function SettingsPage() {
                 Preferences
               </span>
             </div>
-            <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+            <h1 className="text-[2.2rem] sm:text-[2.8rem] font-extrabold leading-none tracking-[-0.04em]">Settings</h1>
             <p className="mt-1.5 text-sm text-muted-foreground">
               Manage your account preferences and appearance
             </p>
@@ -61,7 +62,7 @@ export default function SettingsPage() {
 
           <div className="space-y-5">
             {/* Appearance */}
-            <Card className="border-border bg-card">
+            <Card className="rounded-3xl solid-panel ring-0">
               <CardHeader className="pb-4">
                 <div className="flex items-center gap-2">
                   <Palette className="h-4 w-4 text-[#009B3A]" />
@@ -77,7 +78,7 @@ export default function SettingsPage() {
                       Toggle between dark (default) and light mode
                     </p>
                   </div>
-                  <ThemeToggle className="h-9 w-9 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted/50" />
+                  <ThemeToggle className="h-9 w-9 rounded-full glass-panel text-muted-foreground hover:text-foreground hover:bg-muted/50" />
                 </div>
               </CardContent>
             </Card>
@@ -87,10 +88,10 @@ export default function SettingsPage() {
               onClick={() => router.push("/settings/notifications")}
               className="w-full text-left group"
             >
-              <Card className="border-border bg-card transition-colors group-hover:border-[#009B3A]/30">
+              <Card className="rounded-3xl solid-panel ring-0 transition-colors group-hover:border-[#009B3A]/30">
                 <CardContent className="flex items-center justify-between p-5">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#009B3A]/10">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#009B3A]/10">
                       <Bell className="h-4 w-4 text-[#009B3A]" />
                     </div>
                     <div>
@@ -106,7 +107,7 @@ export default function SettingsPage() {
             </button>
 
             {/* Global Notification Preferences */}
-            <Card className="border-border bg-card">
+            <Card className="rounded-3xl solid-panel ring-0">
               <CardHeader className="pb-4">
                 <CardTitle className="text-base">Notification Preferences</CardTitle>
                 <CardDescription>
@@ -171,10 +172,10 @@ export default function SettingsPage() {
             {/* Help & Contact */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Link href="/help" className="group">
-                <Card className="border-border bg-card h-full transition-colors group-hover:border-[#009B3A]/30">
+                <Card className="rounded-3xl solid-panel ring-0 h-full transition-colors group-hover:border-[#009B3A]/30">
                   <CardContent className="flex items-center justify-between p-5">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#009B3A]/10">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#009B3A]/10">
                         <HelpCircle className="h-4 w-4 text-[#009B3A]" />
                       </div>
                       <div>
@@ -188,10 +189,10 @@ export default function SettingsPage() {
               </Link>
 
               <Link href="mailto:courtwatchjamaica@protonmail.com" className="group">
-                <Card className="border-border bg-card h-full transition-colors group-hover:border-[#009B3A]/30">
+                <Card className="rounded-3xl solid-panel ring-0 h-full transition-colors group-hover:border-[#009B3A]/30">
                   <CardContent className="flex items-center justify-between p-5">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#009B3A]/10">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#009B3A]/10">
                         <Mail className="h-4 w-4 text-[#009B3A]" />
                       </div>
                       <div>

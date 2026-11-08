@@ -116,16 +116,16 @@ function UntrackModal({
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onCancel}
       />
-      <div className="relative z-10 w-full max-w-sm rounded-lg border border-border bg-card p-6 shadow-2xl">
+      <div className="relative z-10 w-full max-w-sm rounded-3xl solid-panel p-6 shadow-2xl">
         <button
           onClick={onCancel}
-          className="absolute right-4 top-4 rounded-lg p-1 text-muted-foreground/50 hover:text-foreground hover:bg-muted transition-colors"
+          className="absolute right-4 top-4 rounded-full p-1 text-muted-foreground/50 hover:text-foreground hover:bg-muted transition-colors"
         >
           <ArrowLeft className="h-4 w-4 rotate-45" />
         </button>
 
         <div className="flex items-center gap-3 mb-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/10">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-red-500/10">
             <AlertTriangle className="h-5 w-5 text-red-500" />
           </div>
           <div>
@@ -141,14 +141,14 @@ function UntrackModal({
         <div className="flex gap-2">
           <button
             onClick={onCancel}
-            className="flex-1 rounded-xl border border-border bg-muted/30 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+            className="flex-1 rounded-full border border-border bg-muted/30 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
             disabled={loading}
-            className="flex-1 rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-60 transition-colors"
+            className="flex-1 rounded-full bg-red-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-60 transition-colors"
           >
             {loading ? "Removing…" : "Untrack"}
           </button>
@@ -167,7 +167,7 @@ function AlertPill({ settings, onClick }: { settings: NotifSettings; onClick: ()
     return (
       <button
         onClick={onClick}
-        className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-bold text-foreground/25 hover:text-foreground/50 hover:border-foreground/20 transition-colors"
+        className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-2 text-xs font-bold text-foreground/25 hover:text-foreground/50 hover:border-foreground/20 transition-colors"
       >
         <BellOff className="h-3.5 w-3.5" />
         Muted
@@ -178,7 +178,7 @@ function AlertPill({ settings, onClick }: { settings: NotifSettings; onClick: ()
     return (
       <button
         onClick={onClick}
-        className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border border-accent/30 bg-accent/[0.14] px-3 py-2 text-xs font-bold text-accent hover:bg-accent/[0.22] transition-colors"
+        className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent/[0.14] px-3 py-2 text-xs font-bold text-accent hover:bg-accent/[0.22] transition-colors"
       >
         <Bell className="h-3.5 w-3.5" />
         Alerts on
@@ -188,7 +188,7 @@ function AlertPill({ settings, onClick }: { settings: NotifSettings; onClick: ()
   return (
     <button
       onClick={onClick}
-      className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-bold text-foreground/45 hover:text-foreground hover:border-accent/35 transition-colors"
+      className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-2 text-xs font-bold text-foreground/45 hover:text-foreground hover:border-accent/35 transition-colors"
     >
       <Bell className="h-3.5 w-3.5" />
       {n}/3 alerts
@@ -203,8 +203,8 @@ function HistoryTimeline({ detail }: { detail: DocketDetail }) {
 
   if (entries.length === 0) {
     return (
-      <div className="rounded-lg border border-border bg-card p-8 text-center">
-        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-lg bg-muted/30">
+      <div className="rounded-3xl solid-panel p-8 text-center">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/30">
           <Calendar className="h-6 w-6 text-muted-foreground/30" />
         </div>
         <p className="text-sm font-medium text-muted-foreground">No history yet</p>
@@ -242,7 +242,7 @@ function HistoryTimeline({ detail }: { detail: DocketDetail }) {
 
             {/* Card */}
             <div
-              className={`flex-1 min-w-0 rounded-lg border bg-card p-4 transition-opacity ${
+              className={`flex-1 min-w-0 rounded-2xl border bg-card p-4 transition-opacity ${
                 isJudgment
                   ? "border-accent/25"
                   : isUpcoming
@@ -340,7 +340,7 @@ function HistoryTimeline({ detail }: { detail: DocketDetail }) {
                       href={entry.pdfUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-accent/30 bg-accent/10 px-2.5 py-1.5 text-[11px] font-semibold text-accent hover:bg-accent/20 transition-colors"
+                      className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent/10 px-2.5 py-1.5 text-[11px] font-semibold text-accent hover:bg-accent/20 transition-colors"
                     >
                       <Download className="h-3 w-3" />
                       Download judgment PDF
@@ -361,8 +361,8 @@ function HistoryTimeline({ detail }: { detail: DocketDetail }) {
 function Skeleton() {
   return (
     <div className="animate-pulse space-y-4">
-      <div className="h-8 w-48 rounded-lg bg-muted" />
-      <div className="rounded-lg border border-border bg-card p-5 space-y-3">
+      <div className="h-8 w-48 rounded-2xl bg-muted" />
+      <div className="rounded-3xl solid-panel p-5 space-y-3">
         <div className="h-4 w-32 rounded bg-muted" />
         <div className="h-5 w-64 rounded bg-muted/70" />
         <div className="grid grid-cols-2 gap-3">
@@ -429,7 +429,8 @@ export default function DocketDetailPage({
 
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-background">
+      <div className="relative min-h-screen bg-background">
+        <div className="glass-backdrop" aria-hidden="true" />
         <Navbar />
 
         {showUntrack && detail && (
@@ -450,7 +451,7 @@ export default function DocketDetailPage({
           />
         )}
 
-        <main className="max-w-2xl mx-auto px-4 sm:px-6 py-8 pb-32 md:pb-16">
+        <main className="relative z-10 max-w-2xl mx-auto px-4 sm:px-6 py-8 pb-32 md:pb-16">
 
           {/* Back link */}
           <div className="mb-5">
@@ -465,8 +466,8 @@ export default function DocketDetailPage({
 
           {/* Not tracking redirect state */}
           {notTracking && (
-            <div className="rounded-lg border border-border bg-card p-8 text-center">
-              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-lg bg-amber-500/10">
+            <div className="rounded-3xl solid-panel p-8 text-center">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10">
                 <AlertTriangle className="h-6 w-6 text-amber-500" />
               </div>
               <p className="text-sm font-medium text-foreground">Not tracking this case</p>
@@ -478,13 +479,13 @@ export default function DocketDetailPage({
               <div className="mt-5 flex flex-col sm:flex-row items-center justify-center gap-2">
                 <Link
                   href="/docket"
-                  className="rounded-xl border border-border bg-muted/30 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+                  className="rounded-full border border-border bg-muted/30 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors"
                 >
                   Back to My Docket
                 </Link>
                 <Link
                   href="/cases"
-                  className="flex items-center gap-1.5 rounded-xl bg-[#009B3A] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#009B3A]/90 transition-colors"
+                  className="flex items-center gap-1.5 rounded-full glass-btn-green px-4 py-2.5 text-sm font-semibold transition-colors"
                 >
                   Browse Cases
                   <ChevronRight className="h-3.5 w-3.5" />
@@ -505,7 +506,7 @@ export default function DocketDetailPage({
                   <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-muted-foreground/60 mb-1">
                     Case File
                   </p>
-                  <h1 className="font-mono text-xl font-bold tracking-tight text-foreground">
+                  <h1 className="font-mono text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
                     {caseNumber}
                   </h1>
                   {caseTitle && (
@@ -517,7 +518,7 @@ export default function DocketDetailPage({
                   <AlertPill settings={notifSettingsOf(detail)} onClick={() => setNotifOpen(true)} />
                   <button
                     onClick={() => setShowUntrack(true)}
-                    className="flex items-center gap-1.5 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-500 hover:bg-red-500/20 transition-colors"
+                    className="flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-500 hover:bg-red-500/20 transition-colors"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                     Untrack
@@ -526,7 +527,7 @@ export default function DocketDetailPage({
               </div>
 
               {/* Quick stats */}
-              <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-lg border border-border bg-card px-4 py-3 text-xs text-muted-foreground">
+              <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-3xl solid-panel px-4 py-3 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1.5">
                   <FileText className="h-3.5 w-3.5" />
                   {detail.sittings.length} hearing{detail.sittings.length !== 1 ? "s" : ""}

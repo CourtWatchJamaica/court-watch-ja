@@ -71,9 +71,9 @@ function Toast({ message, onDismiss }: { message: string; onDismiss: () => void 
   }, [onDismiss]);
 
   return (
-    <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[90] flex items-center gap-2 rounded-md border border-white/15 bg-[#0e0e1a] px-4 py-2.5 shadow-lg">
+    <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[90] flex items-center gap-2 rounded-full border border-foreground/15 bg-card/90 backdrop-blur-xl px-5 py-2.5 shadow-lg">
       <Bell className="h-3.5 w-3.5 text-[#009B3A]" />
-      <span className="text-[12px] font-medium text-white">{message}</span>
+      <span className="text-[12px] font-medium text-foreground">{message}</span>
     </div>
   );
 }
@@ -105,7 +105,7 @@ function CasePanel({
   return (
     <div className="flex-1 space-y-5">
       {/* Case info */}
-      <div className="rounded-xl border border-white/[0.07] bg-[#0e0e1a] p-4">
+      <div className="rounded-3xl border border-foreground/[0.07] bg-card p-4">
         <div className="flex items-center gap-2 mb-2">
           <div className="flex items-center gap-1.5 rounded-full bg-[#009B3A]/10 border border-[#009B3A]/20 px-2.5 py-1">
             <Scale className="h-3 w-3 text-[#009B3A]" />
@@ -119,7 +119,7 @@ function CasePanel({
       </div>
 
       {/* Master toggle */}
-      <div className="rounded-xl border border-white/[0.07] bg-[#0e0e1a] p-4">
+      <div className="rounded-3xl border border-foreground/[0.07] bg-card p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             {settings.enabled ? (
@@ -147,7 +147,7 @@ function CasePanel({
       {/* Alert timings */}
       <div
         className={cn(
-          "rounded-xl border border-white/[0.07] bg-[#0e0e1a] overflow-hidden transition-opacity duration-200",
+          "rounded-3xl border border-foreground/[0.07] bg-card overflow-hidden transition-opacity duration-200",
           !settings.enabled && "opacity-40 pointer-events-none",
         )}
       >
@@ -156,14 +156,14 @@ function CasePanel({
             Alert me
           </p>
         </div>
-        <div className="divide-y divide-white/[0.05]">
+        <div className="divide-y divide-foreground/[0.05]">
           {TIMINGS.map(({ id, label, description }) => {
             const active = settings.timings.includes(id);
             return (
               <button
                 key={id}
                 onClick={() => toggleTiming(id)}
-                className="flex w-full items-center justify-between px-4 py-3.5 hover:bg-white/[0.025] transition-colors text-left"
+                className="flex w-full items-center justify-between px-4 py-3.5 hover:bg-foreground/[0.025] transition-colors text-left"
               >
                 <div className="flex items-center gap-3">
                   <div
@@ -171,7 +171,7 @@ function CasePanel({
                       "flex h-5 w-5 items-center justify-center rounded-md border transition-all duration-200",
                       active
                         ? "border-[#009B3A] bg-[#009B3A]"
-                        : "border-white/[0.15] bg-transparent",
+                        : "border-foreground/[0.15] bg-transparent",
                     )}
                   >
                     {active && (
@@ -193,7 +193,7 @@ function CasePanel({
         <div className="px-4 pb-4 pt-2">
           <p className="text-[10px] text-muted-foreground">
             Method: <span className="text-foreground font-medium">In-app</span>
-            <span className="ml-1 text-white/55">(email &amp; push coming soon)</span>
+            <span className="ml-1 text-foreground/55">(email &amp; push coming soon)</span>
           </p>
         </div>
       </div>
@@ -227,10 +227,10 @@ function ActiveNotifsList({
 
   if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-lg border border-white/[0.05] bg-[#0e0e1a] py-12 text-center px-4">
-        <Bell className="mb-3 h-10 w-10 text-white/10" />
-        <p className="text-sm text-white/70">No alerts scheduled</p>
-        <p className="mt-1 text-[12px] text-white/55">
+      <div className="flex flex-col items-center justify-center rounded-3xl border border-foreground/[0.05] bg-card py-12 text-center px-4">
+        <Bell className="mb-3 h-10 w-10 text-foreground/10" />
+        <p className="text-sm text-foreground/70">No alerts scheduled</p>
+        <p className="mt-1 text-[12px] text-foreground/55">
           Track a case and enable notification timings above.
         </p>
       </div>
@@ -238,13 +238,13 @@ function ActiveNotifsList({
   }
 
   return (
-    <div className="rounded-lg border border-white/[0.06] bg-[#0e0e1a] overflow-hidden divide-y divide-white/[0.05]">
+    <div className="rounded-3xl border border-foreground/[0.06] bg-card overflow-hidden divide-y divide-foreground/[0.05]">
       {items.map(({ key, title, timing }) => (
         <div key={key} className="flex items-center gap-3 px-4 py-3">
           <Bell className="h-3.5 w-3.5 text-[#009B3A] shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-[12px] font-medium text-white/80 truncate">{title}</p>
-            <p className="text-[10px] text-white/65">{timing}</p>
+            <p className="text-[12px] font-medium text-foreground/80 truncate">{title}</p>
+            <p className="text-[10px] text-foreground/65">{timing}</p>
           </div>
           <span className="text-[10px] rounded-full bg-[#009B3A]/10 border border-[#009B3A]/20 px-2 py-0.5 text-[#009B3A] font-medium shrink-0">
             Active
@@ -325,10 +325,11 @@ export default function NotificationSettingsPage() {
 
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-background">
+      <div className="relative min-h-screen bg-background">
+        <div className="glass-backdrop" aria-hidden="true" />
         <Navbar />
 
-        <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-32 md:pb-16">
+        <main className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-32 md:pb-16">
           {/* Header */}
           <div className="mb-7">
             <button
@@ -344,7 +345,7 @@ export default function NotificationSettingsPage() {
                 Alerts
               </span>
             </div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">
+            <h1 className="text-[2.2rem] sm:text-[2.8rem] font-extrabold leading-none tracking-[-0.04em] text-foreground">
               Notification Settings
             </h1>
             <p className="mt-1.5 text-sm text-muted-foreground">
@@ -353,7 +354,7 @@ export default function NotificationSettingsPage() {
           </div>
 
           {/* Global settings strip */}
-          <div className="mb-6 rounded-lg border border-white/[0.07] bg-[#0e0e1a] p-4">
+          <div className="mb-6 rounded-3xl border border-foreground/[0.07] bg-card p-4">
             <div className="flex flex-col sm:flex-row gap-4">
               {/* Do Not Disturb */}
               <div className="flex items-center justify-between flex-1 gap-4">
@@ -373,7 +374,7 @@ export default function NotificationSettingsPage() {
                 />
               </div>
 
-              <div className="h-px sm:h-auto sm:w-px bg-white/[0.07]" />
+              <div className="h-px sm:h-auto sm:w-px bg-foreground/[0.07]" />
 
               {/* Default timing */}
               <div className="flex-1">
@@ -395,7 +396,7 @@ export default function NotificationSettingsPage() {
                         "rounded-full px-2.5 py-1 text-[10px] font-semibold border transition-all duration-150",
                         settings.defaultTimings.includes(id)
                           ? "border-[#009B3A]/50 bg-[#009B3A]/15 text-[#009B3A]"
-                          : "border-white/[0.1] text-white/70 hover:border-white/25 hover:text-white/60",
+                          : "border-foreground/[0.1] text-foreground/70 hover:border-foreground/25 hover:text-foreground/60",
                       )}
                     >
                       {label}
@@ -407,16 +408,16 @@ export default function NotificationSettingsPage() {
           </div>
 
           {/* Tabs: Settings / Active */}
-          <div className="mb-5 flex gap-0.5 rounded-xl bg-white/[0.04] p-1">
+          <div className="mb-5 flex gap-0.5 rounded-full glass-panel p-1">
             {(["settings", "active"] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={cn(
-                  "flex-1 rounded-lg py-2 text-[12px] font-semibold capitalize transition-all duration-150",
+                  "flex-1 rounded-full py-2 text-[12px] font-semibold capitalize transition-all duration-150",
                   activeTab === tab
                     ? "bg-[#009B3A] text-white"
-                    : "text-white/70 hover:text-white/90",
+                    : "text-foreground/70 hover:text-foreground/90",
                 )}
               >
                 {tab === "settings" ? "Case Alerts" : "Active Alerts"}
@@ -435,20 +436,20 @@ export default function NotificationSettingsPage() {
               {[1, 2, 3].map((i) => (
                 <div
                   key={i}
-                  className="h-14 animate-pulse rounded-xl border border-white/[0.06] bg-[#0e0e1a]"
+                  className="h-14 animate-pulse rounded-3xl border border-foreground/[0.06] bg-card"
                 />
               ))}
             </div>
           ) : trackedCases.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-lg border border-white/[0.05] bg-[#0e0e1a] py-16 text-center">
-              <Bell className="mb-3 h-10 w-10 text-white/10" />
-              <p className="text-sm text-white/70">No tracked cases</p>
-              <p className="mt-1 text-[12px] text-white/55">
+            <div className="flex flex-col items-center justify-center rounded-3xl border border-foreground/[0.05] bg-card py-16 text-center">
+              <Bell className="mb-3 h-10 w-10 text-foreground/10" />
+              <p className="text-sm text-foreground/70">No tracked cases</p>
+              <p className="mt-1 text-[12px] text-foreground/55">
                 Track a case to set up custom alert schedules.
               </p>
               <button
                 onClick={() => router.push("/cases")}
-                className="mt-4 rounded-xl border border-[#009B3A]/25 bg-[#009B3A]/10 px-4 py-2.5 text-xs font-semibold text-[#009B3A] hover:bg-[#009B3A]/15 transition-colors"
+                className="mt-4 rounded-full border border-[#009B3A]/25 bg-[#009B3A]/10 px-4 py-2.5 text-xs font-semibold text-[#009B3A] hover:bg-[#009B3A]/15 transition-colors"
               >
                 Browse Cases
               </button>
@@ -457,13 +458,13 @@ export default function NotificationSettingsPage() {
             /* ── Two-panel layout ── */
             <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
               {/* Left: Case list */}
-              <div className="rounded-lg border border-white/[0.07] bg-[#0e0e1a] overflow-hidden h-fit">
-                <div className="px-4 py-3 border-b border-white/[0.06]">
+              <div className="rounded-3xl border border-foreground/[0.07] bg-card overflow-hidden h-fit">
+                <div className="px-4 py-3 border-b border-foreground/[0.06]">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Tracked Cases
                   </p>
                 </div>
-                <div className="divide-y divide-white/[0.05]">
+                <div className="divide-y divide-foreground/[0.05]">
                   {trackedCases.filter((uc) => uc.case_id != null).map((uc) => {
                     const caseId = uc.case_id!;
                     const j = judgments.find((x) => x.id === caseId);
@@ -480,33 +481,33 @@ export default function NotificationSettingsPage() {
                           "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors",
                           selected
                             ? "bg-[#009B3A]/[0.07]"
-                            : "hover:bg-white/[0.025]",
+                            : "hover:bg-foreground/[0.025]",
                         )}
                       >
                         <div
                           className={cn(
-                            "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors",
+                            "flex h-7 w-7 shrink-0 items-center justify-center rounded-xl transition-colors",
                             cs.enabled
                               ? "bg-[#009B3A]/15"
-                              : "bg-white/[0.05]",
+                              : "bg-foreground/[0.05]",
                           )}
                         >
                           <Bell
                             className={cn(
                               "h-3.5 w-3.5",
-                              cs.enabled ? "text-[#009B3A]" : "text-white/60",
+                              cs.enabled ? "text-[#009B3A]" : "text-foreground/60",
                             )}
                           />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-[12px] font-medium text-white/80 truncate">
+                          <p className="text-[12px] font-medium text-foreground/80 truncate">
                             {j?.title || `Case #${uc.case_id}`}
                           </p>
                           {j?.court && (
-                            <p className="text-[10px] text-white/65 truncate">{j.court}</p>
+                            <p className="text-[10px] text-foreground/65 truncate">{j.court}</p>
                           )}
                         </div>
-                        <ChevronRight className="h-3.5 w-3.5 text-white/50 shrink-0" />
+                        <ChevronRight className="h-3.5 w-3.5 text-foreground/50 shrink-0" />
                       </button>
                     );
                   })}
@@ -523,7 +524,7 @@ export default function NotificationSettingsPage() {
                     onUpdate={(cs) => updateCaseSettings(selectedCaseId, cs)}
                   />
                 ) : (
-                  <div className="flex items-center justify-center h-48 rounded-lg border border-white/[0.06] text-white/60 text-sm">
+                  <div className="flex items-center justify-center h-48 rounded-3xl border border-foreground/[0.06] text-foreground/60 text-sm">
                     Select a case to manage alerts
                   </div>
                 )}
@@ -540,15 +541,15 @@ export default function NotificationSettingsPage() {
               onClick={() => setMobileSheetOpen(false)}
             />
             <div
-              className="lg:hidden fixed bottom-0 inset-x-0 z-[75] rounded-t-2xl bg-[#0e0e1a] border-t border-white/[0.1] flex flex-col max-h-[85vh]"
+              className="lg:hidden fixed bottom-0 inset-x-0 z-[75] rounded-t-[28px] bg-card border-t border-foreground/[0.1] flex flex-col max-h-[85vh]"
               style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
             >
-              <div className="mx-auto mt-2.5 mb-1 h-1 w-10 rounded-full bg-white/[0.12]" />
-              <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.07]">
-                <p className="text-sm font-semibold text-white">Case Alerts</p>
+              <div className="mx-auto mt-2.5 mb-1 h-1 w-10 rounded-full bg-foreground/[0.12]" />
+              <div className="flex items-center justify-between px-5 py-3 border-b border-foreground/[0.07]">
+                <p className="text-sm font-semibold text-foreground">Case Alerts</p>
                 <button
                   onClick={() => setMobileSheetOpen(false)}
-                  className="rounded-lg p-1.5 text-white/70 hover:text-white hover:bg-white/[0.07]"
+                  className="rounded-full p-1.5 text-foreground/70 hover:text-foreground hover:bg-foreground/[0.07]"
                 >
                   <X className="h-4 w-4" />
                 </button>

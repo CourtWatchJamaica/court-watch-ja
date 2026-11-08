@@ -45,7 +45,7 @@ function SkeletonHeader() {
     <div className="animate-pulse mb-10">
       <div className="h-3 w-24 rounded bg-muted mb-6" />
       <div className="flex items-start gap-5">
-        <div className="h-16 w-16 rounded-lg bg-muted shrink-0" />
+        <div className="h-16 w-16 rounded-3xl bg-muted shrink-0" />
         <div className="flex-1 space-y-3 pt-1">
           <div className="h-6 w-2/3 rounded bg-muted" />
           <div className="h-3.5 w-1/3 rounded bg-muted" />
@@ -53,7 +53,7 @@ function SkeletonHeader() {
       </div>
       <div className="mt-6 flex gap-3">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="h-14 flex-1 rounded-xl bg-muted" />
+          <div key={i} className="h-14 flex-1 rounded-3xl bg-muted" />
         ))}
       </div>
       <div className="mt-8 h-px bg-muted" />
@@ -64,7 +64,7 @@ function SkeletonHeader() {
 
 function SkeletonCard() {
   return (
-    <div className="animate-pulse rounded-xl border border-border bg-card p-4 space-y-3">
+    <div className="animate-pulse rounded-3xl solid-panel p-4 space-y-3">
       <div className="flex justify-between gap-3">
         <div className="h-3.5 w-2/3 rounded bg-muted" />
         <div className="h-5 w-20 rounded-md bg-muted shrink-0" />
@@ -89,7 +89,7 @@ function StatItem({
   value: string | number;
 }) {
   return (
-    <div className="flex flex-1 items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
+    <div className="flex items-center gap-3 rounded-3xl glass-panel px-4 py-4">
       <Icon className="h-4 w-4 shrink-0 text-[#009B3A]/70" />
       <div className="min-w-0">
         <p className="text-[11px] text-muted-foreground leading-none mb-1">{label}</p>
@@ -123,7 +123,7 @@ function YearActivityChart({ judgments }: { judgments: Judgment[] }) {
   const max = Math.max(1, ...years.map((y) => y.count));
 
   return (
-    <div className="mt-4 rounded-xl border border-border bg-card px-4 py-3">
+    <div className="mt-4 rounded-3xl glass-panel px-5 py-4">
       <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
         Judgments per year
       </p>
@@ -171,7 +171,7 @@ function DivisionChips({ sittings }: { sittings: CourtSitting[] }) {
       {divisions.map(([division, count]) => (
         <span
           key={division}
-          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-[11px] text-foreground/80"
+          className="inline-flex items-center gap-1.5 rounded-full glass-panel px-2.5 py-1 text-[11px] text-foreground/80"
         >
           <Gavel className="h-3 w-3 text-[#009B3A]/70" />
           {division}
@@ -198,7 +198,7 @@ function CoJudgeChips({ coJudges }: { coJudges: CoJudge[] }) {
           <button
             key={cj.id}
             onClick={() => router.push(`/judges/${cj.id}`)}
-            className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-[12px] font-medium text-foreground/85 hover:border-[#009B3A]/40 hover:text-foreground transition-colors"
+            className="inline-flex items-center gap-2 rounded-full glass-panel px-3 py-1.5 text-[12px] font-medium text-foreground/85 hover:border-[#009B3A]/40 hover:text-foreground transition-colors"
           >
             <Scale className="h-3 w-3 text-[#009B3A]/70" />
             {cj.name}
@@ -230,7 +230,7 @@ function SittingRow({
   return (
     <button
       onClick={() => router.push(`/cases/sittings/${sitting.id}`)}
-      className="flex w-full items-start gap-3 rounded-xl border border-border bg-card px-4 py-3 text-left hover:border-[#009B3A]/30 transition-colors"
+      className="flex w-full items-start gap-3 rounded-2xl solid-panel px-4 py-3 text-left hover:border-[#009B3A]/30 transition-colors"
     >
       <div className="shrink-0 pt-0.5">
         <Clock className={`h-3.5 w-3.5 ${iconColor}`} />
@@ -339,10 +339,11 @@ export default function JudgeDetailPage() {
 
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-background">
+      <div className="relative min-h-screen bg-background">
+        <div className="glass-backdrop" aria-hidden="true" />
         <Navbar />
 
-        <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-28 md:pb-12">
+        <main className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-28 md:pb-12">
           {loading ? (
             <>
               <SkeletonHeader />
@@ -373,7 +374,7 @@ export default function JudgeDetailPage() {
               {/* Back */}
               <button
                 onClick={() => router.back()}
-                className="mb-6 flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                className="mb-6 inline-flex items-center gap-1.5 rounded-full glass-panel px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
                 Back
@@ -381,17 +382,18 @@ export default function JudgeDetailPage() {
 
               {/* Judge header */}
               <div className="mb-6">
-                <div className="flex items-start gap-5 mb-5">
-                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-[#009B3A]/15 ring-1 ring-[#009B3A]/30">
-                    <Scale className="h-8 w-8 text-[#009B3A]" />
+                <div className="relative mb-4 flex items-center gap-5 overflow-hidden rounded-[28px] sm:rounded-[36px] glass-panel px-5 py-6 sm:px-8 sm:py-9">
+                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_120%_at_100%_0%,rgba(0,196,74,0.18),transparent_70%),radial-gradient(40%_80%_at_0%_100%,rgba(240,192,64,0.1),transparent_70%)]" aria-hidden="true" />
+                  <div className="relative flex h-16 w-16 sm:h-20 sm:w-20 shrink-0 items-center justify-center rounded-3xl bg-gradient-to-br from-[#00c44a]/25 to-[#009B3A]/5 ring-1 ring-[#009B3A]/30">
+                    <Scale className="h-8 w-8 sm:h-10 sm:w-10 text-[#009B3A]" />
                   </div>
-                  <div>
+                  <div className="relative min-w-0">
                     <div className="mb-1 flex items-center gap-2">
                       <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#009B3A]">
                         Judge Profile
                       </span>
                     </div>
-                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+                    <h1 className="text-[1.9rem] sm:text-[2.8rem] font-extrabold leading-none tracking-[-0.04em]">
                       {judge.name}
                     </h1>
                     {judge.court && (
@@ -404,7 +406,7 @@ export default function JudgeDetailPage() {
                 </div>
 
                 {/* ── Stat bar ── */}
-                <div className="flex gap-3 flex-wrap sm:flex-nowrap">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <StatItem
                     icon={Hash}
                     label="Judgments"
@@ -505,20 +507,20 @@ export default function JudgeDetailPage() {
               {judgments.length > 0 && (
                 <div className="mb-5 flex flex-col sm:flex-row gap-2">
                   <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                    <Search className="absolute left-3.5 top-1/2 z-10 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
                     <input
                       type="text"
                       value={judgmentSearch}
                       onChange={(e) => setJudgmentSearch(e.target.value)}
                       placeholder="Search this judge's cases by number or title…"
-                      className="w-full rounded-lg border border-border bg-card pl-9 pr-3 py-2 text-[13px] text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-[#009B3A]/50 focus:ring-1 focus:ring-[#009B3A]/25 transition-colors"
+                      className="w-full rounded-full glass-panel pl-10 pr-4 py-2.5 text-[13px] text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-[#009B3A]/50 focus:ring-1 focus:ring-[#009B3A]/25 transition-colors"
                     />
                   </div>
                   {judgmentYears.length > 1 && (
                     <select
                       value={yearFilter}
                       onChange={(e) => setYearFilter(e.target.value)}
-                      className="rounded-lg border border-border bg-card px-3 py-2 text-[13px] text-foreground focus:outline-none focus:border-[#009B3A]/50"
+                      className="rounded-full glass-panel px-4 py-2.5 text-[13px] text-foreground focus:outline-none focus:border-[#009B3A]/50"
                     >
                       <option value="all">All years</option>
                       {judgmentYears.map((y) => (
@@ -542,7 +544,7 @@ export default function JudgeDetailPage() {
                   ))}
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center rounded-lg border border-border bg-card/50 py-16 text-center">
+                <div className="flex flex-col items-center justify-center rounded-3xl solid-panel py-16 text-center">
                   <FileText className="mb-3 h-10 w-10 text-muted-foreground/25" />
                   <p className="text-sm text-muted-foreground">
                     {judgments.length === 0

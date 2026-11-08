@@ -39,7 +39,7 @@ function formatDate(date: string): string {
 
 function DetailSkeleton() {
   return (
-    <div className="rounded-lg border border-border bg-card overflow-hidden animate-pulse">
+    <div className="rounded-[28px] solid-panel overflow-hidden animate-pulse">
       <div className="p-6 border-b border-white/[0.06] space-y-4">
         <div className="flex gap-2">
           <div className="h-6 w-28 rounded-full bg-white/[0.06]" />
@@ -78,12 +78,13 @@ export default function SittingDetailPage() {
 
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-background">
+      <div className="relative min-h-screen bg-background">
+        <div className="glass-backdrop" aria-hidden="true" />
         <Navbar />
-        <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8 pb-32 md:pb-12">
+        <main className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6 py-8 pb-32 md:pb-12">
           <Link
             href="/cases?tab=sittings"
-            className="mb-7 inline-flex items-center gap-1.5 text-[12px] font-medium text-amber-600 hover:text-amber-700 dark:text-[#FED100]/70 dark:hover:text-[#FED100] transition-colors"
+            className="mb-7 inline-flex items-center gap-1.5 rounded-full glass-panel px-4 py-2 text-[12px] font-medium text-amber-600 hover:text-amber-700 dark:text-[#FED100]/70 dark:hover:text-[#FED100] transition-colors"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
             Back to Court Lists
@@ -92,11 +93,11 @@ export default function SittingDetailPage() {
           {loading ? (
             <DetailSkeleton />
           ) : !sitting ? (
-            <div className="flex flex-col items-center justify-center rounded-lg border border-border bg-card py-16 text-center">
+            <div className="flex flex-col items-center justify-center rounded-[28px] solid-panel py-16 text-center">
               <p className="text-sm text-muted-foreground">Sitting not found.</p>
             </div>
           ) : (
-            <div className="rounded-lg border-l-[3px] border-l-[#FED100] border-t border-r border-b border-border bg-card overflow-hidden">
+            <div className="relative rounded-[28px] sm:rounded-[36px] solid-panel overflow-hidden [background:radial-gradient(70%_60%_at_100%_0%,rgba(254,209,0,0.12),transparent_70%),radial-gradient(40%_40%_at_0%_100%,rgba(0,196,74,0.07),transparent_70%),var(--card)]">
               {/* Header */}
               <div className="p-6 border-b border-border">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
@@ -114,7 +115,7 @@ export default function SittingDetailPage() {
                         </Badge>
                       )}
                     </div>
-                    <h1 className="text-xl sm:text-2xl font-bold text-foreground leading-snug">
+                    <h1 className="text-[1.6rem] sm:text-[2.2rem] font-extrabold tracking-[-0.03em] text-foreground leading-[1.1]">
                       {sitting.title || sitting.case_number || "Untitled Sitting"}
                     </h1>
                     {sitting.case_number && sitting.title && (
@@ -130,14 +131,14 @@ export default function SittingDetailPage() {
 
                   {/* Track button */}
                   {tracked ? (
-                    <span className="flex shrink-0 items-center gap-1.5 rounded-xl border border-[#FED100]/30 bg-[#FED100]/10 px-4 py-2.5 text-[12px] font-semibold text-[#FED100]">
+                    <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-[#FED100]/30 bg-[#FED100]/10 px-4 py-2.5 text-[12px] font-semibold text-[#FED100]">
                       <VerdictCheckIcon className="h-3.5 w-3.5" />
                       Tracked
                     </span>
                   ) : (
                     <button
                       onClick={() => track(sitting.id, "sitting")}
-                      className="flex shrink-0 items-center gap-1.5 rounded-xl border border-border bg-card px-4 py-2.5 text-[12px] font-semibold text-muted-foreground hover:border-[#FED100]/40 hover:text-[#FED100] hover:bg-[#FED100]/[0.08] transition-colors"
+                      className="flex shrink-0 items-center gap-1.5 rounded-full glass-panel px-4 py-2.5 text-[12px] font-semibold text-muted-foreground hover:border-[#FED100]/40 hover:text-[#FED100] hover:bg-[#FED100]/[0.08] transition-colors"
                     >
                       <VerdictIcon className="h-3.5 w-3.5" />
                       Track sitting
@@ -209,11 +210,11 @@ export default function SittingDetailPage() {
               <div className="px-6 pb-6">
                 <a
                   href={`${process.env.NEXT_PUBLIC_API_URL}/pdf/sitting/${sitting.id}`}
-                  className="group inline-flex items-center gap-2.5 rounded-xl border border-[#FED100]/25 bg-[#FED100]/10 px-4 py-2.5 text-[12px] font-semibold text-[#FED100] hover:bg-[#FED100]/15 transition-colors"
+                  className="group inline-flex items-center gap-2.5 rounded-full border border-[#FED100]/25 bg-[#FED100]/10 px-4 py-2.5 text-[12px] font-semibold text-amber-600 dark:text-[#FED100] hover:bg-[#FED100]/15 transition-colors"
                 >
                   <Download className="h-3.5 w-3.5" />
                   Download Summary (PDF)
-                  <span className="font-mono text-[9px] font-normal text-[#FED100]/50 group-hover:text-[#FED100]/70 transition-colors">
+                  <span className="font-mono text-[9px] font-normal text-amber-600/60 dark:text-[#FED100]/50 group-hover:text-amber-700 dark:group-hover:text-[#FED100]/70 transition-colors">
                     CourtWatch JA
                   </span>
                 </a>

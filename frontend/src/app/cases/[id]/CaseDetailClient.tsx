@@ -29,7 +29,7 @@ import {
 
 function DetailSkeleton() {
   return (
-    <div className="rounded-lg border border-white/[0.07] bg-[#0e0e1a] overflow-hidden animate-pulse">
+    <div className="rounded-[28px] border border-white/[0.07] bg-[#0e0e1a] overflow-hidden animate-pulse">
       <div className="p-6 border-b border-white/[0.06] space-y-4">
         <div className="flex gap-2">
           <div className="h-6 w-28 rounded-full bg-white/[0.06]" />
@@ -47,7 +47,7 @@ function DetailSkeleton() {
         ))}
       </div>
       <div className="px-6 pb-6">
-        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 space-y-2">
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4 space-y-2">
           <div className="h-3 w-16 rounded bg-white/[0.04]" />
           <div className="h-3 w-full rounded bg-white/[0.06]" />
           <div className="h-3 w-4/5 rounded bg-white/[0.05]" />
@@ -109,7 +109,7 @@ function PdfPickerModal({
 
       {/* Sheet / Modal */}
       <div
-        className="relative z-10 w-full sm:max-w-sm rounded-t-lg sm:rounded-lg border border-white/10 bg-[#0e0e1a] shadow-2xl"
+        className="relative z-10 w-full sm:max-w-sm rounded-t-[28px] sm:rounded-[28px] border border-white/10 bg-[#0e0e1a]/90 backdrop-blur-xl shadow-2xl"
         style={{ paddingBottom: "calc(1.25rem + env(safe-area-inset-bottom, 0px))" }}
       >
         {/* Drag handle — mobile only */}
@@ -127,7 +127,7 @@ function PdfPickerModal({
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-white/70 hover:text-white hover:bg-white/[0.07] transition-colors"
+            className="rounded-full p-1.5 text-white/70 hover:text-white hover:bg-white/[0.07] transition-colors"
             aria-label="Close"
           >
             <X className="h-4 w-4" />
@@ -140,7 +140,7 @@ function PdfPickerModal({
           <a
             href={`${process.env.NEXT_PUBLIC_API_URL}/pdf/judgment/${judgment.id}`}
             onClick={onClose}
-            className="group flex items-center gap-4 rounded-xl border border-[#009B3A]/25 bg-[#009B3A]/10 px-4 py-3.5 hover:bg-[#009B3A]/15 transition-colors"
+            className="group flex items-center gap-4 rounded-2xl border border-[#009B3A]/25 bg-[#009B3A]/10 px-4 py-3.5 hover:bg-[#009B3A]/15 transition-colors"
           >
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#009B3A]/20">
               <FileText className="h-5 w-5 text-[#009B3A]" />
@@ -156,7 +156,7 @@ function PdfPickerModal({
           <button
             onClick={handleOriginalDownload}
             disabled={originalLoading}
-            className="group w-full flex items-center gap-4 rounded-xl border border-white/[0.1] bg-white/[0.04] px-4 py-3.5 hover:bg-white/[0.07] disabled:opacity-60 disabled:cursor-wait transition-colors"
+            className="group w-full flex items-center gap-4 rounded-2xl border border-white/[0.1] bg-white/[0.04] px-4 py-3.5 hover:bg-white/[0.07] disabled:opacity-60 disabled:cursor-wait transition-colors"
           >
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.07]">
               {originalLoading ? (
@@ -175,7 +175,7 @@ function PdfPickerModal({
 
           {/* Inline error message */}
           {originalError && (
-            <p className="rounded-xl border border-amber-500/20 bg-amber-500/[0.07] px-3 py-2.5 text-[11px] leading-snug text-amber-400/90">
+            <p className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.07] px-3 py-2.5 text-[11px] leading-snug text-amber-400/90">
               {originalError}
             </p>
           )}
@@ -212,12 +212,13 @@ export default function CaseDetailPage() {
 
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-background">
+      <div className="relative min-h-screen bg-background">
+        <div className="glass-backdrop" aria-hidden="true" />
         <Navbar />
-        <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8 pb-32 md:pb-12">
+        <main className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6 py-8 pb-32 md:pb-12">
           <button
             onClick={() => router.back()}
-            className="mb-7 flex items-center gap-1.5 text-[12px] font-medium text-white/70 hover:text-white/90 transition-colors"
+            className="mb-7 inline-flex items-center gap-1.5 rounded-full glass-panel px-4 py-2 text-[12px] font-medium text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
             Back
@@ -227,7 +228,7 @@ export default function CaseDetailPage() {
             <DetailSkeleton />
           ) : fetchError ? (
             /* Network / server error — offer retry */
-            <div className="flex flex-col items-center justify-center rounded-lg border border-white/[0.07] bg-[#0e0e1a] py-16 text-center px-6 gap-5">
+            <div className="flex flex-col items-center justify-center rounded-[28px] border border-white/[0.07] bg-[#0e0e1a] py-16 text-center px-6 gap-5">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-red-500/10 ring-1 ring-red-500/20">
                 <AlertTriangle className="h-6 w-6 text-red-400" />
               </div>
@@ -241,18 +242,18 @@ export default function CaseDetailPage() {
               </div>
               <button
                 onClick={load}
-                className="flex items-center gap-2 rounded-xl border border-white/[0.12] bg-white/[0.05] px-4 py-2.5 text-sm font-medium text-white/60 hover:text-white hover:bg-white/[0.08] transition-colors"
+                className="flex items-center gap-2 rounded-full border border-white/[0.12] bg-white/[0.05] px-4 py-2.5 text-sm font-medium text-white/60 hover:text-white hover:bg-white/[0.08] transition-colors"
               >
                 <RefreshCw className="h-4 w-4" />
                 Try again
               </button>
             </div>
           ) : !judgment ? (
-            <div className="flex flex-col items-center justify-center rounded-lg border border-white/[0.07] bg-[#0e0e1a] py-16 text-center">
+            <div className="flex flex-col items-center justify-center rounded-[28px] border border-white/[0.07] bg-[#0e0e1a] py-16 text-center">
               <p className="text-sm text-white/70">Case not found.</p>
             </div>
           ) : (
-            <div className="rounded-lg border-l-[3px] border-l-[#009B3A] border-t border-r border-b border-white/[0.08] bg-[#0e0e1a] overflow-hidden">
+            <div className="rounded-[28px] sm:rounded-[36px] border border-white/[0.08] [background:radial-gradient(70%_60%_at_100%_0%,rgba(0,196,74,0.16),transparent_70%),radial-gradient(40%_40%_at_0%_100%,rgba(240,192,64,0.07),transparent_70%),#0e0e1a] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_20px_60px_rgba(0,0,0,0.25)] overflow-hidden">
               {/* Header */}
               <div className="p-6 border-b border-white/[0.06]">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
@@ -268,7 +269,7 @@ export default function CaseDetailPage() {
                         Judgment
                       </Badge>
                     </div>
-                    <h1 className="text-xl sm:text-2xl font-bold text-white leading-snug">
+                    <h1 className="text-[1.6rem] sm:text-[2.2rem] font-extrabold tracking-[-0.03em] text-white leading-[1.1]">
                       {judgment.title || judgment.case_number}
                     </h1>
                     {judgment.case_number && judgment.title && (
@@ -280,14 +281,14 @@ export default function CaseDetailPage() {
 
                   {/* Track button */}
                   {tracked ? (
-                    <span className="flex shrink-0 items-center gap-1.5 rounded-xl border border-[#009B3A]/30 bg-[#009B3A]/10 px-4 py-2.5 text-[12px] font-semibold text-[#009B3A]">
+                    <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-[#009B3A]/30 bg-[#009B3A]/10 px-4 py-2.5 text-[12px] font-semibold text-[#009B3A]">
                       <BookmarkCheck className="h-3.5 w-3.5" />
                       Tracked
                     </span>
                   ) : (
                     <button
                       onClick={() => track(judgment.id, "judgment")}
-                      className="flex shrink-0 items-center gap-1.5 rounded-xl border border-white/[0.12] bg-white/[0.04] px-4 py-2.5 text-[12px] font-semibold text-white/50 hover:border-[#009B3A]/40 hover:text-[#009B3A] hover:bg-[#009B3A]/[0.08] transition-colors"
+                      className="flex shrink-0 items-center gap-1.5 rounded-full border border-white/[0.12] bg-white/[0.04] px-4 py-2.5 text-[12px] font-semibold text-white/50 hover:border-[#009B3A]/40 hover:text-[#009B3A] hover:bg-[#009B3A]/[0.08] transition-colors"
                     >
                       <Bookmark className="h-3.5 w-3.5" />
                       Track case
@@ -341,7 +342,7 @@ export default function CaseDetailPage() {
               {/* Summary */}
               {judgment.summary_text && (
                 <div className="px-6 pb-6">
-                  <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+                  <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4">
                     <div className="flex items-center gap-2 mb-3">
                       <FileText className="h-3.5 w-3.5 text-[#009B3A]" />
                       <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/55">
@@ -359,7 +360,7 @@ export default function CaseDetailPage() {
               <div className="px-6 pb-6">
                 <button
                   onClick={() => setPdfPickerOpen(true)}
-                  className="group inline-flex items-center gap-2.5 rounded-xl border border-[#009B3A]/25 bg-[#009B3A]/10 px-4 py-2.5 text-[12px] font-semibold text-[#009B3A] hover:bg-[#009B3A]/15 transition-colors min-h-[44px]"
+                  className="group inline-flex items-center gap-2.5 rounded-full glass-btn-green px-5 py-2.5 text-[12px] font-semibold min-h-[44px]"
                 >
                   <Download className="h-3.5 w-3.5" />
                   Download PDF

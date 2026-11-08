@@ -749,7 +749,6 @@ export default function CasesPage() {
           {/* Header */}
           <div className="mb-6">
             <div className="mb-5 flex items-center gap-3">
-              <div className="h-px w-8 bg-primary/45" />
               <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-primary/65">
                 Case Registry
               </span>

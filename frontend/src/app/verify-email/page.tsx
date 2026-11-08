@@ -40,7 +40,8 @@ function VerifyEmailContent() {
   }, [searchParams, router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#080810] px-4">
+    <div className="min-h-screen flex items-center justify-center bg-[#080810] relative overflow-hidden px-4">
+      <div className="dark" aria-hidden="true"><div className="glass-backdrop" /></div>
       <div
         className="fixed top-0 left-0 right-0 h-[3px] z-50"
         style={{
@@ -49,7 +50,7 @@ function VerifyEmailContent() {
         }}
       />
 
-      <div className="w-full max-w-sm text-center">
+      <div className="relative z-10 w-full max-w-sm text-center">
         <div className="mb-6 flex justify-center">
           <div className="flex items-center justify-center">
             {status === "loading" && (
@@ -66,14 +67,14 @@ function VerifyEmailContent() {
 
         {status === "loading" && (
           <>
-            <h1 className="font-heading text-xl font-semibold text-white mb-2">Verifying your email…</h1>
+            <h1 className="text-xl font-extrabold tracking-[-0.03em] text-white mb-2">Verifying your email…</h1>
             <p className="text-sm text-white/70">Please wait a moment.</p>
           </>
         )}
 
         {status === "success" && (
           <>
-            <h1 className="font-heading text-xl font-semibold text-white mb-2">
+            <h1 className="text-xl font-extrabold tracking-[-0.03em] text-white mb-2">
               Email verified!{" "}
               <span className="text-[#009B3A]">Welcome to CourtWatch JA.</span>
             </h1>
@@ -83,14 +84,14 @@ function VerifyEmailContent() {
 
         {status === "error" && (
           <>
-            <h1 className="font-heading text-xl font-semibold text-white mb-2">Verification failed</h1>
+            <h1 className="text-xl font-extrabold tracking-[-0.03em] text-white mb-2">Verification failed</h1>
             <p className="text-sm text-white/50 mb-6">{errorMessage}</p>
             <p className="text-sm text-white/70 mb-4">
               The link may have expired. Request a new one by signing up again with the same email.
             </p>
             <Link
               href="/auth/signup"
-              className="inline-block rounded-md bg-[#009B3A] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#009B3A]/85 transition-colors"
+              className="inline-block rounded-full glass-btn-green px-5 py-3 text-sm font-semibold"
             >
               Resend verification email
             </Link>

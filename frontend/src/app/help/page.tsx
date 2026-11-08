@@ -99,13 +99,14 @@ const SECTIONS = [
 
 export default function HelpPage() {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="relative min-h-screen bg-background">
+        <div className="glass-backdrop" aria-hidden="true" />
       <Navbar />
-      <main className="max-w-2xl mx-auto px-4 sm:px-6 py-8 pb-32 md:pb-16">
+      <main className="relative z-10 max-w-2xl mx-auto px-4 sm:px-6 py-8 pb-32 md:pb-16">
 
         {/* Header */}
         <div className="mb-8">
-          <h1 className="font-heading text-3xl font-semibold tracking-tight">Help Centre</h1>
+          <h1 className="text-[2.2rem] sm:text-[2.8rem] font-extrabold leading-none tracking-[-0.04em]">Help Centre</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             Answers to the most common questions about CourtWatch JA.
           </p>
@@ -122,7 +123,7 @@ export default function HelpPage() {
                   <h2 className="text-sm font-semibold text-foreground">{section.title}</h2>
                 </div>
 
-                <div className="rounded-lg border border-border bg-card overflow-hidden">
+                <div className="rounded-3xl solid-panel overflow-hidden">
                   <Accordion type="multiple" className="divide-y divide-border">
                     {section.items.map((item, i) => (
                       <AccordionItem
@@ -146,14 +147,14 @@ export default function HelpPage() {
         </div>
 
         {/* Contact CTA */}
-        <div className="mt-8 rounded-lg border border-border bg-card p-6 text-center">
+        <div className="mt-8 rounded-3xl solid-panel p-6 text-center">
           <h3 className="text-sm font-semibold text-foreground">Still need help?</h3>
           <p className="mt-1 text-sm text-muted-foreground">
             Our team is happy to assist with any questions.
           </p>
           <Link
             href="mailto:courtwatchjamaica@protonmail.com"
-            className="mt-4 inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+            className="mt-4 inline-flex items-center gap-2 rounded-full glass-btn-green px-5 py-2.5 text-sm font-semibold"
           >
             <Mail className="h-4 w-4" />
             Contact us

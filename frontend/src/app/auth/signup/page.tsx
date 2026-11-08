@@ -40,7 +40,7 @@ export default function SignupPage() {
   };
 
   const inputCls =
-    "w-full rounded-md border border-amber-200/15 bg-black/40 px-3.5 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-amber-400/70 focus:ring-1 focus:ring-amber-400/20 transition-colors";
+    "w-full rounded-full border border-amber-200/15 bg-white/[0.05] backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] px-4 py-3 text-sm text-white placeholder-white/30 focus:outline-none focus:border-amber-400/70 focus:ring-1 focus:ring-amber-400/20 transition-colors";
 
   if (success) {
     return (
@@ -60,7 +60,7 @@ export default function SignupPage() {
           <div className="mb-6 flex justify-center">
             <CheckCircle className="h-8 w-8 text-amber-400" />
           </div>
-          <h1 className="font-heading text-xl font-semibold text-white mb-2">Check your inbox</h1>
+          <h1 className="text-[1.5rem] font-extrabold tracking-[-0.03em] text-white mb-2">Check your inbox</h1>
           <p className="text-sm text-white/50 mb-6">
             We sent a verification link to{" "}
             <span className="text-white/80">{email}</span>.
@@ -92,16 +92,16 @@ export default function SignupPage() {
 
       <div className="relative z-10 w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-3">
-          <Scale className="h-7 w-7 text-amber-400" />
+          <span className="flex h-14 w-14 items-center justify-center rounded-full border border-amber-200/25 bg-white/[0.06] backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_10px_30px_rgba(0,0,0,0.4)]"><Scale className="h-7 w-7 text-amber-400" /></span>
           <div className="text-center">
-            <h1 className="font-heading text-2xl font-semibold tracking-tight text-white">
+            <h1 className="text-[1.9rem] font-extrabold tracking-[-0.04em] leading-none text-white">
               CourtWatch JA
             </h1>
             <p className="mt-1 text-sm text-white/60">Create your account</p>
           </div>
         </div>
 
-        <div className="rounded-lg border border-amber-200/20 bg-black/50 backdrop-blur-md p-6 shadow-[0_30px_80px_rgba(0,0,0,0.55)]">
+        <div className="rounded-[28px] border border-amber-200/20 bg-black/40 backdrop-blur-2xl backdrop-saturate-150 p-6 sm:p-7 shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_30px_80px_rgba(0,0,0,0.55)]">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-medium text-white/70 mb-1.5">
@@ -163,7 +163,7 @@ export default function SignupPage() {
             </div>
 
             {error && (
-              <div className="rounded-md bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-400">
+              <div className="rounded-2xl bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-400">
                 {error}
               </div>
             )}
@@ -171,7 +171,7 @@ export default function SignupPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 rounded-md bg-gradient-to-b from-amber-300 to-amber-600 py-2.5 text-sm font-semibold uppercase tracking-wide text-black/80 hover:brightness-105 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="w-full flex items-center justify-center gap-2 rounded-full glass-btn-green py-3 text-sm font-semibold uppercase tracking-wide disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               {loading ? "Creating account…" : "Create Account"}
             </button>
@@ -180,15 +180,10 @@ export default function SignupPage() {
           {/* Google OAuth — only rendered when credentials are configured */}
           {googleEnabled && (
             <>
-              <div className="relative my-5">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-white/[0.08]" />
-                </div>
-                <div className="relative flex justify-center">
-                  <span className="bg-black/50 px-3 text-[11px] text-white/55">
-                    or continue with
-                  </span>
-                </div>
+              <div className="my-5 flex items-center gap-3">
+                <div className="h-px flex-1 bg-white/[0.1]" />
+                <span className="text-[11px] text-white/55">or continue with</span>
+                <div className="h-px flex-1 bg-white/[0.1]" />
               </div>
 
               <button
@@ -196,7 +191,7 @@ export default function SignupPage() {
                 onClick={() =>
                   signIn("google", { callbackUrl: "/auth/oauth-callback" })
                 }
-                className="flex w-full items-center justify-center gap-3 rounded-md border border-white/15 bg-white/[0.04] py-2.5 text-sm font-medium text-white/70 hover:bg-white/[0.08] hover:text-white transition-colors"
+                className="flex w-full items-center justify-center gap-3 rounded-full border border-white/15 bg-white/[0.06] backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] py-3 text-sm font-medium text-white/70 hover:bg-white/[0.08] hover:text-white transition-colors"
               >
                 <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24">
                   <path

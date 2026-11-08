@@ -46,7 +46,7 @@ function RoleBadge({ role }: { role: string }) {
 function Banner({ type, message }: { type: "success" | "error"; message: string }) {
   return (
     <div
-      className={`flex items-center gap-2.5 rounded-xl border px-4 py-3 text-[13px] ${
+      className={`flex items-center gap-2.5 rounded-2xl border px-4 py-3 text-[13px] ${
         type === "success"
           ? "border-[#009B3A]/30 bg-[#009B3A]/10 text-[#009B3A]"
           : "border-red-500/30 bg-red-500/10 text-red-400"
@@ -74,9 +74,9 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-card overflow-hidden">
+    <div className="rounded-3xl solid-panel overflow-hidden">
       <div className="flex items-center gap-3 px-6 py-4 border-b border-border">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#009B3A]/10">
+        <div className="flex h-8 w-8 items-center justify-center rounded-2xl bg-[#009B3A]/10">
           <Icon className="h-4 w-4 text-[#009B3A]" />
         </div>
         <h2 className="text-sm font-semibold text-foreground/80">{title}</h2>
@@ -120,7 +120,7 @@ function Field({
         placeholder={placeholder}
         autoComplete={autoComplete}
         disabled={disabled}
-        className="w-full rounded-xl border border-border bg-background/50 px-4 py-3 text-sm text-foreground placeholder-muted-foreground/40 focus:outline-none focus:border-[#009B3A]/50 focus:ring-1 focus:ring-[#009B3A]/25 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        className="w-full rounded-full glass-panel px-5 py-3 text-sm text-foreground placeholder-muted-foreground/40 focus:outline-none focus:border-[#009B3A]/50 focus:ring-1 focus:ring-[#009B3A]/25 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
       />
     </div>
   );
@@ -156,12 +156,12 @@ function DeleteAccountModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-lg border border-border bg-background/95 backdrop-blur-sm p-6 space-y-5 shadow-2xl"
+        className="w-full max-w-md rounded-[28px] glass-bar p-6 space-y-5"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-500/10 shrink-0">
+          <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-red-500/10 shrink-0">
             <Trash2 className="h-4 w-4 text-red-400" />
           </div>
           <div>
@@ -188,7 +188,7 @@ function DeleteAccountModal({
             onChange={(e) => setConfirmText(e.target.value)}
             placeholder="DELETE"
             autoFocus
-            className="w-full rounded-xl border border-red-500/30 bg-background/50 px-4 py-3 text-sm text-foreground placeholder-muted-foreground/40 focus:outline-none focus:border-red-500/60 focus:ring-1 focus:ring-red-500/25 transition-colors"
+            className="w-full rounded-full border border-red-500/30 bg-background/50 px-5 py-3 text-sm text-foreground placeholder-muted-foreground/40 focus:outline-none focus:border-red-500/60 focus:ring-1 focus:ring-red-500/25 transition-colors"
           />
         </div>
 
@@ -200,7 +200,7 @@ function DeleteAccountModal({
             type="button"
             onClick={onClose}
             disabled={loading}
-            className="flex-1 rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-foreground/70 hover:bg-muted/40 transition-colors disabled:opacity-50"
+            className="flex-1 rounded-full border border-border px-4 py-2.5 text-sm font-semibold text-foreground/70 hover:bg-muted/40 transition-colors disabled:opacity-50"
           >
             Cancel
           </button>
@@ -208,7 +208,7 @@ function DeleteAccountModal({
             type="button"
             onClick={onConfirm}
             disabled={loading || confirmText.toUpperCase() !== "DELETE"}
-            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 active:scale-[0.97] transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex-1 flex items-center justify-center gap-2 rounded-full bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 active:scale-[0.97] transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {loading && <Loader2 className="h-4 w-4 animate-spin" />}
             Delete My Account
@@ -232,7 +232,7 @@ function SubmitButton({
     <button
       type="submit"
       disabled={loading}
-      className="flex items-center gap-2 rounded-xl bg-[#009B3A] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#009B3A]/85 active:scale-[0.97] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+      className="flex items-center gap-2 rounded-full glass-btn-green px-5 py-2.5 text-sm font-semibold active:scale-[0.97] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
     >
       {loading && <Loader2 className="h-4 w-4 animate-spin" />}
       {label}
@@ -398,17 +398,18 @@ function ProfilePage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="relative min-h-screen bg-background">
+        <div className="glass-backdrop" aria-hidden="true" />
       <Navbar />
-      <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-10 pb-28 md:pb-12 space-y-6">
+      <main className="relative z-10 max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-10 pb-28 md:pb-12 space-y-6">
 
         {/* ── Page header ── */}
         <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-[#009B3A]/10 ring-1 ring-[#009B3A]/25 shrink-0">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#009B3A]/10 ring-1 ring-[#009B3A]/25 shrink-0">
             <UserCircle2 className="h-7 w-7 text-[#009B3A]" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">My Profile</h1>
+            <h1 className="text-[2.2rem] sm:text-[2.8rem] font-extrabold leading-none tracking-[-0.04em] text-foreground">My Profile</h1>
             <p className="text-sm text-muted-foreground">Manage your account details and security</p>
           </div>
         </div>
@@ -535,7 +536,7 @@ function ProfilePage() {
         {/* ── Delete account ── */}
         <div className="pt-2 pb-2">
           {deleteGoodbye ? (
-            <div className="flex items-center gap-2.5 rounded-xl border border-[#009B3A]/30 bg-[#009B3A]/10 px-4 py-3 text-[13px] text-[#009B3A]">
+            <div className="flex items-center gap-2.5 rounded-2xl border border-[#009B3A]/30 bg-[#009B3A]/10 px-4 py-3 text-[13px] text-[#009B3A]">
               <CheckCircle2 className="h-4 w-4 shrink-0" />
               Your account has been deleted. Redirecting…
             </div>
@@ -543,7 +544,7 @@ function ProfilePage() {
             <button
               type="button"
               onClick={() => setShowDeleteModal(true)}
-              className="flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/5 px-5 py-2.5 text-sm font-semibold text-red-400 hover:bg-red-500/10 hover:border-red-500/50 active:scale-[0.97] transition-all duration-150"
+              className="flex items-center gap-2 rounded-full border border-red-500/30 bg-red-500/5 px-5 py-2.5 text-sm font-semibold text-red-400 hover:bg-red-500/10 hover:border-red-500/50 active:scale-[0.97] transition-all duration-150"
             >
               <Trash2 className="h-4 w-4" />
               Delete Account

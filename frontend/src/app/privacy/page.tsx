@@ -10,17 +10,18 @@ export const metadata = {
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-[#080810] text-white">
+    <div className="relative min-h-screen bg-[#080810] text-white">
+      <div className="dark" aria-hidden="true"><div className="glass-backdrop" /></div>
       {/* Header */}
-      <header className="border-b border-white/10 px-6 py-4">
-        <div className="max-w-3xl mx-auto flex items-center justify-between">
+      <header className="sticky top-0 z-30 px-4 pt-3">
+        <div className="max-w-3xl mx-auto flex items-center justify-between rounded-full border border-white/10 bg-[#0e0e1a]/60 backdrop-blur-xl backdrop-saturate-150 shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_10px_40px_rgba(0,0,0,0.35)] pl-5 pr-2 py-2">
           <Link href="/" className="flex items-center gap-2">
             <Scale className="h-5 w-5 text-[#009B3A]" />
             <span className="text-sm font-semibold">CourtWatch JA</span>
           </Link>
           <Link
             href="/"
-            className="flex items-center gap-1.5 text-[13px] text-white/55 hover:text-white transition-colors"
+            className="flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] text-white/55 hover:text-white hover:bg-white/[0.06] transition-colors"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
             Back
@@ -28,16 +29,16 @@ export default function PrivacyPage() {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-6 py-16">
+      <main className="relative z-10 max-w-3xl mx-auto px-6 py-14">
         <div className="mb-10">
-          <h1 className="font-heading text-3xl sm:text-4xl font-semibold tracking-tight">Privacy Policy</h1>
+          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-[-0.04em]">Privacy Policy</h1>
           <p className="mt-3 text-sm text-white/70">Last updated: May 15, 2026</p>
         </div>
 
-        <div className="prose prose-sm max-w-none space-y-8 text-white/65 leading-relaxed">
+        <div className="prose prose-sm max-w-none rounded-[28px] border border-white/10 bg-white/[0.035] backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] p-6 sm:p-10 space-y-8 text-white/65 leading-relaxed">
 
           <section>
-            <h2 className="font-heading text-lg font-semibold text-white mb-3">What We Collect</h2>
+            <h2 className="text-lg font-bold tracking-[-0.02em] text-white mb-3">What We Collect</h2>
             <p>
               CourtWatch JA collects only the information necessary to provide
               the service:
@@ -64,7 +65,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="font-heading text-lg font-semibold text-white mb-3">How We Use Your Data</h2>
+            <h2 className="text-lg font-bold tracking-[-0.02em] text-white mb-3">How We Use Your Data</h2>
             <p>
               We use your data solely to operate and improve CourtWatch JA:
             </p>
@@ -76,7 +77,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="font-heading text-lg font-semibold text-white mb-3">We Never Sell Your Data</h2>
+            <h2 className="text-lg font-bold tracking-[-0.02em] text-white mb-3">We Never Sell Your Data</h2>
             <p>
               CourtWatch JA does not sell, rent, or share your personal
               information with third parties for their marketing purposes.
@@ -85,7 +86,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="font-heading text-lg font-semibold text-white mb-3">Data Storage & Security</h2>
+            <h2 className="text-lg font-bold tracking-[-0.02em] text-white mb-3">Data Storage & Security</h2>
             <p>
               Your data is stored in a secured PostgreSQL database. Passwords
               are hashed using bcrypt and are never stored in plain text.
@@ -94,7 +95,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="font-heading text-lg font-semibold text-white mb-3">Third-Party Services</h2>
+            <h2 className="text-lg font-bold tracking-[-0.02em] text-white mb-3">Third-Party Services</h2>
             <p>We use the following third party services:</p>
             <ul className="mt-3 space-y-2 list-disc list-inside text-white/55">
               <li>
@@ -111,7 +112,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="font-heading text-lg font-semibold text-white mb-3">Your Rights</h2>
+            <h2 className="text-lg font-bold tracking-[-0.02em] text-white mb-3">Your Rights</h2>
             <p>
               You may request deletion of your account and all associated data
               at any time by contacting us at{" "}
@@ -126,7 +127,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="font-heading text-lg font-semibold text-white mb-3">Contact</h2>
+            <h2 className="text-lg font-bold tracking-[-0.02em] text-white mb-3">Contact</h2>
             <p>
               Questions about this policy? Email{" "}
               <a

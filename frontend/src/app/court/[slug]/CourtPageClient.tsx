@@ -33,7 +33,7 @@ function StatPill({
   color: string;
 }) {
   return (
-    <div className="flex flex-col items-center rounded-lg border border-border bg-card px-4 py-4">
+    <div className="flex flex-col items-center rounded-3xl solid-panel px-4 py-4">
       <span className={`text-2xl font-bold ${color}`}>{value}</span>
       <span className="mt-1 text-center text-[11px] text-muted-foreground leading-snug">{label}</span>
     </div>
@@ -96,9 +96,10 @@ export default function CourtPage() {
   if (!court) {
     return (
       <AuthGuard>
-        <div className="min-h-screen bg-background">
+        <div className="relative min-h-screen bg-background">
+        <div className="glass-backdrop" aria-hidden="true" />
           <Navbar />
-          <main className="max-w-7xl mx-auto px-4 py-12 text-center">
+          <main className="relative z-10 max-w-7xl mx-auto px-4 py-12 text-center">
             <p className="text-white/70">Court not found.</p>
           </main>
         </div>
@@ -111,9 +112,10 @@ export default function CourtPage() {
 
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-background">
+      <div className="relative min-h-screen bg-background">
+        <div className="glass-backdrop" aria-hidden="true" />
         <Navbar />
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-32 md:pb-12">
+        <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-32 md:pb-12">
           {/* Back link */}
           <Link
             href="/cases"
@@ -131,7 +133,7 @@ export default function CourtPage() {
                 Jamaica Court System
               </span>
             </div>
-            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
+            <h1 className="text-[2.2rem] sm:text-[3rem] font-extrabold leading-none tracking-[-0.04em] text-foreground">
               {court}
             </h1>
             <p className="mt-2 max-w-xl text-sm text-muted-foreground">
@@ -145,7 +147,7 @@ export default function CourtPage() {
               [1, 2, 3].map((i) => (
                 <div
                   key={i}
-                  className="animate-pulse rounded-lg border border-border bg-card px-4 py-4 flex flex-col items-center gap-2"
+                  className="animate-pulse rounded-3xl solid-panel px-4 py-4 flex flex-col items-center gap-2"
                 >
                   <div className="h-6 w-10 rounded bg-muted" />
                   <div className="h-2.5 w-20 rounded bg-muted/60" />
@@ -188,11 +190,11 @@ export default function CourtPage() {
               </Link>
             </div>
             {loading ? (
-              <div className="h-[168px] sm:h-[200px] rounded-lg border border-border bg-card animate-pulse" />
+              <div className="h-[168px] sm:h-[200px] rounded-3xl solid-panel animate-pulse" />
             ) : judgments.length > 0 ? (
               <JudgmentCarousel judgments={judgments} />
             ) : (
-              <div className="flex flex-col items-center justify-center rounded-lg border border-border bg-card py-12">
+              <div className="flex flex-col items-center justify-center rounded-3xl solid-panel py-12">
                 <FileText className="h-8 w-8 text-muted-foreground/30 mb-2" />
                 <p className="text-sm text-muted-foreground">No judgments for this court</p>
               </div>
@@ -219,7 +221,7 @@ export default function CourtPage() {
                 {[1, 2, 3].map((i) => (
                   <div
                     key={i}
-                    className="h-24 animate-pulse rounded-xl border border-border bg-card"
+                    className="h-24 animate-pulse rounded-3xl solid-panel"
                   />
                 ))}
               </div>
@@ -236,7 +238,7 @@ export default function CourtPage() {
                 ))}
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center rounded-lg border border-border bg-card py-12">
+              <div className="flex flex-col items-center justify-center rounded-3xl solid-panel py-12">
                 <Calendar className="h-8 w-8 text-muted-foreground/30 mb-2" />
                 <p className="text-sm text-muted-foreground">No sittings scheduled this week</p>
               </div>
@@ -247,7 +249,7 @@ export default function CourtPage() {
           <div className="flex justify-center pt-2">
             <Link
               href={`/cases?court=${slug}`}
-              className="flex items-center gap-2 rounded-xl border border-[#009B3A]/25 bg-[#009B3A]/10 px-6 py-3 text-sm font-semibold text-[#009B3A] hover:bg-[#009B3A]/15 transition-colors"
+              className="flex items-center gap-2 rounded-full border border-[#009B3A]/25 bg-[#009B3A]/10 px-6 py-3 text-sm font-semibold text-[#009B3A] hover:bg-[#009B3A]/15 transition-colors"
             >
               View All Judgments
               <ArrowRight className="h-4 w-4" />

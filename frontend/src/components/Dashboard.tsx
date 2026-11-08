@@ -79,7 +79,6 @@ function TodaySittings({ sittings, loading }: TodaySittingsProps) {
     <section>
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="h-px w-8 bg-accent/45" />
           <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-accent/65">
             {label}
           </span>
@@ -267,7 +266,6 @@ export default function Dashboard() {
         {/* ── Hero greeting ─────────────────────────────────────────────── */}
         <div className="mb-10">
           <div className="flex items-center gap-3 mb-5">
-            <div className="h-px w-8 bg-primary/45" />
             <span className="text-[10px] font-semibold uppercase tracking-[0.25em] text-primary/65">
               CourtWatch JA
             </span>
@@ -344,7 +342,6 @@ export default function Dashboard() {
         {/* ── Track a Case ──────────────────────────────────────────────── */}
         <div className="mb-8">
           <div className="mb-3 flex items-center gap-3">
-            <div className="h-px w-8 bg-accent/45" />
             <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-accent/65">
               Track a Case
             </span>

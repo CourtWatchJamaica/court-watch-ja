@@ -21,17 +21,16 @@ function formatDate(ts: string | null): string {
   });
 }
 
-function SkeletonRow() {
+function SkeletonTile() {
   return (
-    <div className="flex items-start gap-3.5 px-4 py-3.5 animate-pulse">
-      <div className="mt-1 w-[3px] h-8 shrink-0 rounded-full bg-[#FED100]/20" />
-      <div className="flex-1 space-y-2">
-        <div className="h-3 w-3/4 rounded bg-muted" />
-        <div className="flex gap-2">
-          <div className="h-2.5 w-12 rounded bg-muted/60" />
-          <div className="h-2.5 w-20 rounded-full bg-muted/40" />
-        </div>
+    <div className="aspect-square rounded-3xl glass-panel p-4 flex flex-col justify-between animate-pulse">
+      <div className="h-4 w-16 rounded-full bg-[#FED100]/20" />
+      <div className="space-y-2">
+        <div className="h-3 w-full rounded bg-muted" />
+        <div className="h-3 w-5/6 rounded bg-muted" />
+        <div className="h-3 w-2/3 rounded bg-muted" />
       </div>
+      <div className="h-2.5 w-20 rounded-full bg-muted/60" />
     </div>
   );
 }
@@ -59,9 +58,10 @@ export default function LegalPulse() {
   }, [fetchNews]);
 
   return (
-    <section>
+    // Always-dark grey glass panel (the "dark" class switches the theme colours inside it).
+    <section className="dark relative overflow-hidden rounded-[28px] sm:rounded-[36px] border border-white/10 bg-[#17171f]/85 backdrop-blur-2xl backdrop-saturate-150 p-4 sm:p-6 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_20px_60px_rgba(0,0,0,0.25)]">
       {/* Header */}
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <div className="h-4 w-[3px] rounded-full bg-[#FED100]" />
           <NewspaperIcon className="h-3.5 w-3.5 text-[#FED100]" />
@@ -70,18 +70,18 @@ export default function LegalPulse() {
           </span>
         </div>
         {!loading && news.length > 0 && (
-          <span className="text-[10px] text-muted-foreground/50">
-            {news.length} article{news.length !== 1 ? "s" : ""}
+          <span className="text-[10px] text-muted-foreground">
+ article{news.length !== 1 ? "s" : ""}
           </span>
         )}
       </div>
 
-      {/* Body */}
-      <div className="rounded-3xl solid-panel overflow-hidden divide-y divide-border">
+      {/* Body: grid of square article cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
         {loading ? (
-          Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} />)
+          Array.from({ length: 4 }).map((_, i) => <SkeletonTile key={i} />)
         ) : error || news.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-10 text-center px-6">
+          <div className="col-span-full flex flex-col items-center justify-center rounded-3xl glass-panel py-10 text-center px-6">
             <NewspaperIcon className="h-8 w-8 text-muted-foreground/20 mb-3" />
             <p className="text-sm font-medium text-muted-foreground/50">
               {error ? "Could not load news" : "No news articles yet"}
@@ -102,34 +102,33 @@ export default function LegalPulse() {
                 href={item.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group flex items-start gap-3.5 px-4 py-3.5 cursor-pointer hover:bg-accent/30 transition-colors"
+                className="group relative aspect-square overflow-hidden rounded-3xl glass-panel p-3.5 sm:p-4 flex flex-col cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:border-[#FED100]/40"
               >
-                {/* Gold left bar */}
-                <div className="mt-1 h-full w-[3px] shrink-0 self-stretch rounded-full bg-[#FED100]/40 group-hover:bg-[#FED100]/70 transition-colors" />
+                {/* Gold glow in the corner */}
+                <div className="pointer-events-none absolute inset-0 opacity-60 group-hover:opacity-100 transition-opacity [background:radial-gradient(80%_60%_at_100%_0%,rgba(254,209,0,0.10),transparent_70%)]" aria-hidden="true" />
 
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-[11px] text-foreground/90 font-medium leading-snug line-clamp-2 group-hover:text-foreground transition-colors">
-                    {item.title}
-                  </p>
-                  <div className="mt-1.5 flex items-center gap-2 flex-wrap">
-                    {date && (
-                      <span className="text-[10px] text-muted-foreground">
-                        {date}
-                      </span>
-                    )}
-                    <span className="rounded-full bg-accent px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground">
-                      {item.source}
-                    </span>
-                    <span
-                      className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${meta.color}`}
-                    >
-                      {meta.label}
-                    </span>
-                  </div>
+                {/* Category + link icon */}
+                <div className="relative flex items-start justify-between gap-2">
+                  <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold ${meta.color}`}>
+                    {meta.label}
+                  </span>
+                  <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground/30 group-hover:text-muted-foreground transition-colors" />
                 </div>
 
-                <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground/30 group-hover:text-muted-foreground transition-colors mt-1" />
+                {/* Headline */}
+                <p className="relative mt-2.5 sm:mt-3 text-[12px] sm:text-[14px] lg:text-[16px] font-bold tracking-[-0.01em] text-foreground/90 leading-snug line-clamp-3 sm:line-clamp-4 group-hover:text-foreground transition-colors">
+                  {item.title}
+                </p>
+
+                {/* Source + date */}
+                <div className="relative mt-auto pt-2 sm:pt-3 flex flex-col gap-0.5 sm:gap-1">
+                  <span className="truncate text-[10px] font-medium text-muted-foreground">
+                    {item.source}
+                  </span>
+                  {date && (
+                    <span className="text-[10px] text-muted-foreground/70">{date}</span>
+                  )}
+                </div>
               </a>
             );
           })

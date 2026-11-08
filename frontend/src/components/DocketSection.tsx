@@ -608,7 +608,6 @@ export default function DocketSection({
     <section>
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="h-px w-3 bg-accent/60" />
           <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-accent">
             Your Docket
           </span>

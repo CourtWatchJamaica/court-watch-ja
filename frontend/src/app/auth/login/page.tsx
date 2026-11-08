@@ -61,7 +61,7 @@ export default function LoginPage() {
   };
 
   const inputCls =
-    "w-full rounded-md border border-amber-200/15 bg-black/40 px-3.5 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-amber-400/70 focus:ring-1 focus:ring-amber-400/20 transition-colors";
+    "w-full rounded-full border border-amber-200/15 bg-white/[0.05] backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] px-4 py-3 text-sm text-white placeholder-white/30 focus:outline-none focus:border-amber-400/70 focus:ring-1 focus:ring-amber-400/20 transition-colors";
 
   return (
     <div className="relative min-h-screen flex items-center justify-center bg-[#07060a] px-4 overflow-hidden">
@@ -79,9 +79,9 @@ export default function LoginPage() {
       <div className="relative z-10 w-full max-w-sm">
         {/* Logo */}
         <div className="mb-8 flex flex-col items-center gap-3">
-          <Scale className="h-7 w-7 text-amber-400" />
+          <span className="flex h-14 w-14 items-center justify-center rounded-full border border-amber-200/25 bg-white/[0.06] backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_10px_30px_rgba(0,0,0,0.4)]"><Scale className="h-7 w-7 text-amber-400" /></span>
           <div className="text-center">
-            <h1 className="font-heading text-2xl font-semibold tracking-tight text-white">
+            <h1 className="text-[1.9rem] font-extrabold tracking-[-0.04em] leading-none text-white">
               CourtWatch JA
             </h1>
             <p className="mt-1 text-sm text-white/60">
@@ -91,7 +91,7 @@ export default function LoginPage() {
         </div>
 
         {/* Card */}
-        <div className="rounded-lg border border-amber-200/20 bg-black/50 backdrop-blur-md p-6 shadow-[0_30px_80px_rgba(0,0,0,0.55)]">
+        <div className="rounded-[28px] border border-amber-200/20 bg-black/40 backdrop-blur-2xl backdrop-saturate-150 p-6 sm:p-7 shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_30px_80px_rgba(0,0,0,0.55)]">
           {/* OAuth buttons — only render when provider credentials are configured */}
           {(googleEnabled || appleEnabled) && (
             <>
@@ -102,7 +102,7 @@ export default function LoginPage() {
                     onClick={() =>
                       signIn("google", { callbackUrl: "/auth/oauth-callback" })
                     }
-                    className="flex w-full items-center justify-center gap-3 rounded-md border border-white/15 bg-white/[0.04] py-2.5 text-sm font-medium text-white/70 hover:bg-white/[0.08] hover:text-white transition-colors"
+                    className="flex w-full items-center justify-center gap-3 rounded-full border border-white/15 bg-white/[0.06] backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] py-3 text-sm font-medium text-white/70 hover:bg-white/[0.08] hover:text-white transition-colors"
                   >
                     <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24">
                       <path
@@ -131,7 +131,7 @@ export default function LoginPage() {
                     onClick={() =>
                       signIn("apple", { callbackUrl: "/auth/oauth-callback" })
                     }
-                    className="flex w-full items-center justify-center gap-3 rounded-md border border-white/15 bg-white/[0.04] py-2.5 text-sm font-medium text-white/70 hover:bg-white/[0.08] hover:text-white transition-colors"
+                    className="flex w-full items-center justify-center gap-3 rounded-full border border-white/15 bg-white/[0.06] backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] py-3 text-sm font-medium text-white/70 hover:bg-white/[0.08] hover:text-white transition-colors"
                   >
                     <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701" />
@@ -141,22 +141,17 @@ export default function LoginPage() {
                 )}
               </div>
 
-              <div className="relative mb-5">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-white/[0.08]" />
-                </div>
-                <div className="relative flex justify-center">
-                  <span className="bg-black/50 px-3 text-[11px] text-white/55">
-                    or sign in with email
-                  </span>
-                </div>
+              <div className="mb-5 flex items-center gap-3">
+                <div className="h-px flex-1 bg-white/[0.1]" />
+                <span className="text-[11px] text-white/55">or sign in with email</span>
+                <div className="h-px flex-1 bg-white/[0.1]" />
               </div>
             </>
           )}
 
 
           {passwordReset && (
-            <div className="rounded-md bg-green-500/10 border border-green-500/20 px-4 py-3 text-sm text-green-400 mb-5">
+            <div className="rounded-2xl bg-green-500/10 border border-green-500/20 px-4 py-3 text-sm text-green-400 mb-5">
               Password reset successfully. Sign in with your new password.
             </div>
           )}
@@ -201,13 +196,13 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <div className="rounded-md bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-400">
+              <div className="rounded-2xl bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-400">
                 {error}
               </div>
             )}
 
             {unverified && !resent && (
-              <div className="rounded-md bg-amber-500/10 border border-amber-500/20 px-4 py-3 text-sm text-amber-300">
+              <div className="rounded-2xl bg-amber-500/10 border border-amber-500/20 px-4 py-3 text-sm text-amber-300">
                 <p>Your email is not yet verified. Check your inbox for the verification link, or click below to resend.</p>
                 <button
                   type="button"
@@ -221,7 +216,7 @@ export default function LoginPage() {
             )}
 
             {resent && (
-              <div className="rounded-md bg-green-500/10 border border-green-500/20 px-4 py-3 text-sm text-green-400">
+              <div className="rounded-2xl bg-green-500/10 border border-green-500/20 px-4 py-3 text-sm text-green-400">
                 Verification email resent. Check your inbox.
               </div>
             )}
@@ -229,7 +224,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 rounded-md bg-gradient-to-b from-amber-300 to-amber-600 py-2.5 text-sm font-semibold uppercase tracking-wide text-black/80 hover:brightness-105 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="w-full flex items-center justify-center gap-2 rounded-full glass-btn-green py-3 text-sm font-semibold uppercase tracking-wide disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               {loading ? (
                 <>

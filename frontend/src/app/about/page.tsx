@@ -10,17 +10,18 @@ export const metadata = {
 
 export default function AboutPage() {
   return (
-    <div className="min-h-screen bg-[#080810] text-white">
+    <div className="relative min-h-screen bg-[#080810] text-white">
+      <div className="dark" aria-hidden="true"><div className="glass-backdrop" /></div>
       {/* Header */}
-      <header className="border-b border-white/10 px-6 py-4">
-        <div className="max-w-3xl mx-auto flex items-center justify-between">
+      <header className="sticky top-0 z-30 px-4 pt-3">
+        <div className="max-w-3xl mx-auto flex items-center justify-between rounded-full border border-white/10 bg-[#0e0e1a]/60 backdrop-blur-xl backdrop-saturate-150 shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_10px_40px_rgba(0,0,0,0.35)] pl-5 pr-2 py-2">
           <Link href="/" className="flex items-center gap-2">
             <Scale className="h-5 w-5 text-[#009B3A]" />
             <span className="text-sm font-semibold">CourtWatch JA</span>
           </Link>
           <Link
             href="/"
-            className="flex items-center gap-1.5 text-[13px] text-white/55 hover:text-white transition-colors"
+            className="flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] text-white/55 hover:text-white hover:bg-white/[0.06] transition-colors"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
             Back
@@ -28,9 +29,9 @@ export default function AboutPage() {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-6 py-16">
+      <main className="relative z-10 max-w-3xl mx-auto px-6 py-14">
         {/* Heading */}
-        <h1 className="font-heading text-4xl sm:text-5xl font-semibold tracking-tight leading-tight mb-3">
+        <h1 className="text-4xl sm:text-5xl font-extrabold tracking-[-0.04em] leading-tight mb-3">
           About CourtWatch JA
         </h1>
 
@@ -40,8 +41,8 @@ export default function AboutPage() {
         </p>
 
         {/* Mission */}
-        <section className="border-t border-white/10 pt-8 mb-12">
-          <h2 className="font-heading text-xl font-semibold mb-4">
+        <section className="rounded-[28px] border border-white/10 bg-white/[0.035] backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] p-6 sm:p-8 mb-6">
+          <h2 className="text-xl font-bold tracking-[-0.02em] mb-4">
             Our mission
           </h2>
           <p className="text-white/70 leading-relaxed text-base">
@@ -58,8 +59,8 @@ export default function AboutPage() {
         </section>
 
         {/* What we do */}
-        <section className="border-t border-white/10 pt-8 mb-12">
-          <h2 className="font-heading text-xl font-semibold mb-4">
+        <section className="rounded-[28px] border border-white/10 bg-white/[0.035] backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] p-6 sm:p-8 mb-6">
+          <h2 className="text-xl font-bold tracking-[-0.02em] mb-4">
             What we do
           </h2>
           <ul className="space-y-3 text-white/70 text-[15px] leading-relaxed list-disc pl-5 marker:text-white/30">
@@ -85,8 +86,8 @@ export default function AboutPage() {
         </section>
 
         {/* Built by */}
-        <section className="border-t border-white/10 pt-8">
-          <h2 className="font-heading text-xl font-semibold mb-4">
+        <section className="rounded-[28px] border border-white/10 bg-white/[0.035] backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] p-6 sm:p-8">
+          <h2 className="text-xl font-bold tracking-[-0.02em] mb-4">
             Built by Jamaicans
           </h2>
           <p className="text-white/70 leading-relaxed text-[15px]">
@@ -103,7 +104,7 @@ export default function AboutPage() {
           <p className="text-white/60 text-sm mb-4">Ready to track your cases?</p>
           <Link
             href="/auth/signup"
-            className="inline-flex items-center px-5 py-2.5 bg-[#009B3A] hover:bg-[#00893a] text-white font-medium text-sm rounded-md transition-colors"
+            className="inline-flex items-center px-5 py-2.5 glass-btn-green font-semibold text-sm rounded-full"
           >
             Get started  it&apos;s free
           </Link>
