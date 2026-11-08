@@ -59,7 +59,7 @@ export default function LegalPulse() {
 
   return (
     // Always-dark grey glass panel (the "dark" class switches the theme colours inside it).
-    <section className="dark relative overflow-hidden rounded-[28px] sm:rounded-[36px] border border-white/10 bg-[#17171f]/85 backdrop-blur-2xl backdrop-saturate-150 p-4 sm:p-6 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_20px_60px_rgba(0,0,0,0.25)]">
+    <section className="dark dark-glass-section">
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2.5">

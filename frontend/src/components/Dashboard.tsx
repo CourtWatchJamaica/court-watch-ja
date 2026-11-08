@@ -76,7 +76,7 @@ function TodaySittings({ sittings, loading }: TodaySittingsProps) {
     todaySittings.length > 0 ? "Today's Sittings" : "Upcoming Sittings";
 
   return (
-    <section>
+    <section className="dark dark-glass-section">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-accent/65">
@@ -340,7 +340,7 @@ export default function Dashboard() {
         </div>
 
         {/* ── Track a Case ──────────────────────────────────────────────── */}
-        <div className="mb-8">
+        <div className="dark dark-glass-section mb-8">
           <div className="mb-3 flex items-center gap-3">
             <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-accent/65">
               Track a Case

@@ -605,7 +605,7 @@ export default function DocketSection({
   });
 
   return (
-    <section>
+    <section className="dark dark-glass-section">
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-accent">
