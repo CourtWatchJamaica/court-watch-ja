@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import Navbar from "@/components/Navbar";
@@ -598,8 +599,10 @@ export default function NotificationSettingsPage() {
           )}
         </main>
 
-        {/* ── Mobile: bottom sheet for case settings ── */}
-        {mobileSheetOpen && selectedCase && (
+        {/* ── Mobile: bottom sheet for case settings ──
+            Portalled to <body> so it stacks above the Navbar's fixed bottom
+            pill (z-50), which lives outside <main class="relative z-10">. */}
+        {mobileSheetOpen && selectedCase && typeof document !== "undefined" && createPortal(
           <>
             <div
               className="lg:hidden fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm"
@@ -629,7 +632,8 @@ export default function NotificationSettingsPage() {
                 />
               </div>
             </div>
-          </>
+          </>,
+          document.body,
         )}
 
         {/* Toast */}

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { apiClient, ApiError } from "@/lib/api";
-import { Scale, Loader2 } from "lucide-react";
+import { Scale, Loader2, Eye, EyeOff } from "lucide-react";
 import CourtroomBackground from "@/components/CourtroomBackground";
 import { markLoggedIn } from "@/lib/session";
 
@@ -14,6 +14,7 @@ const appleEnabled = process.env.NEXT_PUBLIC_APPLE_OAUTH_ENABLED === "true";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [unverified, setUnverified] = useState(false);
@@ -41,8 +42,18 @@ export default function LoginPage() {
     } catch (err) {
       if (err instanceof ApiError && err.data?.email_verified === false) {
         setUnverified(true);
+      } else if (
+        (err instanceof ApiError && err.status === 401) ||
+        (err instanceof Error && err.message === "Unauthorized")
+      ) {
+        // The API deliberately doesn't say which field was wrong.
+        setError(
+          "We couldn't sign you in. Please check your email address and password and try again.",
+        );
+      } else if (err instanceof Error && err.message === "Network error") {
+        setError("We couldn't reach CourtWatch JA. Check your connection and try again.");
       } else {
-        setError(err instanceof Error ? err.message : "Login failed");
+        setError(err instanceof Error ? err.message : "Login failed. Please try again.");
       }
       setLoading(false);
     }
@@ -184,15 +195,26 @@ export default function LoginPage() {
                   Forgot password?
                 </Link>
               </div>
-              <input
-                type="password"
-                className={inputCls}
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoComplete="current-password"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  className={`${inputCls} pr-12`}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-pressed={showPassword}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-9 w-9 items-center justify-center rounded-full text-white/45 hover:text-amber-300 hover:bg-white/[0.06] focus:outline-none focus-visible:ring-1 focus-visible:ring-amber-400/40 transition-colors"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
 
             {error && (

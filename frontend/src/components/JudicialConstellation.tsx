@@ -8,6 +8,7 @@ import {
   useCallback,
   Suspense,
 } from "react";
+import { createPortal } from "react-dom";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, Html } from "@react-three/drei";
 import * as THREE from "three";
@@ -1517,22 +1518,28 @@ export default function JudicialConstellation({ judges, connections }: Props) {
         </>
       )}
 
-      {selectedJudge && isMobile && !isListView && (
-        <>
-          <div
-            className="md:hidden fixed inset-0 z-[65] bg-black/40"
-            onClick={clearSelection}
-          />
-          <MobileSheet
-            key={selectedJudge.id}
-            judge={selectedJudge}
-            judgments={judgeJudgments}
-            sittings={judgeSittings}
-            dataLoading={dataLoading}
-            onClose={clearSelection}
-          />
-        </>
-      )}
+      {/* Portalled to <body>: this component sits inside <main class="relative z-10">,
+          which is its own stacking context, so a z-[70] here could never rise
+          above the Navbar's fixed bottom pill (z-50, outside <main>). The pill
+          used to cover the sheet's "View Full Profile" button on phones. */}
+      {selectedJudge && isMobile && !isListView && typeof document !== "undefined" &&
+        createPortal(
+          <>
+            <div
+              className="md:hidden fixed inset-0 z-[65] bg-black/40"
+              onClick={clearSelection}
+            />
+            <MobileSheet
+              key={selectedJudge.id}
+              judge={selectedJudge}
+              judgments={judgeJudgments}
+              sittings={judgeSittings}
+              dataLoading={dataLoading}
+              onClose={clearSelection}
+            />
+          </>,
+          document.body,
+        )}
     </div>
   );
 }
