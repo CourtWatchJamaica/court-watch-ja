@@ -9,7 +9,7 @@ import { Notification } from "@/lib/types";
 import {
   Bell, FileText, Calendar, CheckCheck, Megaphone, PartyPopper,
   ExternalLink, Info, AlertTriangle, AlertOctagon, ChevronDown,
-  ChevronUp, X, ArrowUpDown, MapPin,
+  ChevronUp, X, ArrowUpDown, MapPin, Radar,
 } from "lucide-react";
 
 // ── Type metadata ──────────────────────────────────────────────────────────────
@@ -32,6 +32,7 @@ const TYPE_META: Record<string, NotifMeta> = {
   welcome:                  { label: "Welcome",          bg: "bg-[#009B3A]/15", text: "text-[#009B3A]",                        icon: PartyPopper   },
   service_alert:            { label: "Service Alert",    bg: "bg-amber-400/15", text: "text-amber-600 dark:text-amber-400",      icon: AlertTriangle },
   parish_status_changed:    { label: "Parish Court",     bg: "bg-[#CD7F32]/15", text: "text-[#CD7F32]",                          icon: MapPin        },
+  scan_complete:            { label: "Scan Complete",    bg: "bg-muted",        text: "text-muted-foreground",                   icon: Radar         },
 };
 
 function typeToLabel(t: string): string {
@@ -77,6 +78,7 @@ function fallbackTitle(n: Notification): string {
     case "sitting_reminder_1d":      return "Upcoming hearing tomorrow";
     case "sitting_reminder_morning": return "Hearing scheduled for today";
     case "parish_status_changed":    return `Parish Court status updated — Case #${n.case_id}`;
+    case "scan_complete":            return "Court scan complete";
     default:                         return typeToLabel(n.type);
   }
 }
@@ -107,7 +109,11 @@ function TimelineItem({
       if (notif.link) router.push(notif.link);
       return;
     }
-    if (!notif.case_id) return;
+    // Digest-style notifications (scan_complete) have no case but carry a link.
+    if (!notif.case_id) {
+      if (notif.link) router.push(notif.link);
+      return;
+    }
     if (notif.type === "sitting_changed" || notif.type === "case_listed" ||
         notif.type === "sitting_reminder_1d" || notif.type === "sitting_reminder_morning") {
       router.push(`/cases/sittings/${notif.case_id}`);

@@ -184,6 +184,22 @@ pub async fn trigger_scraper(State(state): State<AppState>) -> Result<Json<Value
     ))
 }
 
+/// Run the notification engine + email dispatcher now, without scraping.
+/// Useful for verifying alert plumbing (per-case preferences, scan digests,
+/// email opt-outs) against whatever is already in the database.
+pub async fn run_notifications_now(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
+    let client = crate::scraper::http_client()
+        .map_err(|e| AppError::Internal(format!("http client: {e}")))?;
+    let pool = state.db.clone();
+    let config = state.config.clone();
+    tokio::spawn(async move {
+        tracing::info!("[Admin] manual notification pass starting");
+        crate::scraper::runner::run_notification_pass(&pool, &client, &config).await;
+        tracing::info!("[Admin] manual notification pass complete");
+    });
+    Ok(Json(json!({ "started": true })))
+}
+
 pub async fn deep_scrape(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
     if state.scraper_running.load(Ordering::SeqCst) {
         return Err(AppError::BadRequest("Scraper is already running".into()));

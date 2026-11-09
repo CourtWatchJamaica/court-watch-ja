@@ -92,7 +92,10 @@ pub fn router(state: AppState) -> Router {
         .route("/api/notifications/mark-read", post(notifications::mark_all_read))
         .route("/api/notifications/:id/mark-read", post(notifications::mark_one_read))
         .route("/api/notifications/:id", delete(notifications::archive_notification))
-        .route("/api/user/preferences", put(notifications::update_preferences))
+        .route(
+            "/api/user/preferences",
+            get(notifications::get_preferences).put(notifications::update_preferences),
+        )
         .route("/api/court-sittings", get(court_sittings::list_sittings))
         .route("/api/court-sittings/today", get(court_sittings::today_sittings))
         .route("/api/court-sittings/:id", get(court_sittings::get_sitting))
@@ -118,6 +121,7 @@ pub fn router(state: AppState) -> Router {
         .route("/api/admin/data/judgments/bulk-delete", post(admin::bulk_delete_judgments))
         .route("/api/admin/data/sittings/bulk-delete", post(admin::bulk_delete_sittings))
         .route("/api/admin/scraper/trigger", post(admin::trigger_scraper))
+        .route("/api/admin/notifications/run", post(admin::run_notifications_now))
         .route("/api/admin/deep-scrape", post(admin::deep_scrape))
         .route("/api/admin/scraper/skipped", delete(admin::remove_skipped_pdf))
         .route("/api/admin/scraper/skip", post(admin::skip_pdf))

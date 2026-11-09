@@ -3096,11 +3096,17 @@ pub struct PendingEmailRow {
     /// Resolved from court_sittings or judgments depending on notification type.
     pub case_number: Option<String>,
     pub event_date: Option<chrono::NaiveDate>,
+    pub event_time: Option<chrono::NaiveTime>,
     pub event_type: Option<String>,
     pub court_division: Option<String>,
     /// Set directly on the notification row for types (like
     /// parish_status_changed) that don't join a separate table for a deep link.
     pub link: Option<String>,
+    /// users.email_notifications — the user's global email opt-in — combined
+    /// with the per-feature scan_alert_channel for 'scan_complete' rows. Rows
+    /// for opted-out users are still claimed (so they never pile up) but the
+    /// dispatcher skips sending them.
+    pub email_enabled: bool,
 }
 
 /// Atomically claims notifications that still need an outbound email and
@@ -3131,9 +3137,11 @@ pub async fn claim_notifications_for_email(
                      AND  type IN (
                             'case_available',
                             'case_listed',
+                            'sitting_changed',
                             'sitting_reminder_1d',
                             'sitting_reminder_morning',
-                            'parish_status_changed'
+                            'parish_status_changed',
+                            'scan_complete'
                           )
                    FOR UPDATE SKIP LOCKED
                )
@@ -3145,14 +3153,17 @@ pub async fn claim_notifications_for_email(
                   c.message,
                   COALESCE(cs.case_number, j.case_number) AS case_number,
                   cs.event_date,
+                  cs.event_time,
                   cs.event_type,
                   cs.court_division,
-                  c.link
+                  c.link,
+                  (u.email_notifications
+                   AND (c.type <> 'scan_complete' OR u.scan_alert_channel = 'both')) AS email_enabled
            FROM   claimed c
            JOIN   users u ON u.id = c.user_id
            LEFT JOIN court_sittings cs
                   ON cs.id = c.case_id
-                 AND c.type IN ('case_listed', 'sitting_reminder_1d', 'sitting_reminder_morning')
+                 AND c.type IN ('case_listed', 'sitting_changed', 'sitting_reminder_1d', 'sitting_reminder_morning')
            LEFT JOIN judgments j
                   ON j.id = c.case_id
                  AND c.type IN ('case_available')"#,
@@ -3168,6 +3179,140 @@ pub async fn retire_stale_unemailed_notifications(pool: &PgPool) -> sqlx::Result
         "UPDATE notifications SET emailed_at = sent_at
          WHERE emailed_at IS NULL AND sent_at <= NOW() - INTERVAL '48 hours'",
     )
+    .execute(pool)
+    .await
+    .map(|r| r.rows_affected())
+}
+
+// ── Global notification preferences ────────────────────────────────────────
+
+pub const SCAN_ALERT_CHANNELS: &[&str] = &["in_app", "both"];
+pub const SCAN_ALERT_FREQUENCIES: &[&str] = &["every_scan", "daily", "weekly"];
+
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct UserNotificationPrefs {
+    pub email_notifications: bool,
+    pub notify_on_scan: bool,
+    /// 'in_app' | 'both'
+    pub scan_alert_channel: String,
+    /// 'every_scan' | 'daily' | 'weekly'
+    pub scan_alert_frequency: String,
+}
+
+pub async fn get_user_notification_prefs(
+    pool: &PgPool,
+    user_id: i32,
+) -> sqlx::Result<UserNotificationPrefs> {
+    sqlx::query_as::<_, UserNotificationPrefs>(
+        "SELECT email_notifications, notify_on_scan, scan_alert_channel, scan_alert_frequency
+         FROM users WHERE id = $1",
+    )
+    .bind(user_id)
+    .fetch_one(pool)
+    .await
+}
+
+/// Every scan-alert field is optional so older clients that only send the
+/// email flag keep working without resetting the scan preferences.  Callers
+/// validate `channel` / `frequency` against the constants above first.
+pub async fn set_user_notification_prefs(
+    pool: &PgPool,
+    user_id: i32,
+    email_notifications: bool,
+    notify_on_scan: Option<bool>,
+    scan_alert_channel: Option<&str>,
+    scan_alert_frequency: Option<&str>,
+) -> sqlx::Result<()> {
+    sqlx::query(
+        "UPDATE users
+         SET email_notifications  = $1,
+             notify_on_scan       = COALESCE($2, notify_on_scan),
+             scan_alert_channel   = COALESCE($3, scan_alert_channel),
+             scan_alert_frequency = COALESCE($4, scan_alert_frequency)
+         WHERE id = $5",
+    )
+    .bind(email_notifications)
+    .bind(notify_on_scan)
+    .bind(scan_alert_channel)
+    .bind(scan_alert_frequency)
+    .bind(user_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// Database clock in the same (session-local, tz-less) form that
+/// `notifications.sent_at DEFAULT NOW()` stores, so callers can compare
+/// against it without worrying about the server's timezone.
+pub async fn db_now(pool: &PgPool) -> sqlx::Result<NaiveDateTime> {
+    sqlx::query_scalar("SELECT NOW()::timestamp").fetch_one(pool).await
+}
+
+/// Scan-complete digest.  For every user who opted in (users.notify_on_scan)
+/// and tracks at least one case, insert one notification summarising the
+/// scans since their previous digest: how many tracked cases are being
+/// watched and how many case alerts were generated in that window (falling
+/// back to `since`, the start of this pass, for a user's first digest).
+///
+/// users.scan_alert_frequency gates how often a digest may be created:
+///   every_scan → at most one per 30 min (overlap guard only)
+///   daily      → at most one per 20 h  (first pass of each day, ~6 am)
+///   weekly     → at most one per 6½ d  (same weekday / pass each week)
+///
+/// Emailed only when users.scan_alert_channel = 'both' (and the global email
+/// opt-in is on); the claim query computes that per row.
+pub async fn create_scan_complete_notifications(
+    pool: &PgPool,
+    since: NaiveDateTime,
+) -> sqlx::Result<u64> {
+    sqlx::query(
+        r#"INSERT INTO notifications (user_id, case_id, type, title, message, link, severity)
+           SELECT u.id,
+                  NULL,
+                  'scan_complete',
+                  CASE u.scan_alert_frequency
+                       WHEN 'weekly' THEN 'Weekly court scan summary'
+                       WHEN 'daily'  THEN 'Daily court scan summary'
+                       ELSE               'Court scan complete'
+                  END,
+                  format(
+                      '%s tracked case%s checked, %s update%s since your last scan alert.',
+                      c.cnt,
+                      CASE WHEN c.cnt = 1 THEN '' ELSE 's' END,
+                      COALESCE(n.cnt, 0),
+                      CASE WHEN COALESCE(n.cnt, 0) = 1 THEN '' ELSE 's' END
+                  ),
+                  CASE WHEN COALESCE(n.cnt, 0) > 0 THEN '/notifications' ELSE '/docket' END,
+                  'info'
+           FROM   users u
+           JOIN  (SELECT user_id, COUNT(*) AS cnt
+                  FROM   user_cases
+                  GROUP  BY user_id) c ON c.user_id = u.id
+           LEFT JOIN LATERAL (
+                  SELECT MAX(sent_at) AS at
+                  FROM   notifications
+                  WHERE  user_id = u.id AND type = 'scan_complete'
+           ) last ON TRUE
+           LEFT JOIN LATERAL (
+                  SELECT COUNT(*) AS cnt
+                  FROM   notifications
+                  WHERE  user_id = u.id
+                    AND  sent_at >= COALESCE(last.at, $1)
+                    AND  type IN ('new_judgment', 'case_available', 'case_listed',
+                                  'sitting_changed', 'sitting_reminder_1d',
+                                  'sitting_reminder_morning', 'parish_status_changed')
+           ) n ON TRUE
+           WHERE  u.notify_on_scan
+             AND  (
+                    last.at IS NULL
+                    OR last.at <= NOW() - CASE u.scan_alert_frequency
+                                               WHEN 'weekly' THEN INTERVAL '6 days 12 hours'
+                                               WHEN 'daily'  THEN INTERVAL '20 hours'
+                                               ELSE               INTERVAL '30 minutes'
+                                          END
+                  )"#,
+    )
+    .bind(since)
     .execute(pool)
     .await
     .map(|r| r.rows_affected())

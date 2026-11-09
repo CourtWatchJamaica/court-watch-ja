@@ -126,6 +126,29 @@ pub async fn start(
         sched.add(job).await?;
     }
 
+    // ── Sat / Sun 11:00 UTC (6 am Jamaica) — notification-only pass ─────────
+    // The scrapers don't run at weekends (the courts publish nothing), but the
+    // reminder engine only fires after a scraper run.  Without this, a hearing
+    // on Monday never gets its "tomorrow" email (that would have to go out on
+    // Sunday), and weekend status changes would wait until Monday morning.
+    {
+        let pool = pool.clone();
+        let config = config.clone();
+        let job = Job::new_async("0 0 11 * * Sat,Sun", move |_uuid, _lock| {
+            let pool = pool.clone();
+            let config = config.clone();
+            Box::pin(async move {
+                info!("=== Weekend notification pass starting ===");
+                match super::http_client() {
+                    Ok(client) => run_notification_pass(&pool, &client, &config).await,
+                    Err(e) => error!("Weekend notification pass: http client error: {e}"),
+                }
+                info!("=== Weekend notification pass complete ===");
+            })
+        })?;
+        sched.add(job).await?;
+    }
+
     // ── Daily RSS news feed at 08:00 UTC ─────────────────────────────────
     // Not gated by scraper_running: it never touches scraper_state, so it
     // can't race the court/judgment scrapers.
@@ -183,17 +206,7 @@ async fn run_court_lists(pool: &PgPool, config: &Config) -> anyhow::Result<()> {
 
     state.save_to_db(pool).await.ok();
 
-    {
-        let pool_n = pool.clone();
-        let client_n = client.clone();
-        let brevo_key = config.resend_api_key.clone();
-        tokio::spawn(async move {
-            crate::db::queries::check_notifications(&pool_n).await;
-            if let Some(ref key) = brevo_key {
-                dispatch_notification_emails(&pool_n, &client_n, key).await;
-            }
-        });
-    }
+    spawn_notification_pass(pool, &client, config);
 
     info!("=== Court-lists refresh complete ===");
     Ok(())
@@ -523,6 +536,11 @@ pub async fn run_catchup_check(pool: &PgPool, config: &Config) -> anyhow::Result
         Err(e) => warn!("Judge cleanup failed: {e}"),
     }
 
+    // Catch-up may have ingested days of court lists / judgments; generate the
+    // resulting notifications and emails now rather than waiting for the next
+    // cron slot (which, after a weekend outage, could be a day away).
+    spawn_notification_pass(pool, &client, config);
+
     info!("Catch-up check complete.");
     Ok(())
 }
@@ -714,17 +732,7 @@ pub async fn run_all(pool: &PgPool, config: &Config) -> anyhow::Result<()> {
     }
 
     // Spawn notification check + email dispatch non-blocking.
-    {
-        let pool_n = pool.clone();
-        let client_n = client.clone();
-        let brevo_key = config.resend_api_key.clone();
-        tokio::spawn(async move {
-            crate::db::queries::check_notifications(&pool_n).await;
-            if let Some(ref key) = brevo_key {
-                dispatch_notification_emails(&pool_n, &client_n, key).await;
-            }
-        });
-    }
+    spawn_notification_pass(pool, &client, config);
 
     // Alert the admin if any source has gone silent past its threshold.
     check_and_send_health_alerts(pool, &client, config).await;
@@ -838,6 +846,41 @@ async fn check_and_send_health_alerts(
 
 // ── Notification email dispatch ───────────────────────────────────────────────
 
+/// Generate in-app notifications for every tracked case, then email the ones
+/// that need an outbound message.  Email is skipped entirely when
+/// RESEND_API_KEY is unset.
+pub async fn run_notification_pass(pool: &PgPool, client: &reqwest::Client, config: &Config) {
+    // Taken from the DB clock so it compares cleanly with notifications.sent_at.
+    let since = queries::db_now(pool).await.ok();
+
+    queries::check_notifications(pool).await;
+
+    // Opt-in "the courts were checked" digest for users who want positive
+    // confirmation after every pass, even when nothing changed.
+    if let Some(since) = since {
+        match queries::create_scan_complete_notifications(pool, since).await {
+            Ok(n) if n > 0 => info!("[Notifications] {n} scan_complete digest(s) inserted"),
+            Ok(_) => {}
+            Err(e) => warn!("[Notifications] scan_complete digest failed: {e}"),
+        }
+    }
+
+    if let Some(ref key) = config.resend_api_key {
+        dispatch_notification_emails(pool, client, key).await;
+    }
+}
+
+/// Non-blocking variant used at the end of scraper runs so the run can report
+/// completion without waiting on the Resend API.
+fn spawn_notification_pass(pool: &PgPool, client: &reqwest::Client, config: &Config) {
+    let pool = pool.clone();
+    let client = client.clone();
+    let config = config.clone();
+    tokio::spawn(async move {
+        run_notification_pass(&pool, &client, &config).await;
+    });
+}
+
 async fn dispatch_notification_emails(
     pool: &PgPool,
     client: &reqwest::Client,
@@ -870,6 +913,13 @@ async fn dispatch_notification_emails(
     let app_url = app_url.trim_end_matches('/');
 
     for row in rows {
+        // Global opt-out (Settings → Email Notifications).  The row is already
+        // claimed (emailed_at set) so it won't be retried; in-app delivery is
+        // unaffected.
+        if !row.email_enabled {
+            continue;
+        }
+
         let case_ref = row.case_number.as_deref().unwrap_or("your tracked case");
         // Deep-link priority: an explicit `link` column (parish court cases,
         // which have no case_number) beats the docket route (judgments/sittings).
@@ -915,6 +965,29 @@ async fn dispatch_notification_emails(
                 );
                 (subj, body)
             }
+            "sitting_changed" => {
+                let event_type = row.event_type.as_deref().unwrap_or("hearing");
+                let court = row.court_division.as_deref().unwrap_or("the Supreme Court");
+                let date_str = row.event_date
+                    .map(|d| d.format("%A, %d %B %Y").to_string())
+                    .unwrap_or_else(|| "to be announced".into());
+                let time_str = row.event_time
+                    .map(|t| t.format("%-I:%M %p").to_string())
+                    .unwrap_or_else(|| "to be announced".into());
+                let subj = format!("CourtWatch JA: {case_ref} has been rescheduled");
+                let body = format!(
+                    r#"<p>The date or time of a case you are tracking has changed on the court list.</p>
+<table style="border-collapse:collapse;margin:16px 0">
+  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Case</td><td style="padding:4px 0;font-weight:600">{case_ref}</td></tr>
+  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Event</td><td style="padding:4px 0">{event_type}</td></tr>
+  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Court</td><td style="padding:4px 0">{court}</td></tr>
+  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">New date</td><td style="padding:4px 0">{date_str}</td></tr>
+  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">New time</td><td style="padding:4px 0">{time_str}</td></tr>
+</table>
+<p style="margin-top:24px"><a href="{cta_url}" style="background:#1d4ed8;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600">View on CourtWatch JA →</a></p>"#
+                );
+                (subj, body)
+            }
             "sitting_reminder_1d" => {
                 let event_type = row.event_type.as_deref().unwrap_or("hearing");
                 let court = row.court_division.as_deref().unwrap_or("the Supreme Court");
@@ -950,6 +1023,17 @@ async fn dispatch_notification_emails(
   <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="padding:4px 0">{date_str}</td></tr>
 </table>
 <p style="margin-top:24px"><a href="{cta_url}" style="background:#1d4ed8;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600">View on CourtWatch JA →</a></p>"#
+                );
+                (subj, body)
+            }
+            "scan_complete" => {
+                let title = row.title.as_deref().unwrap_or("Court scan complete");
+                let subj = format!("CourtWatch JA: {title}");
+                let body = format!(
+                    r#"<p>{}</p>
+<p style="color:#6b7280;font-size:14px">You are receiving this because Scan Alerts is turned on in your notification settings. Turn it off there if you only want to hear about changes to your cases.</p>
+<p style="margin-top:24px"><a href="{cta_url}" style="background:#1d4ed8;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600">View on CourtWatch JA →</a></p>"#,
+                    row.message.as_deref().unwrap_or("Your tracked cases were checked against the latest court lists and judgments.")
                 );
                 (subj, body)
             }

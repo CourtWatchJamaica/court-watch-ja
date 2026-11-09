@@ -276,15 +276,24 @@ async fn main() -> anyhow::Result<()> {
         let config_bg = config.clone();
         let scraper_running_bg = scraper_running.clone();
         tokio::spawn(async move {
-            // Same flag the admin "Run Now" / "Deep Scrape" triggers use — held
-            // for the whole catch-up check so a manual trigger fired during boot
-            // can't race it and clobber shared scraper_state (last-write-wins,
-            // see ScraperState::save_to_db).
-            scraper_running_bg.store(true, std::sync::atomic::Ordering::SeqCst);
-            if let Err(e) = scraper::runner::run_catchup_check(&pool_bg, &config_bg).await {
-                tracing::error!("Startup catch-up check failed: {e}");
+            // SKIP_STARTUP_CATCHUP=1 is a local-dev escape hatch: boot straight
+            // to the scheduler without scraping the live court sites.
+            let skip_catchup = std::env::var("SKIP_STARTUP_CATCHUP")
+                .map(|v| matches!(v.trim(), "1" | "true" | "TRUE" | "yes"))
+                .unwrap_or(false);
+            if skip_catchup {
+                tracing::warn!("SKIP_STARTUP_CATCHUP set — skipping startup catch-up check");
+            } else {
+                // Same flag the admin "Run Now" / "Deep Scrape" triggers use — held
+                // for the whole catch-up check so a manual trigger fired during boot
+                // can't race it and clobber shared scraper_state (last-write-wins,
+                // see ScraperState::save_to_db).
+                scraper_running_bg.store(true, std::sync::atomic::Ordering::SeqCst);
+                if let Err(e) = scraper::runner::run_catchup_check(&pool_bg, &config_bg).await {
+                    tracing::error!("Startup catch-up check failed: {e}");
+                }
+                scraper_running_bg.store(false, std::sync::atomic::Ordering::SeqCst);
             }
-            scraper_running_bg.store(false, std::sync::atomic::Ordering::SeqCst);
 
             if let Err(e) =
                 scraper::runner::start(pool_bg, config_bg, scraper_running_bg).await

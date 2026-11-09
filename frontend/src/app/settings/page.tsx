@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AuthGuard from "@/components/AuthGuard";
@@ -17,20 +17,46 @@ import {
 } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import {
+  ScanAlertSettings,
+  DEFAULT_SCAN_ALERT_PREFS,
+  type ScanAlertPrefs,
+} from "@/components/ScanAlertSettings";
 import { Settings as SettingsIcon, Palette, Bell, ChevronRight, HelpCircle, Mail } from "lucide-react";
 
 export default function SettingsPage() {
   const router = useRouter();
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [pushNotifications, setPushNotifications] = useState(true);
+  const [scanPrefs, setScanPrefs] = useState<ScanAlertPrefs>(DEFAULT_SCAN_ALERT_PREFS);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+
+  // Load the stored email preference so the switch reflects what the backend
+  // will actually do, rather than always rendering "on".
+  useEffect(() => {
+    apiClient
+      .getPreferences()
+      .then((p) => {
+        setEmailNotifications(p.email_notifications);
+        setScanPrefs({
+          enabled: p.notify_on_scan,
+          channel: p.scan_alert_channel,
+          frequency: p.scan_alert_frequency,
+        });
+      })
+      .catch((err) => console.error("Failed to load preferences:", err));
+  }, []);
 
   const handleSave = async () => {
     setSaving(true);
     setMessage("");
     try {
-      await apiClient.updatePreferences(emailNotifications, pushNotifications);
+      await apiClient.updatePreferences(emailNotifications, pushNotifications, {
+        notify_on_scan: scanPrefs.enabled,
+        scan_alert_channel: scanPrefs.channel,
+        scan_alert_frequency: scanPrefs.frequency,
+      });
       setMessage("Settings saved successfully!");
     } catch (error) {
       setMessage("Failed to save settings");
@@ -131,13 +157,20 @@ export default function SettingsPage() {
                   />
                 </div>
 
+                <ScanAlertSettings
+                  idPrefix="settings-scan"
+                  value={scanPrefs}
+                  onChange={setScanPrefs}
+                  emailEnabled={emailNotifications}
+                />
+
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label htmlFor="push-notifications" className="text-sm font-medium">
                       Push Notifications
                     </Label>
                     <p className="text-xs text-muted-foreground">
-                      Receive push notifications for case updates
+                      Coming soon — push delivery is not available yet
                     </p>
                   </div>
                   <Switch

@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import Navbar from "@/components/Navbar";
-import { apiClient } from "@/lib/api";
+import { apiClient, type UserPreferences } from "@/lib/api";
 import { UserCase, Judgment } from "@/lib/types";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -14,52 +14,79 @@ import {
   Scale,
   X,
   ChevronRight,
-  Building2,
   Clock,
+  Mail,
 } from "lucide-react";
+import {
+  ScanAlertSettings,
+  DEFAULT_SCAN_ALERT_PREFS,
+  type ScanAlertPrefs,
+} from "@/components/ScanAlertSettings";
 import { cn } from "@/lib/utils";
 
-/* ── Types ── */
-
-type Timing = "10min" | "1hour" | "1day";
+/* ── Types ──
+ * These mirror the backend's per-tracked-case preferences
+ * (user_case_settings.notify_*). They are persisted through
+ * PUT /api/user/cases/:row_id/settings and read back on GET /api/user/cases,
+ * so they drive the real in-app + email alerts — nothing is kept in
+ * localStorage any more.
+ */
+type AlertKey = "notify_immediately" | "notify_day_before" | "notify_morning_of";
 
 interface CaseNotifSettings {
-  enabled: boolean;
-  timings: Timing[];
+  notify_immediately: boolean;
+  notify_day_before: boolean;
+  notify_morning_of: boolean;
 }
 
-interface NotifSettings {
-  doNotDisturb: boolean;
-  defaultTimings: Timing[];
-  cases: Record<number, CaseNotifSettings>;
-}
-
-const STORAGE_KEY = "cwja_notif_settings";
-const TIMINGS: { id: Timing; label: string; description: string }[] = [
-  { id: "10min", label: "10 minutes before", description: "A quick reminder just before the sitting" },
-  { id: "1hour", label: "1 hour before", description: "Enough time to prepare and travel" },
-  { id: "1day", label: "1 day before", description: "Evening reminder the day before" },
+const ALERTS: { id: AlertKey; label: string; description: string }[] = [
+  {
+    id: "notify_immediately",
+    label: "When listed or updated",
+    description: "Listed on a court list, rescheduled, or judgment published",
+  },
+  {
+    id: "notify_day_before",
+    label: "Day before the hearing",
+    description: "Reminder the morning before the sitting",
+  },
+  {
+    id: "notify_morning_of",
+    label: "Morning of the hearing",
+    description: "Same-day reminder, around 6 AM",
+  },
 ];
 
 /* ── Helpers ── */
 
-function loadSettings(): NotifSettings {
-  if (typeof window === "undefined") return defaultSettings();
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw) as NotifSettings;
-  } catch {}
-  return defaultSettings();
+/** Backend treats a missing preference row as "all on". */
+function settingsFor(uc: UserCase): CaseNotifSettings {
+  return {
+    notify_immediately: uc.notify_immediately ?? true,
+    notify_day_before: uc.notify_day_before ?? true,
+    notify_morning_of: uc.notify_morning_of ?? true,
+  };
 }
 
-function defaultSettings(): NotifSettings {
-  return { doNotDisturb: false, defaultTimings: ["1day"], cases: {} };
+function anyEnabled(s: CaseNotifSettings): boolean {
+  return s.notify_immediately || s.notify_day_before || s.notify_morning_of;
 }
 
-function saveSettings(s: NotifSettings) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
-  } catch {}
+function caseLabel(uc: UserCase, judgments: Judgment[]): { title: string; court: string | null; citation: string | null } {
+  const j =
+    uc.case_type === "judgment" && uc.case_id != null
+      ? judgments.find((x) => x.id === uc.case_id)
+      : undefined;
+  const citation = uc.case_number ?? j?.case_number ?? null;
+  const title = j?.title || citation || `Case #${uc.case_id ?? uc.id}`;
+  const court =
+    j?.court ??
+    (uc.case_type === "parish_court"
+      ? "Parish Court"
+      : uc.case_type === "sitting"
+        ? "Court list"
+        : null);
+  return { title, court, citation: j?.title ? citation : null };
 }
 
 /* ── Toast ── */
@@ -69,7 +96,6 @@ function Toast({ message, onDismiss }: { message: string; onDismiss: () => void 
     const t = setTimeout(onDismiss, 3000);
     return () => clearTimeout(t);
   }, [onDismiss]);
-
   return (
     <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[90] flex items-center gap-2 rounded-full border border-foreground/15 bg-card/90 backdrop-blur-xl px-5 py-2.5 shadow-lg">
       <Bell className="h-3.5 w-3.5 text-[#009B3A]" />
@@ -81,26 +107,25 @@ function Toast({ message, onDismiss }: { message: string; onDismiss: () => void 
 /* ── Case Notification Panel ── */
 
 function CasePanel({
-  caseId,
-  judgment,
+  uc,
+  judgments,
   settings,
+  saving,
   onUpdate,
 }: {
-  caseId: number;
-  judgment: Judgment | null;
+  uc: UserCase;
+  judgments: Judgment[];
   settings: CaseNotifSettings;
+  saving: boolean;
   onUpdate: (s: CaseNotifSettings) => void;
 }) {
-  const title = judgment?.title || `Case #${caseId}`;
-  const court = judgment?.court ?? "Supreme Court";
-  const citation = judgment?.case_number ?? null;
+  const { title, court, citation } = caseLabel(uc, judgments);
+  const enabled = anyEnabled(settings);
 
-  const toggleTiming = (t: Timing) => {
-    const timings = settings.timings.includes(t)
-      ? settings.timings.filter((x) => x !== t)
-      : [...settings.timings, t];
-    onUpdate({ ...settings, timings });
-  };
+  const toggleAlert = (k: AlertKey) => onUpdate({ ...settings, [k]: !settings[k] });
+
+  const setAll = (v: boolean) =>
+    onUpdate({ notify_immediately: v, notify_day_before: v, notify_morning_of: v });
 
   return (
     <div className="flex-1 space-y-5">
@@ -109,7 +134,7 @@ function CasePanel({
         <div className="flex items-center gap-2 mb-2">
           <div className="flex items-center gap-1.5 rounded-full bg-[#009B3A]/10 border border-[#009B3A]/20 px-2.5 py-1">
             <Scale className="h-3 w-3 text-[#009B3A]" />
-            <span className="text-[10px] font-semibold text-[#009B3A]">{court}</span>
+            <span className="text-[10px] font-semibold text-[#009B3A]">{court ?? "Supreme Court"}</span>
           </div>
         </div>
         <p className="text-[14px] font-semibold text-foreground leading-snug">{title}</p>
@@ -122,33 +147,34 @@ function CasePanel({
       <div className="rounded-3xl border border-foreground/[0.07] bg-card p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            {settings.enabled ? (
+            {enabled ? (
               <Bell className="h-4 w-4 text-[#009B3A]" />
             ) : (
               <BellOff className="h-4 w-4 text-muted-foreground" />
             )}
             <div>
-              <Label htmlFor={`case-toggle-${caseId}`} className="text-sm font-medium">
+              <Label htmlFor={`case-toggle-${uc.id}`} className="text-sm font-medium">
                 Notifications
               </Label>
               <p className="text-[11px] text-muted-foreground">
-                {settings.enabled ? "Enabled for this case" : "Disabled for this case"}
+                {enabled ? "Enabled for this case" : "Disabled for this case"}
               </p>
             </div>
           </div>
           <Switch
-            id={`case-toggle-${caseId}`}
-            checked={settings.enabled}
-            onCheckedChange={(v) => onUpdate({ ...settings, enabled: v })}
+            id={`case-toggle-${uc.id}`}
+            checked={enabled}
+            disabled={saving}
+            onCheckedChange={(v) => setAll(v)}
           />
         </div>
       </div>
 
-      {/* Alert timings */}
+      {/* Alert types */}
       <div
         className={cn(
           "rounded-3xl border border-foreground/[0.07] bg-card overflow-hidden transition-opacity duration-200",
-          !settings.enabled && "opacity-40 pointer-events-none",
+          !enabled && "opacity-40",
         )}
       >
         <div className="px-4 pt-4 pb-2">
@@ -157,13 +183,15 @@ function CasePanel({
           </p>
         </div>
         <div className="divide-y divide-foreground/[0.05]">
-          {TIMINGS.map(({ id, label, description }) => {
-            const active = settings.timings.includes(id);
+          {ALERTS.map(({ id, label, description }) => {
+            const active = settings[id];
             return (
               <button
                 key={id}
-                onClick={() => toggleTiming(id)}
-                className="flex w-full items-center justify-between px-4 py-3.5 hover:bg-foreground/[0.025] transition-colors text-left"
+                type="button"
+                disabled={saving}
+                onClick={() => toggleAlert(id)}
+                className="flex w-full items-center justify-between px-4 py-3.5 hover:bg-foreground/[0.025] transition-colors text-left disabled:cursor-wait"
               >
                 <div className="flex items-center gap-3">
                   <div
@@ -192,8 +220,8 @@ function CasePanel({
         </div>
         <div className="px-4 pb-4 pt-2">
           <p className="text-[10px] text-muted-foreground">
-            Method: <span className="text-foreground font-medium">In-app</span>
-            <span className="ml-1 text-foreground/55">(email &amp; push coming soon)</span>
+            Delivered: <span className="text-foreground font-medium">In-app &amp; email</span>
+            <span className="ml-1 text-foreground/55">(email can be paused above)</span>
           </p>
         </div>
       </div>
@@ -206,22 +234,17 @@ function CasePanel({
 function ActiveNotifsList({
   trackedCases,
   judgments,
-  settings,
 }: {
   trackedCases: UserCase[];
   judgments: Judgment[];
-  settings: NotifSettings;
 }) {
   const items = trackedCases.flatMap((uc) => {
-    if (uc.case_id == null) return [];
-    const cs = settings.cases[uc.case_id];
-    if (!cs?.enabled || cs.timings.length === 0) return [];
-    const j = judgments.find((x) => x.id === uc.case_id);
-    const title = j?.title || `Case #${uc.case_id}`;
-    return cs.timings.map((t: string) => ({
-      key: `${uc.case_id}-${t}`,
+    const s = settingsFor(uc);
+    const { title } = caseLabel(uc, judgments);
+    return ALERTS.filter((a) => s[a.id]).map((a) => ({
+      key: `${uc.id}-${a.id}`,
       title,
-      timing: TIMINGS.find((x) => x.id === t)?.label ?? t,
+      timing: a.label,
     }));
   });
 
@@ -231,7 +254,7 @@ function ActiveNotifsList({
         <Bell className="mb-3 h-10 w-10 text-foreground/10" />
         <p className="text-sm text-foreground/70">No alerts scheduled</p>
         <p className="mt-1 text-[12px] text-foreground/55">
-          Track a case and enable notification timings above.
+          Track a case and enable alert types above.
         </p>
       </div>
     );
@@ -262,8 +285,12 @@ export default function NotificationSettingsPage() {
   const [trackedCases, setTrackedCases] = useState<UserCase[]>([]);
   const [judgments, setJudgments] = useState<Judgment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [settings, setSettings] = useState<NotifSettings>(defaultSettings());
-  const [selectedCaseId, setSelectedCaseId] = useState<number | null>(null);
+  const [emailEnabled, setEmailEnabled] = useState(true);
+  const [emailSaving, setEmailSaving] = useState(false);
+  const [scanPrefs, setScanPrefs] = useState<ScanAlertPrefs>(DEFAULT_SCAN_ALERT_PREFS);
+  const [scanSaving, setScanSaving] = useState(false);
+  const [savingRowId, setSavingRowId] = useState<number | null>(null);
+  const [selectedRowId, setSelectedRowId] = useState<number | null>(null);
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"settings" | "active">("settings");
   const [toast, setToast] = useState<string | null>(null);
@@ -275,14 +302,28 @@ export default function NotificationSettingsPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [casesRes, judgementsRes] = await Promise.all([
+        const [casesRes, judgementsRes, prefs] = await Promise.all([
           apiClient.getUserCases(),
           apiClient.getJudgments(),
+          apiClient.getPreferences().catch(
+            (): UserPreferences => ({
+              email_notifications: true,
+              notify_on_scan: DEFAULT_SCAN_ALERT_PREFS.enabled,
+              scan_alert_channel: DEFAULT_SCAN_ALERT_PREFS.channel,
+              scan_alert_frequency: DEFAULT_SCAN_ALERT_PREFS.frequency,
+            }),
+          ),
         ]);
         setTrackedCases(casesRes.cases);
         setJudgments(judgementsRes.judgments);
+        setEmailEnabled(prefs.email_notifications);
+        setScanPrefs({
+          enabled: prefs.notify_on_scan,
+          channel: prefs.scan_alert_channel,
+          frequency: prefs.scan_alert_frequency,
+        });
         if (casesRes.cases.length > 0) {
-          setSelectedCaseId(casesRes.cases[0].case_id);
+          setSelectedRowId(casesRes.cases[0].id);
         }
       } catch (err) {
         console.error("Failed to fetch notification settings data:", err);
@@ -290,38 +331,76 @@ export default function NotificationSettingsPage() {
         setLoading(false);
       }
     };
-    const loaded = loadSettings();
-    setSettings(loaded);
     fetchData();
   }, []);
 
+  /** Persist per-case alert preferences to the backend, with optimistic UI and rollback. */
   const updateCaseSettings = useCallback(
-    (caseId: number, cs: CaseNotifSettings) => {
-      setSettings((prev) => {
-        const next = { ...prev, cases: { ...prev.cases, [caseId]: cs } };
-        saveSettings(next);
-        return next;
-      });
-      showToast("Alert preferences saved");
+    async (uc: UserCase, next: CaseNotifSettings) => {
+      const previous = trackedCases;
+      setTrackedCases((prev) =>
+        prev.map((row) => (row.id === uc.id ? { ...row, ...next } : row)),
+      );
+      setSavingRowId(uc.id);
+      try {
+        await apiClient.updateCaseSettings(uc.id, next);
+        showToast("Alert preferences saved");
+      } catch (err) {
+        console.error("Failed to save alert preferences:", err);
+        setTrackedCases(previous);
+        showToast("Could not save — please try again");
+      } finally {
+        setSavingRowId(null);
+      }
     },
-    [showToast],
+    [trackedCases, showToast],
   );
 
-  const updateGlobal = useCallback(
-    (patch: Partial<NotifSettings>) => {
-      setSettings((prev) => {
-        const next = { ...prev, ...patch };
-        saveSettings(next);
-        return next;
-      });
+  /** Persist the global email opt-in (users.email_notifications). */
+  const updateEmailEnabled = useCallback(
+    async (v: boolean) => {
+      const previous = emailEnabled;
+      setEmailEnabled(v);
+      setEmailSaving(true);
+      try {
+        await apiClient.updatePreferences(v, false);
+        showToast(v ? "Email alerts resumed" : "Email alerts paused");
+      } catch (err) {
+        console.error("Failed to save email preference:", err);
+        setEmailEnabled(previous);
+        showToast("Could not save — please try again");
+      } finally {
+        setEmailSaving(false);
+      }
     },
-    [],
+    [emailEnabled, showToast],
   );
 
-  const getCaseSettings = (caseId: number): CaseNotifSettings =>
-    settings.cases[caseId] ?? { enabled: false, timings: settings.defaultTimings };
+  /** Persist the scan-alert preferences (users.notify_on_scan / channel / frequency). */
+  const updateScanPrefs = useCallback(
+    async (next: ScanAlertPrefs) => {
+      const previous = scanPrefs;
+      setScanPrefs(next);
+      setScanSaving(true);
+      try {
+        await apiClient.updatePreferences(emailEnabled, false, {
+          notify_on_scan: next.enabled,
+          scan_alert_channel: next.channel,
+          scan_alert_frequency: next.frequency,
+        });
+        showToast(next.enabled ? "Scan alert preferences saved" : "Scan alerts off");
+      } catch (err) {
+        console.error("Failed to save scan preference:", err);
+        setScanPrefs(previous);
+        showToast("Could not save — please try again");
+      } finally {
+        setScanSaving(false);
+      }
+    },
+    [scanPrefs, emailEnabled, showToast],
+  );
 
-  const selectedJudgment = judgments.find((j) => j.id === selectedCaseId) ?? null;
+  const selectedCase = trackedCases.find((uc) => uc.id === selectedRowId) ?? null;
 
   return (
     <AuthGuard>
@@ -356,55 +435,47 @@ export default function NotificationSettingsPage() {
           {/* Global settings strip */}
           <div className="mb-6 rounded-3xl border border-foreground/[0.07] bg-card p-4">
             <div className="flex flex-col sm:flex-row gap-4">
-              {/* Do Not Disturb */}
-              <div className="flex items-center justify-between flex-1 gap-4">
+              {/* Email alerts */}
+              <div className="flex items-center justify-between flex-1 gap-4 sm:self-start">
                 <div className="flex items-center gap-2.5">
-                  <BellOff className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
                   <div>
-                    <Label htmlFor="dnd-toggle" className="text-sm font-medium">
-                      Do Not Disturb
+                    <Label htmlFor="email-toggle" className="text-sm font-medium">
+                      Email Alerts
                     </Label>
-                    <p className="text-[11px] text-muted-foreground">Pause all notifications</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {emailEnabled
+                        ? "Case alerts are also sent to your email"
+                        : "Paused — alerts appear in-app only"}
+                    </p>
                   </div>
                 </div>
                 <Switch
-                  id="dnd-toggle"
-                  checked={settings.doNotDisturb}
-                  onCheckedChange={(v) => updateGlobal({ doNotDisturb: v })}
+                  id="email-toggle"
+                  checked={emailEnabled}
+                  disabled={emailSaving}
+                  onCheckedChange={(v) => updateEmailEnabled(v)}
                 />
               </div>
 
               <div className="h-px sm:h-auto sm:w-px bg-foreground/[0.07]" />
 
-              {/* Default timing */}
-              <div className="flex-1">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                  Default Alert (new cases)
-                </p>
-                <div className="flex gap-1.5 flex-wrap">
-                  {TIMINGS.map(({ id, label }) => (
-                    <button
-                      key={id}
-                      onClick={() =>
-                        updateGlobal({
-                          defaultTimings: settings.defaultTimings.includes(id)
-                            ? settings.defaultTimings.filter((x) => x !== id)
-                            : [...settings.defaultTimings, id],
-                        })
-                      }
-                      className={cn(
-                        "rounded-full px-2.5 py-1 text-[10px] font-semibold border transition-all duration-150",
-                        settings.defaultTimings.includes(id)
-                          ? "border-[#009B3A]/50 bg-[#009B3A]/15 text-[#009B3A]"
-                          : "border-foreground/[0.1] text-foreground/70 hover:border-foreground/25 hover:text-foreground/60",
-                      )}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
+              {/* Scan alerts */}
+              <div className="flex-1 min-w-0">
+                <ScanAlertSettings
+                  idPrefix="notif-scan"
+                  value={scanPrefs}
+                  onChange={(next) => updateScanPrefs(next)}
+                  disabled={scanSaving}
+                  emailEnabled={emailEnabled}
+                />
               </div>
             </div>
+            <p className="mt-3 text-[11px] text-muted-foreground leading-relaxed">
+              New cases you track start with every alert type on. The courts are
+              checked each weekday around 6 AM, 10 AM and 2 PM, with a reminder
+              pass on weekend mornings.
+            </p>
           </div>
 
           {/* Tabs: Settings / Active */}
@@ -426,11 +497,7 @@ export default function NotificationSettingsPage() {
           </div>
 
           {activeTab === "active" ? (
-            <ActiveNotifsList
-              trackedCases={trackedCases}
-              judgments={judgments}
-              settings={settings}
-            />
+            <ActiveNotifsList trackedCases={trackedCases} judgments={judgments} />
           ) : loading ? (
             <div className="space-y-2.5">
               {[1, 2, 3].map((i) => (
@@ -465,16 +532,15 @@ export default function NotificationSettingsPage() {
                   </p>
                 </div>
                 <div className="divide-y divide-foreground/[0.05]">
-                  {trackedCases.filter((uc) => uc.case_id != null).map((uc) => {
-                    const caseId = uc.case_id!;
-                    const j = judgments.find((x) => x.id === caseId);
-                    const cs = getCaseSettings(caseId);
-                    const selected = selectedCaseId === caseId;
+                  {trackedCases.map((uc) => {
+                    const { title, court } = caseLabel(uc, judgments);
+                    const enabled = anyEnabled(settingsFor(uc));
+                    const selected = selectedRowId === uc.id;
                     return (
                       <button
                         key={uc.id}
                         onClick={() => {
-                          setSelectedCaseId(caseId);
+                          setSelectedRowId(uc.id);
                           setMobileSheetOpen(true);
                         }}
                         className={cn(
@@ -487,24 +553,22 @@ export default function NotificationSettingsPage() {
                         <div
                           className={cn(
                             "flex h-7 w-7 shrink-0 items-center justify-center rounded-xl transition-colors",
-                            cs.enabled
-                              ? "bg-[#009B3A]/15"
-                              : "bg-foreground/[0.05]",
+                            enabled ? "bg-[#009B3A]/15" : "bg-foreground/[0.05]",
                           )}
                         >
                           <Bell
                             className={cn(
                               "h-3.5 w-3.5",
-                              cs.enabled ? "text-[#009B3A]" : "text-foreground/60",
+                              enabled ? "text-[#009B3A]" : "text-foreground/60",
                             )}
                           />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-[12px] font-medium text-foreground/80 truncate">
-                            {j?.title || `Case #${uc.case_id}`}
+                            {title}
                           </p>
-                          {j?.court && (
-                            <p className="text-[10px] text-foreground/65 truncate">{j.court}</p>
+                          {court && (
+                            <p className="text-[10px] text-foreground/65 truncate">{court}</p>
                           )}
                         </div>
                         <ChevronRight className="h-3.5 w-3.5 text-foreground/50 shrink-0" />
@@ -516,12 +580,13 @@ export default function NotificationSettingsPage() {
 
               {/* Right: Settings panel — desktop only */}
               <div className="hidden lg:block">
-                {selectedCaseId !== null ? (
+                {selectedCase ? (
                   <CasePanel
-                    caseId={selectedCaseId}
-                    judgment={selectedJudgment}
-                    settings={getCaseSettings(selectedCaseId)}
-                    onUpdate={(cs) => updateCaseSettings(selectedCaseId, cs)}
+                    uc={selectedCase}
+                    judgments={judgments}
+                    settings={settingsFor(selectedCase)}
+                    saving={savingRowId === selectedCase.id}
+                    onUpdate={(s) => updateCaseSettings(selectedCase, s)}
                   />
                 ) : (
                   <div className="flex items-center justify-center h-48 rounded-3xl border border-foreground/[0.06] text-foreground/60 text-sm">
@@ -534,7 +599,7 @@ export default function NotificationSettingsPage() {
         </main>
 
         {/* ── Mobile: bottom sheet for case settings ── */}
-        {mobileSheetOpen && selectedCaseId !== null && (
+        {mobileSheetOpen && selectedCase && (
           <>
             <div
               className="lg:hidden fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm"
@@ -556,12 +621,11 @@ export default function NotificationSettingsPage() {
               </div>
               <div className="overflow-y-auto px-5 py-5">
                 <CasePanel
-                  caseId={selectedCaseId}
-                  judgment={selectedJudgment}
-                  settings={getCaseSettings(selectedCaseId)}
-                  onUpdate={(cs) => {
-                    updateCaseSettings(selectedCaseId, cs);
-                  }}
+                  uc={selectedCase}
+                  judgments={judgments}
+                  settings={settingsFor(selectedCase)}
+                  saving={savingRowId === selectedCase.id}
+                  onUpdate={(s) => updateCaseSettings(selectedCase, s)}
                 />
               </div>
             </div>

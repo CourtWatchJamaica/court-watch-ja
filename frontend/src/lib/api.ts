@@ -32,6 +32,13 @@ import {
   UserCase,
 } from "./types";
 
+export interface UserPreferences {
+  email_notifications: boolean;
+  notify_on_scan: boolean;
+  scan_alert_channel: "in_app" | "both";
+  scan_alert_frequency: "every_scan" | "daily" | "weekly";
+}
+
 const DIRECT_API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
 // In the browser every call goes through the same-origin proxy, which attaches
 // the httpOnly session cookie. During SSR (public data only) call the API directly.
@@ -366,13 +373,26 @@ export const apiClient = {
     return request(`/notifications/${id}`, { method: "DELETE" });
   },
 
+  async getPreferences(): Promise<UserPreferences> {
+    return request("/user/preferences");
+  },
+
+  /**
+   * Scan-alert fields are optional: when omitted the backend leaves the stored
+   * values untouched.
+   */
   async updatePreferences(
     email_notifications: boolean,
     push_notifications: boolean,
+    scan?: {
+      notify_on_scan: boolean;
+      scan_alert_channel: "in_app" | "both";
+      scan_alert_frequency: "every_scan" | "daily" | "weekly";
+    },
   ): Promise<{ success: boolean }> {
     return request("/user/preferences", {
       method: "PUT",
-      body: JSON.stringify({ email_notifications, push_notifications }),
+      body: JSON.stringify({ email_notifications, push_notifications, ...scan }),
     });
   },
 

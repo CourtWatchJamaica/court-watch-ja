@@ -14,7 +14,7 @@ export interface NotifSettings {
 const NOTIF_ITEMS: { key: keyof NotifSettings; label: string; sub: string }[] = [
   { key: "notify_immediately", label: "When listed or updated",  sub: "Any change to this case" },
   { key: "notify_day_before",  label: "Day before the hearing",  sub: "Evening reminder" },
-  { key: "notify_morning_of",  label: "Morning of the hearing",  sub: "Same-day alert at 7 AM" },
+  { key: "notify_morning_of",  label: "Morning of the hearing",  sub: "Same-day alert, around 6 AM" },
 ];
 
 export function NotifModal({
