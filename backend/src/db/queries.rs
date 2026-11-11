@@ -151,7 +151,11 @@ pub async fn update_user_profile(
 
 pub async fn bootstrap_admin(pool: &PgPool, email: &str) -> sqlx::Result<()> {
     sqlx::query(
-        "UPDATE users SET role = 'super_admin' WHERE email = $1 AND role != 'super_admin'",
+        // Only a verified owner of ADMIN_EMAIL is promoted — otherwise anyone
+        // who points an unverified account at that address would become
+        // super_admin on the next restart.
+        "UPDATE users SET role = 'super_admin'
+          WHERE email = $1 AND role != 'super_admin' AND email_verified = TRUE",
     )
     .bind(email)
     .execute(pool)
@@ -2779,7 +2783,33 @@ pub async fn find_or_create_oauth_user(
 ) -> sqlx::Result<(User, bool)> {
     // Fast path: existing user
     if let Some(u) = find_user_by_email(pool, email).await? {
-        return Ok((u, false));
+        if u.email_verified {
+            return Ok((u, false));
+        }
+        // The account holds this address but never proved ownership of it:
+        // it was created by password signup, or re-pointed here by an email
+        // change, possibly by someone other than the address owner. The OAuth
+        // provider has just verified the real owner, so hand the account to
+        // them: drop the old password, revoke every existing session, and
+        // discard pending tokens (which may carry a stranger's new password).
+        let mut tx = pool.begin().await?;
+        sqlx::query("DELETE FROM verification_tokens WHERE user_id = $1")
+            .bind(u.id)
+            .execute(&mut *tx)
+            .await?;
+        let claimed = sqlx::query_as::<_, User>(
+            "UPDATE users
+                SET email_verified = TRUE,
+                    password_hash  = '$oauth$no_password',
+                    token_version  = token_version + 1
+              WHERE id = $1
+              RETURNING id, email, password_hash, role, display_name, created_at, email_verified",
+        )
+        .bind(u.id)
+        .fetch_one(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        return Ok((claimed, false));
     }
 
     // Create; ON CONFLICT DO NOTHING guards against a race.
@@ -3704,6 +3734,38 @@ pub async fn upsert_parish_case(
     Ok(())
 }
 
+/// Set `week_of` on rows from one source PDF that were stored without a date.
+/// Returns the number of rows updated.
+pub async fn backfill_parish_case_week(
+    pool: &PgPool,
+    pdf_source_url: &str,
+    week_of: NaiveDate,
+) -> sqlx::Result<u64> {
+    let res = sqlx::query(
+        "UPDATE parish_court_cases
+            SET week_of = $1
+          WHERE pdf_source_url = $2
+            AND week_of IS NULL",
+    )
+    .bind(week_of)
+    .bind(pdf_source_url)
+    .execute(pool)
+    .await?;
+    Ok(res.rows_affected())
+}
+
+/// Distinct source PDFs that still have rows without a `week_of`.
+pub async fn undated_parish_case_pdf_urls(pool: &PgPool) -> sqlx::Result<Vec<String>> {
+    sqlx::query_scalar(
+        "SELECT DISTINCT pdf_source_url
+           FROM parish_court_cases
+          WHERE week_of IS NULL
+            AND pdf_source_url IS NOT NULL",
+    )
+    .fetch_all(pool)
+    .await
+}
+
 // ── Case lookup ────────────────────────────────────────────────────────────────
 
 pub async fn case_lookup(
@@ -4547,6 +4609,54 @@ mod judge_dedupe_tests {
             .expect("db connect");
         let deleted = super::dedupe_judges_table(&pool).await.expect("dedupe");
         println!("deleted {deleted} duplicate judge row(s)");
+    }
+
+    /// OAuth sign-in must take over an account that holds the address without
+    /// having verified it, and must leave a verified account untouched.
+    /// Creates and removes its own throwaway users.  Run manually with:
+    ///   DATABASE_URL=… cargo test oauth_claims_unverified -- --ignored
+    #[tokio::test]
+    #[ignore]
+    async fn oauth_claims_unverified_account_against_database() {
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL not set");
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .max_connections(2)
+            .connect(&url)
+            .await
+            .expect("db connect");
+        let tag = uuid::Uuid::new_v4();
+        let squatted = format!("oauth-test-squat-{tag}@example.invalid");
+        let verified = format!("oauth-test-ok-{tag}@example.invalid");
+
+        // Unverified account with a password someone else chose.
+        let u = super::create_user(&pool, &squatted, "$2y$12$attackerchosenhash", None)
+            .await
+            .expect("create");
+        assert!(!u.email_verified);
+        let v0 = super::get_token_version(&pool, u.id).await.unwrap();
+        let (claimed, is_new) = super::find_or_create_oauth_user(&pool, &squatted, None)
+            .await
+            .expect("oauth");
+        assert!(!is_new);
+        assert_eq!(claimed.id, u.id);
+        assert!(claimed.email_verified);
+        assert_eq!(claimed.password_hash, "$oauth$no_password");
+        assert_eq!(super::get_token_version(&pool, u.id).await.unwrap(), v0 + 1);
+
+        // Verified account keeps its password and sessions.
+        let w = super::create_user(&pool, &verified, "$2y$12$ownerhash", None)
+            .await
+            .expect("create");
+        super::mark_email_verified(&pool, w.id).await.unwrap();
+        let w0 = super::get_token_version(&pool, w.id).await.unwrap();
+        let (same, _) = super::find_or_create_oauth_user(&pool, &verified, None)
+            .await
+            .expect("oauth");
+        assert_eq!(same.password_hash, "$2y$12$ownerhash");
+        assert_eq!(super::get_token_version(&pool, w.id).await.unwrap(), w0);
+
+        super::admin_delete_user(&pool, u.id).await.unwrap();
+        super::admin_delete_user(&pool, w.id).await.unwrap();
     }
 
     /// Dry run against a live database: prints the merge plan without

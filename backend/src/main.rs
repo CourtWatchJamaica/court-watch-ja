@@ -133,6 +133,25 @@ async fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
+    // One-off CLI mode: run only the Parish Court case-list scraper and exit.
+    // No other scrapers and no notification pass run in this mode.
+    if std::env::args().any(|a| a == "--scrape-parish-cases") {
+        let client = scraper::http_client()?;
+        let mut state =
+            scraper::ScraperState::load_from_db(&pool, &config.scraper_state_path).await;
+        let inserted = scraper::parish_court_judges::run(
+            &pool,
+            &mut state,
+            config.judgment_cutoff_date,
+            &client,
+            &config.pdf_dir,
+        )
+        .await?;
+        state.save_to_db(&pool).await?;
+        info!("[Parish Cases] Done: {inserted} case row(s) upserted");
+        return Ok(());
+    }
+
     // One-off CLI mode: ingest Wayback-recovered court-list PDFs from a TSV
     // manifest (local_path<TAB>original_url) and exit.
     {

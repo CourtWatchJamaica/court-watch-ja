@@ -67,14 +67,30 @@ pub async fn run(
             }
         };
 
-        let pdf_urls = extract_pdf_urls_from_rss(&rss_xml);
-        total_in_rss += pdf_urls.len();
+        let entries = extract_rss_entries(&rss_xml);
+        total_in_rss += entries.len();
         info!(
             "[Parish Cases] {parish} — {} PDF(s) in RSS",
-            pdf_urls.len()
+            entries.len()
         );
 
-        for pdf_url in &pdf_urls {
+        for (pdf_url, title_date) in &entries {
+            // The post title ("… for the week of July 20th, 2026") is the most
+            // reliable date source: many filenames carry no date at all
+            // (e.g. "Hanover Criminal Division 166.pdf") or a mistyped one.
+            let week_of = title_date.or_else(|| date_from_url(pdf_url));
+
+            // Backfill rows stored before the title date was used.
+            if let Some(d) = week_of {
+                match queries::backfill_parish_case_week(pool, pdf_url, d).await {
+                    Ok(n) if n > 0 => info!(
+                        "[Parish Cases] {parish} — backfilled week_of={d} on {n} row(s) from {pdf_url}"
+                    ),
+                    Ok(_) => {}
+                    Err(e) => warn!("[Parish Cases] week_of backfill failed for {pdf_url}: {e}"),
+                }
+            }
+
             if state.parish_case_pdf_already_processed(pdf_url) {
                 continue;
             }
@@ -113,7 +129,6 @@ pub async fn run(
 
             let text = normalize_ocr_text(&raw_text);
             let rows = parse_case_rows(&text);
-            let week_of = date_from_url(pdf_url);
 
             let mut new_cases = 0usize;
             for row in &rows {
@@ -148,6 +163,24 @@ pub async fn run(
         }
     }
 
+    // Older PDFs have dropped out of the feeds (latest 10 posts only), so for
+    // any rows still undated, retry the filename with the current patterns.
+    match queries::undated_parish_case_pdf_urls(pool).await {
+        Ok(urls) => {
+            for url in urls {
+                let Some(d) = date_from_url(&url) else { continue };
+                match queries::backfill_parish_case_week(pool, &url, d).await {
+                    Ok(n) if n > 0 => info!(
+                        "[Parish Cases] backfilled week_of={d} on {n} row(s) from filename {url}"
+                    ),
+                    Ok(_) => {}
+                    Err(e) => warn!("[Parish Cases] week_of backfill failed for {url}: {e}"),
+                }
+            }
+        }
+        Err(e) => warn!("[Parish Cases] could not list undated PDFs: {e}"),
+    }
+
     info!(
         "[Parish Cases] RSS feed found {total_in_rss} PDFs. \
          Downloaded {total_downloaded} new PDFs, {total_inserted} cases upserted."
@@ -172,6 +205,36 @@ fn extract_pdf_urls_from_rss(xml: &str) -> Vec<String> {
         .map(|m| m.as_str().to_string())
         .filter(|u| seen.insert(u.clone()))
         .collect()
+}
+
+/// Pair every PDF URL in the feed with the week date parsed from the title of
+/// the `<item>` it belongs to.  Falls back to a whole-document URL scan (no
+/// dates) if the feed has no recognisable `<item>` blocks.
+fn extract_rss_entries(xml: &str) -> Vec<(String, Option<NaiveDate>)> {
+    let item_re = Regex::new(r"(?s)<item\b[^>]*>(.*?)</item>").expect("static regex");
+    let title_re = Regex::new(r"(?s)<title>(.*?)</title>").expect("static regex");
+
+    let mut seen = std::collections::HashSet::new();
+    let mut out = Vec::new();
+    for item in item_re.captures_iter(xml) {
+        let body = &item[1];
+        let title_date = title_re
+            .captures(body)
+            .and_then(|c| date_from_text(&c[1].to_lowercase()));
+        for url in extract_pdf_urls_from_rss(body) {
+            if seen.insert(url.clone()) {
+                out.push((url, title_date));
+            }
+        }
+    }
+
+    if out.is_empty() {
+        return extract_pdf_urls_from_rss(xml)
+            .into_iter()
+            .map(|u| (u, None))
+            .collect();
+    }
+    out
 }
 
 // ── HTTP ──────────────────────────────────────────────────────────────────────
@@ -275,16 +338,20 @@ fn normalize_ocr_text(text: &str) -> String {
 fn date_from_url(url: &str) -> Option<NaiveDate> {
     let decoded = percent_decode(url);
     let filename = decoded.split('/').last().unwrap_or("").to_lowercase();
+    date_from_text(&filename)
+}
 
+/// Find a date in lowercase free text (a PDF filename or an RSS item title).
+fn date_from_text(filename: &str) -> Option<NaiveDate> {
     let iso = Regex::new(r"(\d{4}-\d{2}-\d{2})").unwrap();
-    if let Some(cap) = iso.captures(&filename) {
+    if let Some(cap) = iso.captures(filename) {
         if let Ok(d) = NaiveDate::parse_from_str(&cap[1], "%Y-%m-%d") {
             return Some(d);
         }
     }
 
     let compact = Regex::new(r"(\d{4})(\d{2})(\d{2})").unwrap();
-    if let Some(cap) = compact.captures(&filename) {
+    if let Some(cap) = compact.captures(filename) {
         let s = format!("{}-{}-{}", &cap[1], &cap[2], &cap[3]);
         if let Ok(d) = NaiveDate::parse_from_str(&s, "%Y-%m-%d") {
             return Some(d);
@@ -292,7 +359,7 @@ fn date_from_url(url: &str) -> Option<NaiveDate> {
     }
 
     let dmy = Regex::new(r"(\d{1,2})\.(\d{1,2})\.(\d{2,4})").unwrap();
-    if let Some(cap) = dmy.captures(&filename) {
+    if let Some(cap) = dmy.captures(filename) {
         let day: u32 = cap[1].parse().ok()?;
         let month: u32 = cap[2].parse().ok()?;
         let year_raw: i32 = cap[3].parse().ok()?;
@@ -303,13 +370,41 @@ fn date_from_url(url: &str) -> Option<NaiveDate> {
     }
 
     let month_day = Regex::new(
-        r"(?i)(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*[\s,]+(\d{1,2})(st|nd|rd|th)?[,\s]+(\d{4})",
+        r"(?i)\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[\s,\-]+(\d{1,2})(st|nd|rd|th)?[,\s\-]+(\d{4})",
     )
     .unwrap();
-    if let Some(cap) = month_day.captures(&filename) {
+    if let Some(cap) = month_day.captures(filename) {
         let month = month_abbr_to_num(&cap[1])?;
         let day: u32 = cap[2].parse().ok()?;
         let year: i32 = cap[4].parse().ok()?;
+        if let Some(d) = NaiveDate::from_ymd_opt(year, month, day) {
+            return Some(d);
+        }
+    }
+
+    // "week of may 26 to 29 2026" / "march 30th to 2nd april 2026"
+    let month_range = Regex::new(
+        r"(?i)\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{1,2})(st|nd|rd|th)?\s+to\s+.{0,20}?\b(\d{4})\b",
+    )
+    .unwrap();
+    if let Some(cap) = month_range.captures(filename) {
+        let month = month_abbr_to_num(&cap[1])?;
+        let day: u32 = cap[2].parse().ok()?;
+        let year: i32 = cap[4].parse().ok()?;
+        if let Some(d) = NaiveDate::from_ymd_opt(year, month, day) {
+            return Some(d);
+        }
+    }
+
+    // "the 6th of July, 2020" / "6 July 2020"
+    let day_month = Regex::new(
+        r"(?i)\b(\d{1,2})(st|nd|rd|th)?\s+(of\s+)?(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[,\s]+(\d{4})",
+    )
+    .unwrap();
+    if let Some(cap) = day_month.captures(filename) {
+        let day: u32 = cap[1].parse().ok()?;
+        let month = month_abbr_to_num(&cap[4])?;
+        let year: i32 = cap[5].parse().ok()?;
         if let Some(d) = NaiveDate::from_ymd_opt(year, month, day) {
             return Some(d);
         }
@@ -543,6 +638,51 @@ COURT LIST - CIVIL DIVISION
         let urls = extract_pdf_urls_from_rss(xml);
         assert_eq!(urls.len(), 1);
         assert!(urls[0].ends_with("Hanover%20Criminal%20Division%20158.pdf"));
+    }
+
+    #[test]
+    fn rss_entries_take_week_from_item_title() {
+        let xml = r#"<channel><title>The Parish Court - Hanover Parish Court</title>
+<item><title>Hanover Parish Court - Criminal Court List for the week of July 20th, 2026</title>
+<description>&lt;a href=&quot;https://parishcourt.gov.jm/sites/default/files/Hanover%20Criminal%20Division%20166.pdf&quot;&gt;x&lt;/a&gt;</description></item>
+<item><title>Portland Parish Court List for week October 26, 2026 (Civil)</title>
+<description>https://parishcourt.gov.jm/sites/default/files/October-26-2026-Civil.pdf</description></item>
+<item><title>LIST OF CASES COMMENCING THE 6TH OF JULY, 2020</title>
+<description>https://parishcourt.gov.jm/sites/default/files/Gun-Court.pdf</description></item>
+<item><title>No date here</title>
+<description>https://parishcourt.gov.jm/sites/default/files/Undated.pdf</description></item></channel>"#;
+        let e = extract_rss_entries(xml);
+        assert_eq!(e.len(), 4);
+        assert_eq!(e[0].1, NaiveDate::from_ymd_opt(2026, 7, 20));
+        assert_eq!(e[1].1, NaiveDate::from_ymd_opt(2026, 10, 26));
+        assert_eq!(e[2].1, NaiveDate::from_ymd_opt(2020, 7, 6));
+        assert_eq!(e[3].1, None);
+    }
+
+    #[test]
+    fn filename_dates_still_parse() {
+        let base = "https://parishcourt.gov.jm/sites/default/files/";
+        assert_eq!(
+            date_from_url(&format!("{base}October-26-2026-Civil.pdf")),
+            NaiveDate::from_ymd_opt(2026, 10, 26)
+        );
+        assert_eq!(
+            date_from_url(&format!("{base}May%2011%2C%202026%20Criminal.pdf")),
+            NaiveDate::from_ymd_opt(2026, 5, 11)
+        );
+        assert_eq!(date_from_url(&format!("{base}Hanover%20Criminal%20Division%20166.pdf")), None);
+        assert_eq!(
+            date_from_url(&format!("{base}WEEK%20OF%20MAY%2018%20TO%2022%202026.pdf")),
+            NaiveDate::from_ymd_opt(2026, 5, 18)
+        );
+        assert_eq!(
+            date_from_url(&format!("{base}WEEK%20OF%20MARCH%2030TH%20%20TO%202ND%20APRIL%202026.pdf")),
+            NaiveDate::from_ymd_opt(2026, 3, 30)
+        );
+        assert_eq!(
+            date_from_url(&format!("{base}April-13-2026-Criminal.pdf")),
+            NaiveDate::from_ymd_opt(2026, 4, 13)
+        );
     }
 
     #[test]
