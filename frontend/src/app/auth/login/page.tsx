@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { apiClient, ApiError } from "@/lib/api";
-import { Scale, Loader2, Eye, EyeOff } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react";
+import BrandLogo from "@/components/BrandLogo";
 import CourtroomBackground from "@/components/CourtroomBackground";
 import { markLoggedIn } from "@/lib/session";
 
@@ -90,7 +91,7 @@ export default function LoginPage() {
       <div className="relative z-10 w-full max-w-sm">
         {/* Logo */}
         <div className="mb-8 flex flex-col items-center gap-3">
-          <span className="flex h-14 w-14 items-center justify-center rounded-full border border-amber-200/25 bg-white/[0.06] backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_10px_30px_rgba(0,0,0,0.4)]"><Scale className="h-7 w-7 text-amber-400" /></span>
+          <span className="flex h-14 w-14 items-center justify-center rounded-full border border-amber-200/25 bg-white/[0.06] backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_10px_30px_rgba(0,0,0,0.4)]"><BrandLogo size={40} priority className="h-10 w-10" /></span>
           <div className="text-center">
             <h1 className="text-[1.9rem] font-extrabold tracking-[-0.04em] leading-none text-white">
               CourtWatch JA

@@ -194,11 +194,13 @@ pub async fn signup(
             let app_url = app_url.trim_end_matches('/');
             let verify_url = format!("{app_url}/verify-email?token={token}");
             let subject = "Verify your CourtWatch JA email";
-            let html = format!(
-                r#"<p>Thank you for signing up to <strong>CourtWatch JA</strong>.</p>
-<p>Click the link below to verify your email address:</p>
-<p><a href="{verify_url}">Verify Email Address</a></p>
-<p>This link expires in 24 hours. If you did not create an account, please ignore this email.</p>"#
+            let html = crate::notifications::email::render(
+                "Verify your email address",
+                crate::notifications::email::Accent::Green,
+                &crate::notifications::email::p("Thanks for signing up for CourtWatch JA. Click the button below to verify your email and start tracking Jamaican court cases."),
+                &[],
+                Some(("Verify Email", &verify_url)),
+                Some("This link expires in 24 hours. If you didn't create an account, you can ignore this email."),
             );
             if let Err(e) =
                 crate::notifications::email::send_email(
@@ -469,11 +471,13 @@ pub async fn request_password_change(
             let app_url = app_url.trim_end_matches('/');
             let confirm_url = format!("{app_url}/verify-password-change?token={token}");
             let subject = "Confirm your CourtWatch JA password change";
-            let html = format!(
-                r#"<p>We received a request to change the password on your CourtWatch JA account.</p>
-<p>Click the link below to confirm. This link expires in <strong>15 minutes</strong>.</p>
-<p><a href="{confirm_url}">Confirm Password Change</a></p>
-<p>If you did not request this change, you can safely ignore this email — your password will not be changed.</p>"#
+            let html = crate::notifications::email::render(
+                "Confirm your password change",
+                crate::notifications::email::Accent::Green,
+                &crate::notifications::email::p("We received a request to change the password on your CourtWatch JA account. Click the button below to confirm."),
+                &[],
+                Some(("Confirm Password Change", &confirm_url)),
+                Some("This link expires in 15 minutes. If you didn't request this change, you can ignore this email and your password will stay the same."),
             );
             if let Err(e) = crate::notifications::email::send_email(
                 &client,
@@ -562,11 +566,13 @@ pub async fn forgot_password(
                     let app_url = app_url.trim_end_matches('/');
                     let reset_url = format!("{app_url}/reset-password?token={token}");
                     let subject = "Reset your CourtWatch JA password";
-                    let html = format!(
-                        r#"<p>We received a request to reset the password for your CourtWatch JA account.</p>
-<p>Click the link below to set a new password. This link expires in <strong>1 hour</strong>.</p>
-<p><a href="{reset_url}">Reset Password</a></p>
-<p>If you did not request this, you can safely ignore this email — your password will not be changed.</p>"#
+                    let html = crate::notifications::email::render(
+                        "Reset your password",
+                        crate::notifications::email::Accent::Green,
+                        &crate::notifications::email::p("Someone requested a password reset for your CourtWatch JA account. Click the button below to choose a new password."),
+                        &[],
+                        Some(("Reset Password", &reset_url)),
+                        Some("This link expires in 1 hour. If you didn't request this, you can ignore this email and your password will stay the same."),
                     );
                     if let Err(e) = crate::notifications::email::send_email(
                         &client,
@@ -729,11 +735,13 @@ pub async fn update_profile(
                 let app_url = app_url.trim_end_matches('/');
 
                 let verify_url = format!("{app_url}/verify-email?token={token}");
-                let html = format!(
-                    r#"<p>The email address on your CourtWatch JA account was changed to this one.</p>
-<p>Click the link below to verify it:</p>
-<p><a href="{verify_url}">Verify Email Address</a></p>
-<p>This link expires in 24 hours.</p>"#
+                let html = crate::notifications::email::render(
+                    "Verify your new email address",
+                    crate::notifications::email::Accent::Green,
+                    &crate::notifications::email::p("The email address on your CourtWatch JA account was changed to this one. Click the button below to verify it."),
+                    &[],
+                    Some(("Verify Email", &verify_url)),
+                    Some("This link expires in 24 hours."),
                 );
                 if let Err(e) = crate::notifications::email::send_email(
                     &client,
@@ -750,10 +758,18 @@ pub async fn update_profile(
 
                 // Security notice to the OLD address so a hijacked account
                 // can't be silently re-pointed.
-                let notice = format!(
-                    r#"<p>The email address on your CourtWatch JA account was just changed from this address to <strong>{new_to}</strong>.</p>
-<p>If you made this change, no action is needed.</p>
-<p>If you did NOT make this change, your account may be compromised — reset your password immediately at <a href="{app_url}/auth/forgot-password">{app_url}/auth/forgot-password</a>.</p>"#
+                let forgot_url = format!("{app_url}/forgot-password");
+                let notice = crate::notifications::email::render(
+                    "Your email address was changed",
+                    crate::notifications::email::Accent::Gold,
+                    &[
+                        crate::notifications::email::p("The email address on your CourtWatch JA account was just changed away from this address."),
+                        crate::notifications::email::p("If you made this change, no action is needed. If you did NOT make it, your account may be compromised: reset your password right away."),
+                    ]
+                    .concat(),
+                    &[("New address", new_to.clone())],
+                    Some(("Reset Password", &forgot_url)),
+                    None,
                 );
                 if let Err(e) = crate::notifications::email::send_email(
                     &client,

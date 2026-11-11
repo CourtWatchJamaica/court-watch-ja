@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-15 15 1030 1030" role="img" aria-label="CourtWatch JA">
+  <title>CourtWatch JA</title>
+  <defs>
+    <linearGradient id="cwja-gold" gradientUnits="userSpaceOnUse" x1="150" y1="40" x2="850" y2="1030">
+      <stop offset="0" stop-color="#fbe694"/>
+      <stop offset="0.3" stop-color="#edc048"/>
+      <stop offset="0.65" stop-color="#d09a2c"/>
+      <stop offset="1" stop-color="#a97614"/>
+    </linearGradient>
+    <g id="cwja-pan">
+      <path d="M256 300 L160 540 H352 Z" fill="none" stroke="url(#cwja-gold)" stroke-width="36" stroke-linejoin="round"/>
+      <path d="M126 546 H386 A130 116 0 0 1 126 546 Z" fill="url(#cwja-gold)"/>
+    </g>
+  </defs>
+  <g fill="url(#cwja-gold)">
+    <!-- finial -->
+    <circle cx="500" cy="95" r="56"/>
+    <path d="M472 138 H528 V178 Q528 196 548 204 H452 Q472 196 472 178 Z"/>
+    <!-- beam -->
+    <path d="M214 300 Q500 132 786 300" fill="none" stroke="url(#cwja-gold)" stroke-width="46" stroke-linecap="round"/>
+    <circle cx="196" cy="282" r="28"/>
+    <circle cx="804" cy="282" r="28"/>
+    <!-- pans -->
+    <use href="#cwja-pan"/>
+    <use href="#cwja-pan" transform="matrix(-1 0 0 1 1000 0)"/>
+    <!-- pillar -->
+    <path d="M380 296 H620 Q614 326 584 336 H416 Q386 326 380 296 Z"/>
+    <rect x="450" y="354" width="44" height="352" rx="4"/>
+    <rect x="506" y="354" width="44" height="352" rx="4"/>
+    <path d="M404 724 H596 Q622 730 632 772 H368 Q378 730 404 724 Z"/>
+    <path d="M362 790 H638 Q668 796 680 842 H320 Q332 796 362 790 Z"/>
+    <!-- shield -->
+    <path d="M140 650 C160 836 330 962 500 1032 C670 962 840 836 860 650 L824 680 C800 806 664 900 500 900 C336 900 200 806 176 680 Z"/>
+  </g>
+</svg>

@@ -803,7 +803,7 @@ async fn check_and_send_health_alerts(
         .iter()
         .map(|s| {
             format!(
-                r#"<tr><td style="padding:4px 12px 4px 0;font-weight:600">{}</td><td style="padding:4px 12px 4px 0">{}</td><td style="padding:4px 0;color:#6b7280">threshold: {} days</td></tr>"#,
+                r#"<tr><td style="padding:4px 12px 4px 0;font-weight:600">{}</td><td style="padding:4px 12px 4px 0">{}</td><td style="padding:4px 0;color:#9a9aae">threshold: {} days</td></tr>"#,
                 s.source,
                 s.last_data_at
                     .map(|t| t.format("%Y-%m-%d %H:%M").to_string())
@@ -812,14 +812,28 @@ async fn check_and_send_health_alerts(
             )
         })
         .collect();
-    let html = format!(
-        r#"<p>The following scraper source(s) have not produced new rows past their staleness threshold. The court website's markup may have changed, or the source may be unavailable.</p>
-<table style="border-collapse:collapse;margin:16px 0">
-<tr><th style="text-align:left;padding:4px 12px 4px 0;color:#6b7280;font-size:12px">Source</th><th style="text-align:left;padding:4px 12px 4px 0;color:#6b7280;font-size:12px">Last new data</th><th></th></tr>
+    let html = {
+        use crate::notifications::email;
+        let table = format!(
+            r#"<table style="border-collapse:collapse;margin:4px 0 18px;font-size:13px;color:#ededf8">
+<tr><th style="text-align:left;padding:4px 12px 4px 0;color:#9a9aae;font-size:12px">Source</th><th style="text-align:left;padding:4px 12px 4px 0;color:#9a9aae;font-size:12px">Last new data</th><th></th></tr>
 {rows}
-</table>
-<p>See the Health page in the admin dashboard for details.</p>"#
-    );
+</table>"#
+        );
+        let health_url = format!("{}/admin/health", email::app_url());
+        email::render(
+            "Scraper source(s) look stale",
+            email::Accent::Gold,
+            &[
+                email::p("The following scraper source(s) have not produced new rows past their staleness threshold. The court website's markup may have changed, or the source may be unavailable."),
+                table,
+            ]
+            .concat(),
+            &[],
+            Some(("Open Health page", &health_url)),
+            None,
+        )
+    };
 
     match crate::notifications::email::send_email(
         client,
@@ -930,120 +944,135 @@ async fn dispatch_notification_emails(
         };
         let cta_url = cta_url.as_str();
 
+        let event_type = row.event_type.as_deref().unwrap_or("hearing");
+        let court = row.court_division.as_deref().unwrap_or("the Supreme Court");
+        let fmt_date = |fallback: &str| {
+            row.event_date
+                .map(|d| d.format("%A, %d %B %Y").to_string())
+                .unwrap_or_else(|| fallback.to_string())
+        };
+        // Case / Event / Court rows shared by every sitting email.
+        let sitting_details = || {
+            vec![
+                ("Case", case_ref.to_string()),
+                ("Event", event_type.to_string()),
+                ("Court", court.to_string()),
+            ]
+        };
+
         let (subject, html) = match row.notification_type.as_str() {
             "case_available" => {
                 let title = row.title.as_deref().unwrap_or("Case Available");
                 let subj = format!("CourtWatch JA: Judgment available — {case_ref}");
-                let body = format!(
-                    r#"<p>Good news — a judgment for a case you are tracking is now available on CourtWatch JA.</p>
-<table style="border-collapse:collapse;margin:16px 0">
-  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Case</td><td style="padding:4px 0;font-weight:600">{case_ref}</td></tr>
-  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Title</td><td style="padding:4px 0">{title}</td></tr>
-</table>
-<p>{}</p>
-<p style="margin-top:24px"><a href="{cta_url}" style="background:#1d4ed8;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600">View Judgment →</a></p>"#,
-                    row.message.as_deref().unwrap_or("The judgment has been published. Click below to read the full decision.")
+                let msg = row.message.as_deref().unwrap_or(
+                    "The judgment has been published. Click below to read the full decision.",
+                );
+                let body = email::render(
+                    "Judgment available",
+                    email::Accent::Green,
+                    &[
+                        email::p("A judgment for a case you are tracking is now available on CourtWatch JA."),
+                        email::p(&email::esc(msg)),
+                    ]
+                    .concat(),
+                    &[("Case", case_ref.to_string()), ("Title", title.to_string())],
+                    Some(("View Judgment", cta_url)),
+                    None,
                 );
                 (subj, body)
             }
             "case_listed" => {
-                let event_type = row.event_type.as_deref().unwrap_or("hearing");
-                let court = row.court_division.as_deref().unwrap_or("the Supreme Court");
-                let date_str = row.event_date
-                    .map(|d| d.format("%A, %d %B %Y").to_string())
-                    .unwrap_or_else(|| "an upcoming date".into());
                 let subj = format!("CourtWatch JA: {case_ref} has been listed");
-                let body = format!(
-                    r#"<p>A case you are tracking has been listed for a {event_type}.</p>
-<table style="border-collapse:collapse;margin:16px 0">
-  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Case</td><td style="padding:4px 0;font-weight:600">{case_ref}</td></tr>
-  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Event</td><td style="padding:4px 0">{event_type}</td></tr>
-  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Court</td><td style="padding:4px 0">{court}</td></tr>
-  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="padding:4px 0">{date_str}</td></tr>
-</table>
-<p style="margin-top:24px"><a href="{cta_url}" style="background:#1d4ed8;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600">View on CourtWatch JA →</a></p>"#
+                let mut details = sitting_details();
+                details.push(("Date", fmt_date("an upcoming date")));
+                let body = email::render(
+                    "Case listed",
+                    email::Accent::Green,
+                    &email::p(&format!(
+                        "A case you are tracking has been listed for a {}.",
+                        email::esc(event_type)
+                    )),
+                    &details,
+                    Some(("View Case", cta_url)),
+                    None,
                 );
                 (subj, body)
             }
             "sitting_changed" => {
-                let event_type = row.event_type.as_deref().unwrap_or("hearing");
-                let court = row.court_division.as_deref().unwrap_or("the Supreme Court");
-                let date_str = row.event_date
-                    .map(|d| d.format("%A, %d %B %Y").to_string())
-                    .unwrap_or_else(|| "to be announced".into());
                 let time_str = row.event_time
                     .map(|t| t.format("%-I:%M %p").to_string())
                     .unwrap_or_else(|| "to be announced".into());
                 let subj = format!("CourtWatch JA: {case_ref} has been rescheduled");
-                let body = format!(
-                    r#"<p>The date or time of a case you are tracking has changed on the court list.</p>
-<table style="border-collapse:collapse;margin:16px 0">
-  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Case</td><td style="padding:4px 0;font-weight:600">{case_ref}</td></tr>
-  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Event</td><td style="padding:4px 0">{event_type}</td></tr>
-  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Court</td><td style="padding:4px 0">{court}</td></tr>
-  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">New date</td><td style="padding:4px 0">{date_str}</td></tr>
-  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">New time</td><td style="padding:4px 0">{time_str}</td></tr>
-</table>
-<p style="margin-top:24px"><a href="{cta_url}" style="background:#1d4ed8;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600">View on CourtWatch JA →</a></p>"#
+                let mut details = sitting_details();
+                details.push(("New date", fmt_date("to be announced")));
+                details.push(("New time", time_str));
+                let body = email::render(
+                    "Hearing rescheduled",
+                    email::Accent::Gold,
+                    &email::p("The date or time of a case you are tracking has changed on the court list."),
+                    &details,
+                    Some(("View Case", cta_url)),
+                    None,
                 );
                 (subj, body)
             }
             "sitting_reminder_1d" => {
-                let event_type = row.event_type.as_deref().unwrap_or("hearing");
-                let court = row.court_division.as_deref().unwrap_or("the Supreme Court");
-                let date_str = row.event_date
-                    .map(|d| d.format("%A, %d %B %Y").to_string())
-                    .unwrap_or_else(|| "tomorrow".into());
                 let subj = format!("CourtWatch JA: Reminder — {case_ref} is tomorrow");
-                let body = format!(
-                    r#"<p>This is a reminder that a case you are tracking is scheduled for tomorrow.</p>
-<table style="border-collapse:collapse;margin:16px 0">
-  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Case</td><td style="padding:4px 0;font-weight:600">{case_ref}</td></tr>
-  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Event</td><td style="padding:4px 0">{event_type}</td></tr>
-  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Court</td><td style="padding:4px 0">{court}</td></tr>
-  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="padding:4px 0">{date_str}</td></tr>
-</table>
-<p style="margin-top:24px"><a href="{cta_url}" style="background:#1d4ed8;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600">View on CourtWatch JA →</a></p>"#
+                let mut details = sitting_details();
+                details.push(("Date", fmt_date("tomorrow")));
+                let body = email::render(
+                    "Hearing Tomorrow",
+                    email::Accent::Gold,
+                    &email::p("Your tracked case is scheduled for tomorrow."),
+                    &details,
+                    Some(("View Case", cta_url)),
+                    None,
                 );
                 (subj, body)
             }
             "sitting_reminder_morning" => {
-                let event_type = row.event_type.as_deref().unwrap_or("hearing");
-                let court = row.court_division.as_deref().unwrap_or("the Supreme Court");
-                let date_str = row.event_date
-                    .map(|d| d.format("%A, %d %B %Y").to_string())
-                    .unwrap_or_else(|| "today".into());
                 let subj = format!("CourtWatch JA: {case_ref} is today");
-                let body = format!(
-                    r#"<p>A case you are tracking is scheduled for today.</p>
-<table style="border-collapse:collapse;margin:16px 0">
-  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Case</td><td style="padding:4px 0;font-weight:600">{case_ref}</td></tr>
-  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Event</td><td style="padding:4px 0">{event_type}</td></tr>
-  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Court</td><td style="padding:4px 0">{court}</td></tr>
-  <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="padding:4px 0">{date_str}</td></tr>
-</table>
-<p style="margin-top:24px"><a href="{cta_url}" style="background:#1d4ed8;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600">View on CourtWatch JA →</a></p>"#
+                let mut details = sitting_details();
+                details.push(("Date", fmt_date("today")));
+                let body = email::render(
+                    "Hearing Today",
+                    email::Accent::Green,
+                    &email::p("Your tracked case is scheduled for today."),
+                    &details,
+                    Some(("View Case", cta_url)),
+                    None,
                 );
                 (subj, body)
             }
             "scan_complete" => {
                 let title = row.title.as_deref().unwrap_or("Court scan complete");
                 let subj = format!("CourtWatch JA: {title}");
-                let body = format!(
-                    r#"<p>{}</p>
-<p style="color:#6b7280;font-size:14px">You are receiving this because Scan Alerts is turned on in your notification settings. Turn it off there if you only want to hear about changes to your cases.</p>
-<p style="margin-top:24px"><a href="{cta_url}" style="background:#1d4ed8;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600">View on CourtWatch JA →</a></p>"#,
-                    row.message.as_deref().unwrap_or("Your tracked cases were checked against the latest court lists and judgments.")
+                let msg = row.message.as_deref().unwrap_or(
+                    "Your tracked cases were checked against the latest court lists and judgments.",
+                );
+                let body = email::render(
+                    title,
+                    email::Accent::Green,
+                    &email::p(&email::esc(msg)),
+                    &[],
+                    Some(("View on CourtWatch JA", cta_url)),
+                    Some("You are receiving this because Scan Alerts is turned on in your notification settings. Turn it off there if you only want to hear about changes to your cases."),
                 );
                 (subj, body)
             }
             "parish_status_changed" => {
                 let title = row.title.as_deref().unwrap_or("Case Status Updated");
                 let subj = format!("CourtWatch JA: {title}");
-                let body = format!(
-                    r#"<p>{}</p>
-<p style="margin-top:24px"><a href="{cta_url}" style="background:#1d4ed8;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600">View Case →</a></p>"#,
-                    row.message.as_deref().unwrap_or("A case you are tracking in Parish Court has a status update.")
+                let msg = row.message.as_deref().unwrap_or(
+                    "A case you are tracking in Parish Court has a status update.",
+                );
+                let body = email::render(
+                    title,
+                    email::Accent::Green,
+                    &email::p(&email::esc(msg)),
+                    &[],
+                    Some(("View Case", cta_url)),
+                    None,
                 );
                 (subj, body)
             }

@@ -29,6 +29,7 @@ interface FormState {
   message: string;
   url: string;
   url_text: string;
+  image_url: string;
   display_frequency: string;
   starts_at: string;
   ends_at: string;
@@ -40,6 +41,7 @@ const EMPTY: FormState = {
   message: "",
   url: "",
   url_text: "",
+  image_url: "",
   display_frequency: "once",
   starts_at: "",
   ends_at: "",
@@ -56,6 +58,7 @@ function promoToForm(p: Promo): FormState {
     message: p.message,
     url: p.url ?? "",
     url_text: p.url_text ?? "",
+    image_url: p.image_url ?? "",
     display_frequency: p.display_frequency,
     starts_at: toLocal(p.starts_at),
     ends_at: toLocal(p.ends_at),
@@ -115,6 +118,7 @@ export default function AdminPromosPage() {
       message: form.message.trim(),
       url: form.url.trim() || undefined,
       url_text: form.url_text.trim() || undefined,
+      image_url: form.image_url.trim() || undefined,
       display_frequency: form.display_frequency,
       starts_at: form.starts_at || undefined,
       ends_at: form.ends_at || undefined,
@@ -235,6 +239,35 @@ export default function AdminPromosPage() {
                 maxLength={40}
               />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70 mb-1.5">
+              Image Link
+            </label>
+            <input
+              className={inputCls}
+              type="url"
+              inputMode="url"
+              value={form.image_url}
+              onChange={(e) => set("image_url", e.target.value)}
+              placeholder="https://… (optional banner shown at the top of the popup)"
+              maxLength={2048}
+            />
+            <p className="mt-1 text-[10px] text-white/50">
+              Paste the address of an image that is already online. It must
+              start with https://. A wide image (about 2:1) works best.
+            </p>
+            {form.image_url.trim().startsWith("https://") && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={form.image_url.trim()}
+                src={form.image_url.trim()}
+                alt="Promo image preview"
+                referrerPolicy="no-referrer"
+                className="mt-2 max-h-40 w-full rounded-lg border border-white/[0.07] object-cover"
+              />
+            )}
           </div>
 
           <div>
@@ -391,6 +424,11 @@ export default function AdminPromosPage() {
                       <span className="shrink-0 rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] text-white/70">
                         {p.display_frequency}
                       </span>
+                      {p.image_url && (
+                        <span className="shrink-0 rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] text-white/70">
+                          image
+                        </span>
+                      )}
                     </div>
                     <p className="mt-1 text-xs text-white/45 line-clamp-2">
                       {p.message}

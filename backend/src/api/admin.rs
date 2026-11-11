@@ -645,6 +645,8 @@ pub struct AnnounceBody {
     pub title: String,
     pub message: String,
     pub promo: Option<bool>,
+    /// Optional banner image for the email (public https URL).
+    pub image_url: Option<String>,
 }
 
 pub async fn announce(
@@ -657,6 +659,8 @@ pub async fn announce(
     if body.message.trim().is_empty() {
         return Err(AppError::BadRequest("Message is required".into()));
     }
+    // Validate before anything is sent so a bad link can't half-deliver.
+    let image_url = crate::api::promos::clean_image_url(body.image_url.as_deref())?;
     let user_count = queries::admin_announce(&state.db, &body.title, &body.message).await?;
     if body.promo.unwrap_or(false) {
         if let Some(api_key) = state.config.resend_api_key.clone() {
@@ -664,7 +668,7 @@ pub async fn announce(
             let subject = body.title.clone();
             let message = body.message.clone();
             tokio::spawn(async move {
-                send_broadcast(&pool, &api_key, &subject, &message).await;
+                send_broadcast(&pool, &api_key, &subject, &message, image_url.as_deref()).await;
             });
         } else {
             tracing::warn!("[Broadcast] RESEND_API_KEY not set — email broadcast skipped (in-app notifications were still sent)");
@@ -673,7 +677,13 @@ pub async fn announce(
     Ok(Json(json!({ "sent": true, "user_count": user_count })))
 }
 
-async fn send_broadcast(pool: &PgPool, api_key: &str, subject: &str, message: &str) {
+async fn send_broadcast(
+    pool: &PgPool,
+    api_key: &str,
+    subject: &str,
+    message: &str,
+    image_url: Option<&str>,
+) {
     let emails = match queries::get_all_verified_emails(pool).await {
         Ok(e) => e,
         Err(err) => {
@@ -690,7 +700,7 @@ async fn send_broadcast(pool: &PgPool, api_key: &str, subject: &str, message: &s
         return;
     }
 
-    let html = format_broadcast_html(subject, message);
+    let html = format_broadcast_html(subject, message, image_url);
     let client = reqwest::Client::new();
     let mut sent: i32 = 0;
 
@@ -723,25 +733,19 @@ async fn send_broadcast(pool: &PgPool, api_key: &str, subject: &str, message: &s
     tracing::info!("[Broadcast] Done — {sent}/{total} emails delivered");
 }
 
-fn format_broadcast_html(title: &str, message: &str) -> String {
-    let app_url = std::env::var("APP_URL")
-        .unwrap_or_else(|_| "https://courtwatchjamaica.com".into());
-    let app_url_trimmed = app_url.trim_end_matches('/');
-    let title = html_escape(title);
+fn format_broadcast_html(title: &str, message: &str, image_url: Option<&str>) -> String {
+    use crate::notifications::email;
+    let app_url = email::app_url();
+    // Escaped here; newlines in the admin's message become line breaks.
     let message_html = html_escape(message).replace('\n', "<br>");
-    format!(
-        r#"<!DOCTYPE html>
-<html>
-<body style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#111;padding:24px 16px;">
-  <p style="font-size:15px;font-weight:700;margin:0 0 12px;">{title}</p>
-  <p style="font-size:14px;line-height:1.6;margin:0 0 24px;">{message_html}</p>
-  <p><a href="{app_url_trimmed}" style="color:#009B3A;font-weight:600;">Visit CourtWatch JA →</a></p>
-  <hr style="margin:32px 0;border:none;border-top:1px solid #eee;">
-  <p style="font-size:11px;color:#999;">
-    You're receiving this because you registered at courtwatchjamaica.com.
-  </p>
-</body>
-</html>"#
+    email::render_with_image(
+        title,
+        email::Accent::Green,
+        image_url,
+        &email::p(&message_html),
+        &[],
+        Some(("Visit CourtWatch JA", &app_url)),
+        Some("You're receiving this because you registered at courtwatchjamaica.com."),
     )
 }
 

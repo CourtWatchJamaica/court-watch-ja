@@ -340,6 +340,8 @@ export interface Promo {
   message: string;
   url: string | null;
   url_text: string | null;
+  /** Optional banner image (public https URL). */
+  image_url: string | null;
   display_frequency: "once" | "daily" | "weekly" | "every_session";
   starts_at: string | null;
   ends_at: string | null;

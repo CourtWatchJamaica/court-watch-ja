@@ -281,6 +281,8 @@ pub struct Promo {
     pub message: String,
     pub url: Option<String>,
     pub url_text: Option<String>,
+    /// Optional banner image (public https URL).
+    pub image_url: Option<String>,
     pub display_frequency: String,
     pub starts_at: Option<NaiveDateTime>,
     pub ends_at: Option<NaiveDateTime>,

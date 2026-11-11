@@ -3870,7 +3870,7 @@ fn parse_dt(s: &str) -> Option<NaiveDateTime> {
 
 pub async fn get_active_promo(pool: &PgPool, user_id: Option<i32>) -> sqlx::Result<Option<Promo>> {
     sqlx::query_as::<_, Promo>(
-        r#"SELECT id, title, message, url, url_text, display_frequency, starts_at, ends_at, enabled, created_at
+        r#"SELECT id, title, message, url, url_text, image_url, display_frequency, starts_at, ends_at, enabled, created_at
            FROM promos
            WHERE enabled = true
              AND (starts_at IS NULL OR starts_at <= NOW())
@@ -3912,7 +3912,7 @@ pub async fn dismiss_promo(pool: &PgPool, user_id: i32, promo_id: i32) -> sqlx::
 
 pub async fn admin_list_promos(pool: &PgPool) -> sqlx::Result<Vec<Promo>> {
     sqlx::query_as::<_, Promo>(
-        "SELECT id, title, message, url, url_text, display_frequency, starts_at, ends_at, enabled, created_at
+        "SELECT id, title, message, url, url_text, image_url, display_frequency, starts_at, ends_at, enabled, created_at
          FROM promos ORDER BY created_at DESC",
     )
     .fetch_all(pool)
@@ -3924,6 +3924,7 @@ pub struct PromoInput<'a> {
     pub message: &'a str,
     pub url: Option<&'a str>,
     pub url_text: Option<&'a str>,
+    pub image_url: Option<&'a str>,
     pub display_frequency: &'a str,
     pub starts_at: Option<NaiveDateTime>,
     pub ends_at: Option<NaiveDateTime>,
@@ -3932,9 +3933,9 @@ pub struct PromoInput<'a> {
 
 pub async fn admin_create_promo(pool: &PgPool, input: PromoInput<'_>) -> sqlx::Result<Promo> {
     sqlx::query_as::<_, Promo>(
-        "INSERT INTO promos (title, message, url, url_text, display_frequency, starts_at, ends_at, enabled)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-         RETURNING id, title, message, url, url_text, display_frequency, starts_at, ends_at, enabled, created_at",
+        "INSERT INTO promos (title, message, url, url_text, display_frequency, starts_at, ends_at, enabled, image_url)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         RETURNING id, title, message, url, url_text, image_url, display_frequency, starts_at, ends_at, enabled, created_at",
     )
     .bind(input.title)
     .bind(input.message)
@@ -3944,6 +3945,7 @@ pub async fn admin_create_promo(pool: &PgPool, input: PromoInput<'_>) -> sqlx::R
     .bind(input.starts_at)
     .bind(input.ends_at)
     .bind(input.enabled)
+    .bind(input.image_url)
     .fetch_one(pool)
     .await
 }
@@ -3951,9 +3953,9 @@ pub async fn admin_create_promo(pool: &PgPool, input: PromoInput<'_>) -> sqlx::R
 pub async fn admin_update_promo(pool: &PgPool, id: i32, input: PromoInput<'_>) -> sqlx::Result<Option<Promo>> {
     sqlx::query_as::<_, Promo>(
         "UPDATE promos SET title=$1, message=$2, url=$3, url_text=$4, display_frequency=$5,
-         starts_at=$6, ends_at=$7, enabled=$8
+         starts_at=$6, ends_at=$7, enabled=$8, image_url=$10
          WHERE id=$9
-         RETURNING id, title, message, url, url_text, display_frequency, starts_at, ends_at, enabled, created_at",
+         RETURNING id, title, message, url, url_text, image_url, display_frequency, starts_at, ends_at, enabled, created_at",
     )
     .bind(input.title)
     .bind(input.message)
@@ -3964,6 +3966,7 @@ pub async fn admin_update_promo(pool: &PgPool, id: i32, input: PromoInput<'_>) -
     .bind(input.ends_at)
     .bind(input.enabled)
     .bind(id)
+    .bind(input.image_url)
     .fetch_optional(pool)
     .await
 }
@@ -4657,6 +4660,43 @@ mod judge_dedupe_tests {
 
         super::admin_delete_user(&pool, u.id).await.unwrap();
         super::admin_delete_user(&pool, w.id).await.unwrap();
+    }
+
+    /// Promo image link round-trips through create / update / list.
+    /// Creates and removes its own throwaway promo (disabled, so it is never shown).
+    ///   DATABASE_URL=… cargo test promo_image_url_round_trip -- --ignored
+    #[tokio::test]
+    #[ignore]
+    async fn promo_image_url_round_trip_against_database() {
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL not set");
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .max_connections(2)
+            .connect(&url)
+            .await
+            .expect("db connect");
+        let input = |image_url| super::PromoInput {
+            title: "image test",
+            message: "m",
+            url: None,
+            url_text: None,
+            image_url,
+            display_frequency: "once",
+            starts_at: None,
+            ends_at: None,
+            enabled: false,
+        };
+        let created = super::admin_create_promo(&pool, input(Some("https://cdn.example.com/a.png")))
+            .await
+            .expect("create");
+        assert_eq!(created.image_url.as_deref(), Some("https://cdn.example.com/a.png"));
+        let listed = super::admin_list_promos(&pool).await.expect("list");
+        assert!(listed.iter().any(|p| p.id == created.id && p.image_url.is_some()));
+        let cleared = super::admin_update_promo(&pool, created.id, input(None))
+            .await
+            .expect("update")
+            .expect("row");
+        assert_eq!(cleared.image_url, None);
+        assert!(super::admin_delete_promo(&pool, created.id).await.expect("delete"));
     }
 
     /// Dry run against a live database: prints the merge plan without

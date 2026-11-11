@@ -36,9 +36,12 @@ export const metadata: Metadata = {
   keywords:
     "Jamaica court, Supreme Court, Court of Appeal, judgment, case tracker, Parish Court, legal research, Jamaican law",
   icons: {
-    icon: [{ url: "/icons/higher-court.svg", type: "image/svg+xml" }],
-    shortcut: ["/icons/higher-court.svg"],
-    apple: [{ url: "/icons/higher-court.svg" }],
+    icon: [
+      { url: "/brand/logo.svg", type: "image/svg+xml" },
+      { url: "/brand/icon-192.png", type: "image/png", sizes: "192x192" },
+    ],
+    shortcut: ["/brand/logo.svg"],
+    apple: [{ url: "/brand/apple-touch-icon.png", sizes: "180x180" }],
   },
   openGraph: {
     title: "CourtWatch JA — Free Jamaican Court Case Tracker",

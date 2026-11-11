@@ -8,6 +8,7 @@ export default function AdminAnnouncePage() {
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const [promo, setPromo] = useState(false);
+  const [imageUrl, setImageUrl] = useState("");
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{
     sent: boolean;
@@ -23,10 +24,16 @@ export default function AdminAnnouncePage() {
     setResult(null);
 
     try {
-      const res = await apiClient.adminAnnounce(title.trim(), message.trim(), promo);
+      const res = await apiClient.adminAnnounce(
+        title.trim(),
+        message.trim(),
+        promo,
+        promo ? imageUrl.trim() : undefined,
+      );
       setResult(res);
       setTitle("");
       setMessage("");
+      setImageUrl("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to send announcement");
     } finally {
@@ -113,6 +120,39 @@ export default function AdminAnnouncePage() {
             </span>
           </div>
         </label>
+
+        {/* Email banner image — only used when the email option is on */}
+        {promo && (
+          <div>
+            <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70 mb-1.5">
+              Email Image Link
+            </label>
+            <input
+              className={inputCls}
+              type="url"
+              inputMode="url"
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              placeholder="https://… (optional banner at the top of the email)"
+              maxLength={2048}
+            />
+            <p className="mt-1 text-[10px] text-white/50">
+              Paste the address of an image that is already online. It must
+              start with https://. The image appears in the email only, not
+              in the in-app notification.
+            </p>
+            {imageUrl.trim().startsWith("https://") && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={imageUrl.trim()}
+                src={imageUrl.trim()}
+                alt="Email image preview"
+                referrerPolicy="no-referrer"
+                className="mt-2 max-h-40 w-full rounded-lg border border-white/[0.07] object-cover"
+              />
+            )}
+          </div>
+        )}
 
         {error && (
           <div className="rounded-xl bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-400">

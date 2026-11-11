@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import BrandLogo from "@/components/BrandLogo";
 import AdminGuard from "@/components/AdminGuard";
 import {
   Scale,
@@ -57,9 +58,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <aside className="hidden md:flex w-56 shrink-0 flex-col border-r border-white/[0.06] bg-[#0e0e1a]">
           {/* Logo */}
           <div className="flex items-center gap-2.5 px-5 py-5 border-b border-white/[0.06]">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#009B3A]/20">
-              <Scale className="h-4 w-4 text-[#009B3A]" />
-            </div>
+            <BrandLogo size={28} className="h-7 w-7 shrink-0" />
             <div>
               <p className="text-[11px] font-bold text-white leading-none">CourtWatch JA</p>
               <p className="text-[9px] text-[#FED100] font-semibold mt-0.5 uppercase tracking-widest">
@@ -111,7 +110,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Mobile top bar */}
         <div className="md:hidden fixed inset-x-0 top-0 z-50 flex items-center gap-3 border-b border-white/[0.06] bg-[#0e0e1a] px-4 py-3">
-          <Scale className="h-4 w-4 text-[#009B3A]" />
+          <BrandLogo size={20} className="h-5 w-5 shrink-0" />
           <span className="text-sm font-bold text-white">Admin</span>
           <div className="flex-1" />
           {NAV.slice(1).map(({ href, label, icon: Icon }) => (

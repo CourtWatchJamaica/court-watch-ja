@@ -1,4 +1,5 @@
 import { ImageResponse } from "next/og";
+import { OG_LOGO_DATA_URI } from "./og-logo";
 
 export const runtime = "edge";
 export const alt = "CourtWatch JA — Jamaican Legal Case Tracker";
@@ -30,7 +31,7 @@ export default function Image() {
             marginBottom: 40,
           }}
         >
-          <span style={{ fontSize: 30 }}>⚖️</span>
+          <img src={OG_LOGO_DATA_URI} width={64} height={64} alt="" />
           <span
             style={{
               fontSize: 26,

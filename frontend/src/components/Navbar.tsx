@@ -20,6 +20,7 @@ import {
   Scale,
 } from "lucide-react";
 import { HigherCourtIcon, CourtroomIcon } from "@/components/icons";
+import BrandLogo from "@/components/BrandLogo";
 import { Button } from "@/components/ui/button";
 import ThemeToggle from "@/components/ThemeToggle";
 import ServiceAlertBanner from "@/components/ServiceAlertBanner";
@@ -125,7 +126,8 @@ export default function Navbar() {
 
             {/* Logo + Court Tabs */}
             <div className="flex items-center gap-4 shrink-0 min-w-0">
-              <Link href="/" className="shrink-0 group">
+              <Link href="/" className="shrink-0 group flex items-center gap-2">
+                <BrandLogo size={28} priority className="h-7 w-7 shrink-0" />
                 <span className="font-heading font-bold text-[17px] tracking-tight whitespace-nowrap">
                   <span className="text-foreground group-hover:text-foreground transition-colors duration-150">Court</span><span className="text-primary">Watch</span><sup className="text-[10px] font-semibold text-accent ml-0.5 tracking-wide">JA</sup>
                 </span>

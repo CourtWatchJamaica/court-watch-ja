@@ -5,6 +5,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
+import BrandLogo from "@/components/BrandLogo";
 import Link from "next/link";
 import {
   ArrowUpRight,
@@ -190,7 +191,7 @@ export default function GlassLanding() {
         {/* ── Floating pill nav ── */}
         <nav className={s.nav} aria-label="Main">
           <span className={s.brand}>
-            <Scale className="h-5 w-5" />
+            <BrandLogo size={26} priority className="h-[26px] w-[26px] shrink-0" />
             CourtWatch JA
           </span>
           <div className={s.navLinks}>
@@ -351,7 +352,7 @@ export default function GlassLanding() {
         {/* ── Footer ── */}
         <footer className={cx(s.glassCard, s.foot)}>
           <span className={s.footBrand}>
-            <Scale className="h-4 w-4" />
+            <BrandLogo size={18} className="h-[18px] w-[18px] shrink-0" />
             © 2026 CourtWatch JA. Made in Jamaica.
           </span>
           <nav className={s.footLinks}>

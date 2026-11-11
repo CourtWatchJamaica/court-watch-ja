@@ -766,6 +766,7 @@ export const apiClient = {
     message: string;
     url?: string;
     url_text?: string;
+    image_url?: string;
     display_frequency?: string;
     starts_at?: string;
     ends_at?: string;
@@ -784,6 +785,7 @@ export const apiClient = {
       message: string;
       url?: string;
       url_text?: string;
+      image_url?: string;
       display_frequency?: string;
       starts_at?: string;
       ends_at?: string;
@@ -801,10 +803,15 @@ export const apiClient = {
   },
 
   // ── Admin: Announce ───────────────────────────────────────────────────────
-  async adminAnnounce(title: string, message: string, promo = false): Promise<{ sent: boolean; user_count: number }> {
+  async adminAnnounce(
+    title: string,
+    message: string,
+    promo = false,
+    imageUrl?: string,
+  ): Promise<{ sent: boolean; user_count: number }> {
     return request("/admin/announce", {
       method: "POST",
-      body: JSON.stringify({ title, message, promo }),
+      body: JSON.stringify({ title, message, promo, image_url: imageUrl || undefined }),
     });
   },
 

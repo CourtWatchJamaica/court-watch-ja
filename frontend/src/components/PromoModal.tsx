@@ -9,6 +9,7 @@ import { isLoggedIn } from "@/lib/session";
 export default function PromoModal() {
   const [promo, setPromo] = useState<Promo | null>(null);
   const [visible, setVisible] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
 
   useEffect(() => {
     if (!isLoggedIn()) return;
@@ -51,14 +52,28 @@ export default function PromoModal() {
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={handleDismiss}
       />
-      <div className="relative w-full max-w-md rounded-lg border border-white/[0.08] bg-[#0e0e1a] shadow-2xl p-6">
+      <div className="relative w-full max-w-md overflow-hidden rounded-lg border border-white/[0.08] bg-[#0e0e1a] shadow-2xl p-6">
         <button
           onClick={handleDismiss}
           aria-label="Dismiss"
-          className="absolute top-4 right-4 flex h-7 w-7 items-center justify-center rounded-full bg-white/[0.06] text-white/70 hover:bg-white/[0.12] hover:text-white/70 transition-colors"
+          className="absolute top-4 right-4 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-white/80 hover:bg-black/70 hover:text-white transition-colors"
         >
           <X className="h-3.5 w-3.5" />
         </button>
+
+        {promo.image_url && !imageFailed && (
+          // Admin-supplied remote image: a plain <img> avoids having to
+          // allow-list every possible host for next/image.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={promo.image_url}
+            alt=""
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            onError={() => setImageFailed(true)}
+            className="-mx-6 -mt-6 mb-5 block max-h-56 w-[calc(100%+3rem)] max-w-none object-cover"
+          />
+        )}
 
         <div className="flex items-start gap-3 pr-8">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[#009B3A]/15">
